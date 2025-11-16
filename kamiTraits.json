@@ -89780,5 +89780,166 @@
         "color": "Yellow",
         "face": "Drip",
         "hand": "Plant"
+    },
+    "12827": {
+        "background": "Blue-Grey",
+        "body": "Shrimp",
+        "color": "Green",
+        "face": "Disapproval",
+        "hand": "Scorpion"
+    },
+    "12828": {
+        "background": "Blue",
+        "body": "Drip",
+        "color": "Red",
+        "face": "O_o",
+        "hand": "Spectral"
+    },
+    "12829": {
+        "background": "Yellow",
+        "body": "Battery",
+        "color": "Red",
+        "face": "Jiangshi Hat",
+        "hand": "Beetle"
+    },
+    "12830": {
+        "background": "Rust",
+        "body": "Ghost",
+        "color": "Lime Green",
+        "face": "Jiangshi Hat",
+        "hand": "Spectral"
+    },
+    "12831": {
+        "background": "Blue-Grey",
+        "body": "Ghost",
+        "color": "Orange",
+        "face": "O_o",
+        "hand": "Beetle"
+    },
+    "12832": {
+        "background": "Mustard",
+        "body": "Plant",
+        "color": "Red",
+        "face": "v_v",
+        "hand": "Melted"
+    },
+    "12833": {
+        "background": "Default Green",
+        "body": "Plant",
+        "color": "Yellow",
+        "face": "Third Eye",
+        "hand": "Scorpion"
+    },
+    "12834": {
+        "background": "Alt Green",
+        "body": "Shrimp",
+        "color": "Blue",
+        "face": ".w.",
+        "hand": "Spinning Coins"
+    },
+    "12835": {
+        "background": "Blue",
+        "body": "Tube",
+        "color": "Grey",
+        "face": "v_v",
+        "hand": "Beetle"
+    },
+    "12836": {
+        "background": "Orange",
+        "body": "Lightbulb",
+        "color": "Green",
+        "face": "n_n",
+        "hand": "Eyeballs"
+    },
+    "12837": {
+        "background": "Blue-Grey",
+        "body": "Orb",
+        "color": "Orange",
+        "face": ".w.",
+        "hand": "Spectral"
+    },
+    "12838": {
+        "background": "Blue-Grey",
+        "body": "Shrimp",
+        "color": "White",
+        "face": "o_o",
+        "hand": "Wrenches"
+    },
+    "12839": {
+        "background": "Blue",
+        "body": "Caterpillar",
+        "color": "Green",
+        "face": "Concerned",
+        "hand": "Paws"
+    },
+    "12840": {
+        "background": "Blue",
+        "body": "Octopus",
+        "color": "Green",
+        "face": "v_v",
+        "hand": "Mudra"
+    },
+    "12841": {
+        "background": "Default Green",
+        "body": "Orb",
+        "color": "Pink",
+        "face": ".w.",
+        "hand": "UFO Catcher"
+    },
+    "12842": {
+        "background": "Mustard",
+        "body": "Ant",
+        "color": "Green",
+        "face": "Concerned",
+        "hand": "Beetle"
+    },
+    "12843": {
+        "background": "GOB",
+        "body": "Ant",
+        "color": "Blue",
+        "face": "._.",
+        "hand": "Toasters"
+    },
+    "12844": {
+        "background": "Pink",
+        "body": "Drip",
+        "color": "Blue",
+        "face": "Serious Teddy",
+        "hand": "Tentacles"
+    },
+    "12845": {
+        "background": "Hot Pink",
+        "body": "Shrimp",
+        "color": "Blue",
+        "face": "Sideeye",
+        "hand": "Scorpion"
+    },
+    "12846": {
+        "background": "Blue-Grey",
+        "body": "Amphora",
+        "color": "Blue",
+        "face": "Ou0",
+        "hand": "Mole Cricket"
+    },
+    "12847": {
+        "background": "Default Green",
+        "body": "Plant",
+        "color": "Lime Green",
+        "face": "^-^",
+        "hand": "Melted"
+    },
+    "12848": {
+        "background": "Alt Green",
+        "body": "Octopus",
+        "color": "Yellow",
+        "face": "Sated",
+        "hand": "Spectral"
+    },
+    "12849": {
+        "background": "Graveyard",
+        "body": "Eyes",
+        "color": "White",
+        "face": "o_o",
+        "hand": "Melted"
     }
 }
