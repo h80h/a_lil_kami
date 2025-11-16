@@ -157,6 +157,7 @@ function createFilterControls() {
         searchInput.type = 'text';
         searchInput.className = 'trait-search';
         searchInput.placeholder = `Search ${traitType}...`;
+        searchInput.autocomplete = `off`;
         searchInput.dataset.traitType = traitType;
         filterGroup.appendChild(searchInput);
         
