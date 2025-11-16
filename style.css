@@ -24,6 +24,8 @@ body {
   left: 50%;
   transform: translate(-50%, -50%) scale(0.7);
   z-index: 9999;
+  transition: opacity 0.3s ease;
+  opacity: 1;
 }
 
 @media (max-width: 640px) {
@@ -37,6 +39,8 @@ body {
     margin: 0 auto;
     padding: 30px;
     border-radius: 15px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
 }
 
 h2 {
@@ -349,6 +353,30 @@ button {
   font-style: italic;
 }
 
+/* Count header styling */
+.count-header {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 15px;
+  font-size: 1.1em;
+  font-weight: bold;
+  color: #667eea;
+  background: #f0f4ff;
+  border-radius: 8px;
+  border: 2px solid #999;
+  margin-bottom: 10px;
+}
+
+/* Loading indicator */
+.loading-indicator {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 20px;
+  color: #667eea;
+  font-size: 12px;
+  font-style: italic;
+}
+
 #results {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
@@ -373,8 +401,8 @@ button {
   border-radius: 5px;
   border: 2px solid #333;
   margin-bottom: 5px;
-  color: transparent; /* Hides the alt text */
-  font-size: 0; /* Additional hiding */
+  color: transparent;
+  font-size: 0;
 }
 
 .nft-id {
