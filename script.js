@@ -8,6 +8,7 @@ let traitCounts = {}; // Store trait occurrence counts
 let nftRarityScores = {}; // Store calculated rarity scores for each NFT
 let currentSortOrder = 'latest'; // 'latest', 'oldest', 'rarity'
 let isFiltering = false; // Track if filter is active
+let nftObserver = null; // NEW: Global variable to manage the Intersection Observer
 const INITIAL_LOAD_COUNT = 50; // Load first 50 NFTs
 const LAZY_LOAD_COUNT = 30; // Load 30 more when scrolling
 let isLoading = false; // Prevent multiple simultaneous loads
@@ -143,7 +144,7 @@ async function loadData() {
         
         const traitsResponse = await fetch('kamiTraits.json');
         if (!traitsResponse.ok) {
-            throw new Error(`Failed to load kamiTraits.json: ${traitsResponse.status}`);
+            throw new Error(`Failed to load kamiTraits.json: ${imagesResponse.status}`);
         }
         
         imagesData = await imagesResponse.json();
@@ -179,10 +180,13 @@ async function loadData() {
     }
 }
 
-// Load initial batch of NFTs
+// Lines 218-220
 function loadInitialNFTs() {
     const resultsDiv = document.getElementById('results');
-    resultsDiv.innerHTML = '';
+    
+    // Optimization: Use textContent = '' for fast clearing
+    resultsDiv.textContent = ''; 
+    
     
     // Determine which IDs to display
     const idsToDisplay = isFiltering ? filteredNFTIds : allNFTIds;
@@ -256,7 +260,13 @@ function updateLoadingIndicator() {
 
 // Setup infinite scroll
 function setupInfiniteScroll() {
-    const observer = new IntersectionObserver((entries) => {
+    // Optimization: Disconnect the previous observer if it exists
+    if (nftObserver) {
+        nftObserver.disconnect();
+    }
+    
+    // Use the global variable
+    nftObserver = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
             const idsToDisplay = isFiltering ? filteredNFTIds : allNFTIds;
             if (entry.isIntersecting && currentLoadIndex < idsToDisplay.length && !isLoading) {
@@ -272,7 +282,8 @@ function setupInfiniteScroll() {
         const cards = document.querySelectorAll('.nft-card');
         if (cards.length > 0) {
             const lastCard = cards[cards.length - 1];
-            observer.observe(lastCard);
+            // Use the global variable to observe
+            nftObserver.observe(lastCard); 
         }
     };
     
@@ -287,7 +298,7 @@ function setupInfiniteScroll() {
     };
 }
 
-// Create count header helper (simplified without sort info)
+// Create count header helper (simplified without sort info) - Used for initial load
 function createCountHeader(count, title) {
     const countDiv = document.createElement('div');
     countDiv.className = 'count-header';
@@ -297,42 +308,39 @@ function createCountHeader(count, title) {
     return countDiv;
 }
 
-// Update selected traits display
+// ✨ MODIFIED: Remove a single selected trait (used by count-header buttons)
+function removeSelectedTrait(event) {
+    // We use currentTarget because the click handler is on the button, not the span inside it.
+    const btn = event.currentTarget; 
+    const traitType = btn.dataset.traitType;
+    const traitValue = btn.dataset.traitValue;
+    
+    // 1. Find the corresponding checkbox and uncheck it
+    const checkbox = document.querySelector(
+        `.trait-checkbox[data-trait-type="${traitType}"][data-trait-value="${traitValue}"]`
+    );
+    
+    if (checkbox) {
+        checkbox.checked = false;
+        
+        // 2. Trigger the filter refresh cycle
+        // updateSelectedTraitsDisplay() now handles calling filterByTraits
+        updateSelectedTraitsDisplay(); 
+        
+        // The button will be automatically removed when filterByTraits redraws the count-header
+    }
+}
+
+// ✨ MODIFIED: Update selected traits display (Now only a trigger)
 function updateSelectedTraitsDisplay() {
+    // 1. Hide the old display element as requested
     const selectedTraitsDiv = document.getElementById('selectedTraitsDisplay');
-    if (!selectedTraitsDiv) return;
-    
-    const checkboxes = document.querySelectorAll('.trait-checkbox:checked');
-    
-    if (checkboxes.length === 0) {
-        selectedTraitsDiv.style.display = 'none';
-        return;
+    if (selectedTraitsDiv) {
+        selectedTraitsDiv.style.display = 'none'; 
     }
     
-    const selectedTraits = {};
-    checkboxes.forEach(checkbox => {
-        const traitType = checkbox.dataset.traitType;
-        const traitValue = checkbox.dataset.traitValue;
-        
-        if (!selectedTraits[traitType]) {
-            selectedTraits[traitType] = [];
-        }
-        selectedTraits[traitType].push(traitValue);
-    });
-    
-    const traitsHTML = Object.entries(selectedTraits)
-        .map(([type, values]) => `
-            <div class="selected-trait-item">
-                <span class="trait-type">${type}:</span>
-                <span class="trait-values">${values.join(', ')}</span>
-            </div>
-        `).join('');
-    
-    selectedTraitsDiv.innerHTML = `
-        <div class="selected-traits-header">Selected Traits:</div>
-        <div class="selected-traits-list">${traitsHTML}</div>
-    `;
-    selectedTraitsDiv.style.display = 'block';
+    // 2. Automatically trigger filtering (which now handles the new count-header display)
+    filterByTraits();
 }
 
 // Create filter controls with dropdown and checkboxes (SORTED BY RARITY)
@@ -424,6 +432,9 @@ function createFilterControls() {
             checkbox.className = 'trait-checkbox';
             checkbox.dataset.traitType = traitType;
             checkbox.dataset.traitValue = value;
+            
+            // Set up change listener to update display AND filter
+            // It now calls updateSelectedTraitsDisplay, which calls filterByTraits
             checkbox.addEventListener('change', updateSelectedTraitsDisplay);
             
             const span = document.createElement('span');
@@ -597,18 +608,33 @@ function clearAllSelectedIDs() {
     document.getElementById('searchInput').value = '';
 }
 
+// Lines 661-665
 function filterByTraits() {
     const resultsDiv = document.getElementById('results');
-    resultsDiv.innerHTML = '<div class="no-results">Filtering...</div>';
     
+    // Optimization: Clear the content efficiently first
+    resultsDiv.textContent = ''; 
+
     const checkboxes = document.querySelectorAll('.trait-checkbox:checked');
     
     if (checkboxes.length === 0) {
-        // No filter applied, show all NFTs
+        // ... (unchanged)
         isFiltering = false;
         loadInitialNFTs();
         return;
     }
+    
+    // Display a filtering message (must be added back after clearing textContent)
+    const filteringMessage = document.createElement('div');
+    filteringMessage.className = 'no-results';
+    filteringMessage.textContent = 'Filtering...';
+    resultsDiv.appendChild(filteringMessage);
+
+    // ... (rest of the function is unchanged until line 700)
+
+    // After filtering and before adding results:
+    
+
     
     const selectedTraits = {};
     checkboxes.forEach(checkbox => {
@@ -626,6 +652,7 @@ function filterByTraits() {
         .filter(id => {
             const nftTraits = traitsData[id];
             return Object.entries(selectedTraits).every(([traitType, selectedValues]) => {
+                // An NFT matches this type if its trait value is one of the selected values
                 return selectedValues.includes(nftTraits[traitType]);
             });
         });
@@ -642,19 +669,47 @@ function filterByTraits() {
         return;
     }
     
-    // Create count header with filter summary
-    const filterSummary = Object.entries(selectedTraits)
-        .map(([type, values]) => `${type}: ${values.join(', ')}`)
-        .join(' | ');
+    // --- START OF NEW/MODIFIED SECTION: Interactive Count Header ---
     
+    // 1. Build the filter summary HTML using single, clickable buttons
+    let summaryButtonsHTML = '';
+    
+    Object.entries(selectedTraits).forEach(([type, values]) => {
+        values.forEach(value => {
+            // Create a button for each trait value
+            summaryButtonsHTML += `
+                <button class="count-header-trait-btn" 
+                        data-trait-type="${type}" 
+                        data-trait-value="${value}"
+                        title="Click to remove filter: ${type}: ${value}">
+                    ${type}: ${value} x
+                </button>
+            `;
+        });
+    });
+    
+    // 2. Create the count header and insert the buttons
     const countDiv = document.createElement('div');
     countDiv.className = 'count-header';
     countDiv.innerHTML = `
         <div id="count-summary" style="font-size: 14px; margin-bottom: 15px;">Found matching Kamigotchi: ${filteredNFTIds.length}</div>
-        <div id="filter-summary" style="font-size: 13px; color: #666;">${filterSummary}</div>
+        <div id="filter-summary-buttons" class="filter-summary-buttons-container" style="display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px;">
+            ${summaryButtonsHTML}
+        </div>
     `;
+
+    // Line 704
+    resultsDiv.textContent = ''; // Clear the "Filtering..." message before adding results
+
     resultsDiv.appendChild(countDiv);
     
+    // 3. Attach event listeners to the new buttons, using the existing removal function
+    countDiv.querySelectorAll('.count-header-trait-btn').forEach(btn => {
+        btn.addEventListener('click', removeSelectedTrait);
+    });
+
+    // --- END OF NEW/MODIFIED SECTION ---
+
     // Reset load index
     currentLoadIndex = 0;
     
@@ -693,7 +748,7 @@ document.getElementById('searchInput').addEventListener('keypress', (e) => {
     if (e.key === 'Enter') searchByID();
 });
 document.getElementById('clearSearchBtn').addEventListener('click', clearAllSelectedIDs);
-document.getElementById('filterBtn').addEventListener('click', filterByTraits);
+// document.getElementById('filterBtn').addEventListener('click', filterByTraits);
 document.getElementById('clearBtn').addEventListener('click', clearFilters);
 
 loadData();
