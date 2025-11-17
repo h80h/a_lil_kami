@@ -546,8 +546,8 @@ button {
   }
     
   .nft-card-content img {
-    width: 100px;
-    height: 100px;
+    /* width: 120px;
+    height: 120px; */
     flex-shrink: 0;
   }
     
@@ -559,7 +559,11 @@ button {
   }
   
   .trait {
-    font-size: 9px;
+    font-size: 10px;
+  }
+
+  .nft-id {
+    font-size: 11px;
   }
 
   .scroll-to-top {
@@ -567,5 +571,9 @@ button {
     height: 45px;
     bottom: 10px;
     right: 10px;
+  }
+
+  .container{
+    padding: 10px;
   }
 }
