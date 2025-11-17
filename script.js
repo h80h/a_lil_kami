@@ -538,7 +538,7 @@ function displayNFT(id, showCloseButton = false) {
     
     card.innerHTML = `
     ${closeButtonHTML}
-    <div class="rank-badge ${rankClass}" style="font-size: 9px; color: #937d1aff; margin-bottom: 7px; border-radius: 2px; width: 52px; height: 12px; padding: 1px 0 0 5px; background: rgba(255, 240, 31, 0.3); border: 1px solid rgba(147, 125, 26, 0.3)" title="Rarity Rank: #${rank} | Score: ${score}">
+    <div class="rank-badge ${rankClass}" title="Rarity Rank: #${rank} | Score: ${score}">
         ${rank}
     </div>
     <div class="nft-card-content">
