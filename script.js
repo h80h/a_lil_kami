@@ -758,14 +758,32 @@ document.getElementById('clearBtn').addEventListener('click', clearFilters);
 // Scroll to top functionality
 function setupScrollToTop() {
     const scrollBtn = document.getElementById('scrollToTop');
+    let lastScrollTop = 0;
+    let scrollTimeout;
     
-    // Show/hide button based on scroll position
     window.addEventListener('scroll', () => {
-        if (window.pageYOffset > 300) {
-            scrollBtn.classList.add('show');
+        const currentScroll = window.pageYOffset;
+        
+        // Clear previous timeout
+        clearTimeout(scrollTimeout);
+        
+        // Show button if scrolled down more than 300px
+        if (currentScroll > 300) {
+            // Check scroll direction
+            if (currentScroll > lastScrollTop) {
+                // Scrolling DOWN - show button
+                scrollBtn.classList.add('show');
+            } else {
+                // Scrolling UP - hide button
+                scrollBtn.classList.remove('show');
+            }
         } else {
+            // Near top of page - hide button
             scrollBtn.classList.remove('show');
         }
+        
+        // Update last scroll position
+        lastScrollTop = currentScroll;
     });
     
     // Smooth scroll to top when clicked
