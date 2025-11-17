@@ -115,11 +115,12 @@ input[type="text"] {
 }
 
 button {
-  padding: 15px 6px;
+  width: 55px;
+  height: 37px;
   color: white;
   border: none;
   border-radius: 10px;
-  font-size: 12px;
+  font-size: 11px;
   cursor: pointer;
   transition: background 0.3s;
 }
@@ -149,6 +150,7 @@ button:hover {
 
 #filterBtn {
   background: #6cc871;
+  text-shadow: #eeeeee 0 -1px 4px, #2e8c33 0 1px 1px;
 }
 
 #clearBtn {
@@ -178,6 +180,7 @@ button:hover {
 .sort-btn {
   background: #93bbbf;
   box-shadow: 1px 5px 0 0 #516668;
+  font-size: 9px;
 }
 
 .sort-btn:hover {
@@ -203,11 +206,6 @@ button:hover {
 .sort-btn.active:hover {
   transform: translateY(2px);
 }
-
-/* .sort-btn.active:hover {
-  transform: none;
-} */
-
 
 #filterControls {
     margin-bottom: 15px;
