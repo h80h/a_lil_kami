@@ -537,14 +537,18 @@ function displayNFT(id, showCloseButton = false) {
         `<button class="close-btn" onclick="removeSelectedID('${id}')" title="Remove this Kamigotchi">×</button>` : '';
     
     card.innerHTML = `
-        ${closeButtonHTML}
-        <div class="rank-badge ${rankClass}" style="font-size: 9px; color: #937d1aff; margin-bottom: 7px; border-radius: 2px; width: 52px; height: 12px; padding: 1px 0 0 5px; background: rgba(255, 240, 31, 0.3); border: 1px solid rgba(147, 125, 26, 0.3)" title="Rarity Rank: #${rank} | Score: ${score}">
-            ${rank}
-        </div>
+    ${closeButtonHTML}
+    <div class="rank-badge ${rankClass}" style="font-size: 9px; color: #937d1aff; margin-bottom: 7px; border-radius: 2px; width: 52px; height: 12px; padding: 1px 0 0 5px; background: rgba(255, 240, 31, 0.3); border: 1px solid rgba(147, 125, 26, 0.3)" title="Rarity Rank: #${rank} | Score: ${score}">
+        ${rank}
+    </div>
+    <div class="nft-card-content">
         <img src="${imageUrl}" alt="NFT #${id}" loading="lazy" onerror="this.src='https://via.placeholder.com/250?text=Image+Not+Found'">
-        <div class="nft-id">Kamigotchi ${id}</div>
-        ${traitsHTML}
-    `;
+        <div class="nft-details">
+            <div class="nft-id">Kamigotchi ${id}</div>
+            ${traitsHTML}
+        </div>
+    </div>
+`;
     
     return card;
 }
@@ -750,5 +754,30 @@ document.getElementById('searchInput').addEventListener('keypress', (e) => {
 document.getElementById('clearSearchBtn').addEventListener('click', clearAllSelectedIDs);
 // document.getElementById('filterBtn').addEventListener('click', filterByTraits);
 document.getElementById('clearBtn').addEventListener('click', clearFilters);
+
+// Scroll to top functionality
+function setupScrollToTop() {
+    const scrollBtn = document.getElementById('scrollToTop');
+    
+    // Show/hide button based on scroll position
+    window.addEventListener('scroll', () => {
+        if (window.pageYOffset > 300) {
+            scrollBtn.classList.add('show');
+        } else {
+            scrollBtn.classList.remove('show');
+        }
+    });
+    
+    // Smooth scroll to top when clicked
+    scrollBtn.addEventListener('click', () => {
+        window.scrollTo({
+            top: 0,
+            behavior: 'smooth'
+        });
+    });
+}
+
+// Call this function when the page loads
+document.addEventListener('DOMContentLoaded', setupScrollToTop);
 
 loadData();

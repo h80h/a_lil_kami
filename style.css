@@ -28,12 +28,6 @@ body {
   opacity: 1;
 }
 
-@media (max-width: 640px) {
-  .loader {
-    transform: translate(-50%, -50%) scale(0.35);
-  }
-}
-
 .container {
     max-width: 1000px;
     margin: 0 auto;
@@ -393,7 +387,6 @@ button {
 .trait-count {
   color: #667eea;
   font-size: 9px;
-  font-weight: normal;
 }
 
 /* No trait results message */
@@ -410,14 +403,12 @@ button {
   grid-column: 1 / -1;
   text-align: center;
   padding: 15px;
-  /* font-size: 14px; */
   font-weight: bold;
   color: #667eea;
   background: #f0f4ff;
   border-radius: 8px;
   border: 2px solid #999;
   margin-bottom: 10px;
-  /* height: 80px; */
 }
 
 /* Loading indicator */
@@ -461,7 +452,7 @@ button {
 }
 
 .nft-id {
-  font-size: 9px;
+  font-size: 10px;
   color: #667eea;
   margin-bottom: 7px;
   font-weight: bold;
@@ -502,4 +493,71 @@ button {
 .count-header-trait-btn span {
     font-weight: bold;
     color: #888;
+}
+
+.scroll-to-top {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: rgba(255, 240, 31, 1);
+    color: #937d1aff;
+    border: 2px solid rgba(147, 125, 26, 0.5);
+    font-size: 24px;
+    font-weight: bold;
+    cursor: pointer;
+    z-index: 1000;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.scroll-to-top.show {
+    opacity: 1;
+    visibility: visible;
+}
+
+@media (max-width: 390px) {
+  .loader {
+    transform: translate(-50%, -50%) scale(0.35);
+  }
+
+  .nft-card-content {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 12px;
+    width: 100%;
+  }
+    
+  .nft-card-content img {
+    width: 100px;
+    height: 100px;
+    flex-shrink: 0;
+
+  
+    
+  }
+    
+  .nft-details {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding-top: 1px;
+  }
+  
+  .trait {
+    font-size: 9px;
+  }
+
+  .scroll-to-top {
+    width: 45px;
+    height: 45px;
+    bottom: 20px;
+    right: 10px;
+    font-size: 20px;
+  }
 }
