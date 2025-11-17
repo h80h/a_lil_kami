@@ -2,7 +2,12 @@ let imagesData = {};
 let traitsData = {};
 let selectedIDs = new Set();
 let allNFTIds = []; // Store all NFT IDs
+let filteredNFTIds = []; // Store filtered NFT IDs
 let currentLoadIndex = 0; // Track loading progress
+let traitCounts = {}; // Store trait occurrence counts
+let nftRarityScores = {}; // Store calculated rarity scores for each NFT
+let currentSortOrder = 'latest'; // 'latest', 'oldest', 'rarity'
+let isFiltering = false; // Track if filter is active
 const INITIAL_LOAD_COUNT = 50; // Load first 50 NFTs
 const LAZY_LOAD_COUNT = 30; // Load 30 more when scrolling
 let isLoading = false; // Prevent multiple simultaneous loads
@@ -30,6 +35,104 @@ function showContainer() {
     }, 50);
 }
 
+// Calculate trait occurrence counts
+function calculateTraitCounts() {
+    const counts = {};
+    
+    Object.values(traitsData).forEach(nft => {
+        Object.entries(nft).forEach(([category, traitName]) => {
+            if (!counts[category]) {
+                counts[category] = {};
+            }
+            if (!counts[category][traitName]) {
+                counts[category][traitName] = 0;
+            }
+            counts[category][traitName]++;
+        });
+    });
+    
+    return counts;
+}
+
+// Calculate rarity score for each NFT using statistical rarity
+function calculateRarityScores() {
+    const totalNFTs = Object.keys(traitsData).length;
+    const scores = {};
+    
+    Object.entries(traitsData).forEach(([id, traits]) => {
+        let rarityScore = 0;
+        
+        // Calculate rarity score: sum of (1 / trait_frequency) for each trait
+        Object.entries(traits).forEach(([category, traitName]) => {
+            const traitCount = traitCounts[category][traitName];
+            const traitRarity = 1 / (traitCount / totalNFTs);
+            rarityScore += traitRarity;
+        });
+        
+        scores[id] = rarityScore;
+    });
+    
+    // Normalize and rank
+    const sortedByScore = Object.entries(scores)
+        .sort((a, b) => b[1] - a[1]); // Highest score first
+    
+    const rankedScores = {};
+    sortedByScore.forEach(([id, score], index) => {
+        rankedScores[id] = {
+            score: score,
+            rank: index + 1
+        };
+    });
+    
+    return rankedScores;
+}
+
+// Get sorted NFT IDs based on current sort order
+function getSortedNFTIds(idsToSort) {
+    const ids = idsToSort || Object.keys(traitsData);
+    
+    switch(currentSortOrder) {
+        case 'latest':
+            return ids.sort((a, b) => Number(b) - Number(a));
+        case 'oldest':
+            return ids.sort((a, b) => Number(a) - Number(b));
+        case 'rarity':
+            return ids.sort((a, b) => {
+                return nftRarityScores[a].rank - nftRarityScores[b].rank;
+            });
+        default:
+            return ids.sort((a, b) => Number(b) - Number(a));
+    }
+}
+
+// Setup sort button event listeners
+function setupSortButtons() {
+    const sortButtons = document.querySelectorAll('.sort-btn');
+    
+    sortButtons.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const newSort = e.target.dataset.sort;
+            if (newSort === currentSortOrder) return;
+            
+            currentSortOrder = newSort;
+            
+            // Update active button
+            sortButtons.forEach(b => b.classList.remove('active'));
+            e.target.classList.add('active');
+            
+            // Re-sort and reload current view (filtered or all)
+            if (isFiltering) {
+                // Re-apply filter with new sort order
+                filterByTraits();
+            } else {
+                // Reload all NFTs with new sort
+                allNFTIds = getSortedNFTIds();
+                loadInitialNFTs();
+            }
+        });
+    });
+}
+
 // Load JSON files
 async function loadData() {
     try {
@@ -46,9 +149,16 @@ async function loadData() {
         imagesData = await imagesResponse.json();
         traitsData = await traitsResponse.json();
         
-        // Get all IDs sorted in descending order
-        allNFTIds = Object.keys(traitsData).sort((a, b) => Number(b) - Number(a));
+        // Calculate trait counts for rarity sorting
+        traitCounts = calculateTraitCounts();
         
+        // Calculate rarity scores and ranks for all NFTs
+        nftRarityScores = calculateRarityScores();
+        
+        // Get all IDs sorted in descending order (latest first) by default
+        allNFTIds = getSortedNFTIds();
+        
+        setupSortButtons();
         createFilterControls();
         loadInitialNFTs();
         
@@ -74,8 +184,12 @@ function loadInitialNFTs() {
     const resultsDiv = document.getElementById('results');
     resultsDiv.innerHTML = '';
     
+    // Determine which IDs to display
+    const idsToDisplay = isFiltering ? filteredNFTIds : allNFTIds;
+    
     // Add count header
-    const countDiv = createCountHeader(allNFTIds.length, 'Showing all Kamigotchi', 'No filters applied (Latest first)');
+    const title = isFiltering ? 'Found matching Kamigotchi' : 'Showing all Kamigotchi';
+    const countDiv = createCountHeader(idsToDisplay.length, title);
     resultsDiv.appendChild(countDiv);
     
     // Load first batch
@@ -92,14 +206,17 @@ function loadMoreNFTs() {
     
     isLoading = true;
     const resultsDiv = document.getElementById('results');
-    const endIndex = Math.min(currentLoadIndex + LAZY_LOAD_COUNT, allNFTIds.length);
+    
+    // Use filtered IDs if filtering is active, otherwise use all IDs
+    const idsToDisplay = isFiltering ? filteredNFTIds : allNFTIds;
+    const endIndex = Math.min(currentLoadIndex + LAZY_LOAD_COUNT, idsToDisplay.length);
     
     // Use requestAnimationFrame for smooth rendering
     requestAnimationFrame(() => {
         const fragment = document.createDocumentFragment();
         
         for (let i = currentLoadIndex; i < endIndex; i++) {
-            const card = displayNFT(allNFTIds[i], false);
+            const card = displayNFT(idsToDisplay[i], false);
             if (card) fragment.appendChild(card);
         }
         
@@ -131,7 +248,8 @@ function updateLoadingIndicator() {
         document.getElementById('results').appendChild(indicator);
     }
     
-    if (currentLoadIndex >= allNFTIds.length) {
+    const idsToDisplay = isFiltering ? filteredNFTIds : allNFTIds;
+    if (currentLoadIndex >= idsToDisplay.length) {
         indicator.style.display = 'none';
     }
 }
@@ -140,7 +258,8 @@ function updateLoadingIndicator() {
 function setupInfiniteScroll() {
     const observer = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
-            if (entry.isIntersecting && currentLoadIndex < allNFTIds.length && !isLoading) {
+            const idsToDisplay = isFiltering ? filteredNFTIds : allNFTIds;
+            if (entry.isIntersecting && currentLoadIndex < idsToDisplay.length && !isLoading) {
                 loadMoreNFTs();
             }
         });
@@ -168,13 +287,12 @@ function setupInfiniteScroll() {
     };
 }
 
-// Create count header helper
-function createCountHeader(count, title, subtitle) {
+// Create count header helper (simplified without sort info)
+function createCountHeader(count, title) {
     const countDiv = document.createElement('div');
     countDiv.className = 'count-header';
     countDiv.innerHTML = `
-        <div style="font-size: 14px; margin-bottom: 5px;">${title}: ${count}</div>
-        <div style="font-size: 14px; color: #666;">${subtitle}</div>
+        <div style="font-size: 14px;">${title}: ${count}</div>
     `;
     return countDiv;
 }
@@ -217,7 +335,7 @@ function updateSelectedTraitsDisplay() {
     selectedTraitsDiv.style.display = 'block';
 }
 
-// Create filter controls with dropdown and checkboxes
+// Create filter controls with dropdown and checkboxes (SORTED BY RARITY)
 function createFilterControls() {
     const filterControls = document.getElementById('filterControls');
     const allTraits = {};
@@ -285,8 +403,18 @@ function createFilterControls() {
         checkboxContainer.className = 'checkbox-container';
         checkboxContainer.dataset.traitType = traitType;
         
-        const sortedValues = [...allTraits[traitType]].sort();
+        // Sort by rarity (least common first = most rare)
+        const sortedValues = [...allTraits[traitType]].sort((a, b) => {
+            const countA = traitCounts[traitType][a] || 0;
+            const countB = traitCounts[traitType][b] || 0;
+            return countA - countB; // Ascending = rarest first
+        });
+        
         sortedValues.forEach(value => {
+            const count = traitCounts[traitType][value] || 0;
+            const totalNFTs = Object.keys(traitsData).length;
+            const percentage = ((count / totalNFTs) * 100).toFixed(1);
+            
             const checkboxWrapper = document.createElement('label');
             checkboxWrapper.className = 'checkbox-label';
             checkboxWrapper.dataset.traitValue = value.toLowerCase();
@@ -299,7 +427,11 @@ function createFilterControls() {
             checkbox.addEventListener('change', updateSelectedTraitsDisplay);
             
             const span = document.createElement('span');
-            span.textContent = value;
+            span.className = 'trait-label-text';
+            span.innerHTML = `
+                <span class="trait-name">${value}</span>
+                <span class="trait-count">${count} (${percentage}%)</span>
+            `;
             
             checkboxWrapper.appendChild(checkbox);
             checkboxWrapper.appendChild(span);
@@ -365,9 +497,23 @@ function displayNFT(id, showCloseButton = false) {
         return null;
     }
     
+    const rarityData = nftRarityScores[id];
+    const rank = rarityData ? rarityData.rank : '?';
+    const score = rarityData ? rarityData.score.toFixed(2) : '?';
+    
     const card = document.createElement('div');
     card.className = 'nft-card';
     card.dataset.nftId = id;
+    
+    // Determine rank badge color based on rarity tier
+    let rankClass = 'rank-common';
+    const totalNFTs = Object.keys(traitsData).length;
+    const rankPercentile = (rank / totalNFTs) * 100;
+    
+    if (rankPercentile <= 1) rankClass = 'rank-legendary';
+    else if (rankPercentile <= 5) rankClass = 'rank-epic';
+    else if (rankPercentile <= 15) rankClass = 'rank-rare';
+    else if (rankPercentile <= 40) rankClass = 'rank-uncommon';
     
     const traitsHTML = Object.entries(traits)
         .map(([key, value]) => `
@@ -381,8 +527,11 @@ function displayNFT(id, showCloseButton = false) {
     
     card.innerHTML = `
         ${closeButtonHTML}
+        <div class="rank-badge ${rankClass}" style="font-size: 9px; color: #937d1aff; margin-bottom: 7px; border-radius: 2px; width: 52px; height: 12px; padding: 1px 0 0 5px; background: rgba(255, 240, 31, 0.3); border: 1px solid rgba(147, 125, 26, 0.3)" title="Rarity Rank: #${rank} | Score: ${score}">
+            ${rank}
+        </div>
         <img src="${imageUrl}" alt="NFT #${id}" loading="lazy" onerror="this.src='https://via.placeholder.com/250?text=Image+Not+Found'">
-        <div class="nft-id">Kamigotchi #${id}</div>
+        <div class="nft-id">Kamigotchi ${id}</div>
         ${traitsHTML}
     `;
     
@@ -455,6 +604,8 @@ function filterByTraits() {
     const checkboxes = document.querySelectorAll('.trait-checkbox:checked');
     
     if (checkboxes.length === 0) {
+        // No filter applied, show all NFTs
+        isFiltering = false;
         loadInitialNFTs();
         return;
     }
@@ -470,36 +621,46 @@ function filterByTraits() {
         selectedTraits[traitType].push(traitValue);
     });
     
-    const matchingNFTs = Object.keys(traitsData)
+    // Filter NFTs based on selected traits
+    let matchingNFTs = Object.keys(traitsData)
         .filter(id => {
             const nftTraits = traitsData[id];
             return Object.entries(selectedTraits).every(([traitType, selectedValues]) => {
                 return selectedValues.includes(nftTraits[traitType]);
             });
-        })
-        .sort((a, b) => Number(b) - Number(a));
+        });
+    
+    // Apply current sort order to filtered results
+    filteredNFTIds = getSortedNFTIds(matchingNFTs);
+    isFiltering = true;
     
     resultsDiv.innerHTML = '';
     
-    if (matchingNFTs.length === 0) {
+    if (filteredNFTIds.length === 0) {
         resultsDiv.innerHTML = '<div class="no-results">No Kamigotchi match your selected traits</div>';
+        isFiltering = false;
         return;
     }
     
+    // Create count header with filter summary
     const filterSummary = Object.entries(selectedTraits)
-        .map(([type, values]) => `${type}: ${values.join(' OR ')}`)
+        .map(([type, values]) => `${type}: ${values.join(', ')}`)
         .join(' | ');
     
-    const countDiv = createCountHeader(matchingNFTs.length, 'Found matching Kamigotchi', filterSummary + ' (Latest first)');
+    const countDiv = document.createElement('div');
+    countDiv.className = 'count-header';
+    countDiv.innerHTML = `
+        <div id="count-summary" style="font-size: 14px; margin-bottom: 15px;">Found matching Kamigotchi: ${filteredNFTIds.length}</div>
+        <div id="filter-summary" style="font-size: 13px; color: #666;">${filterSummary}</div>
+    `;
     resultsDiv.appendChild(countDiv);
     
-    // Use DocumentFragment for better performance
-    const fragment = document.createDocumentFragment();
-    matchingNFTs.forEach(id => {
-        const card = displayNFT(id, false);
-        if (card) fragment.appendChild(card);
-    });
-    resultsDiv.appendChild(fragment);
+    // Reset load index
+    currentLoadIndex = 0;
+    
+    // Load filtered results with infinite scroll
+    loadMoreNFTs();
+    setupInfiniteScroll();
 }
 
 function clearFilters() {
@@ -520,7 +681,11 @@ function clearFilters() {
     allFilterGroups.forEach(group => group.style.display = 'none');
     
     updateSelectedTraitsDisplay();
-    document.getElementById('results').innerHTML = '';
+    
+    // Clear filtering state and reload all NFTs
+    isFiltering = false;
+    filteredNFTIds = [];
+    loadInitialNFTs();
 }
 
 document.getElementById('searchBtn').addEventListener('click', searchByID);
