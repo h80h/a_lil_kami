@@ -176,32 +176,19 @@ button:hover {
 }
 
 .sort-btn {
-  background: #f0a33f;
-  box-shadow: 1px 5px 0 0 rgba(111, 76, 30, 0.7);
+  background: #93bbbf;
+  box-shadow: 1px 5px 0 0 #516668;
 }
 
 .sort-btn:hover {
-  box-shadow: 1px 3px 0 0 rgba(111, 76, 30, 0.7);
+  box-shadow: 1px 3px 0 0 #516668;
 }
-
-/* .sort-btn.active {
-  background: #52a0e9;
-  box-shadow: 1px 5px 0 0 rgba(2, 13, 23, 0.6);
-} */
-
-/* .sort-btn.active {
-  background: rgb(213, 137, 111);
-  box-shadow: 1px 5px 0 0 rgba(56, 12, 34, 0.6);
-} */
 
 .sort-btn.active {
-  background: #6d9295;
-  box-shadow: 1px 3px 0 0 rgba(38, 88, 77, 0.8);
+  background: #55a9b0;
+  box-shadow: 1px 3px 0 0 #34656a;
+  text-shadow: #eeeeee 0 -1px 4px, rgb(42, 135, 166) 0 1px 1px;
 }
-
-/* .sort-btn.active:hover {
-  box-shadow: 1px 3px 0 0 rgba(38, 88, 77, 0.8);
-} */
 
 #filterBtn,
 #clearBtn,
