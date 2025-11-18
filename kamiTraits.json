@@ -90305,5 +90305,68 @@
     "color": "Orange",
     "face": "O_0",
     "hand": "Melted"
+  },
+  "12902": {
+    "background": "Rust",
+    "body": "Octopus",
+    "color": "Red",
+    "face": "._.",
+    "hand": "Mole Cricket"
+  },
+  "12903": {
+    "background": "Pink",
+    "body": "Lightbulb",
+    "color": "Orange",
+    "face": ":3",
+    "hand": "Orbs"
+  },
+  "12904": {
+    "background": "Blue",
+    "body": "Lightbulb",
+    "color": "Green",
+    "face": "Unamused",
+    "hand": "Toasters"
+  },
+  "12905": {
+    "background": "Yellow",
+    "body": "Orb",
+    "color": "Blue",
+    "face": ":3",
+    "hand": "Plugs"
+  },
+  "12906": {
+    "background": "Mustard",
+    "body": "Shrimp",
+    "color": "Pink",
+    "face": "^-^",
+    "hand": "Scorpion"
+  },
+  "12907": {
+    "background": "Orange",
+    "body": "Ghost",
+    "color": "1BIT BW",
+    "face": ">_>",
+    "hand": "Orbs"
+  },
+  "12908": {
+    "background": "Nature 2",
+    "body": "Battery",
+    "color": "Grey",
+    "face": "-_-",
+    "hand": "Tentacles"
+  },
+  "12909": {
+    "background": "Blue-Grey",
+    "body": "Drip",
+    "color": "Blue",
+    "face": "Drip",
+    "hand": "Melted"
+  },
+  "12910": {
+    "background": "Purple",
+    "body": "Bee",
+    "color": "Red",
+    "face": "x_x ",
+    "hand": "Paws"
   }
 }
