@@ -90375,5 +90375,12 @@
     "color": "Blue",
     "face": "Jiangshi Hat",
     "hand": "Plugs"
+  },
+  "12912": {
+    "background": "Pink",
+    "body": "Broken CRT Monitor",
+    "color": "Grey",
+    "face": "Unamused",
+    "hand": "Beetle"
   }
 }
