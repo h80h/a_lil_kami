@@ -90298,5 +90298,12 @@
     "color": "White",
     "face": "^-^",
     "hand": "Plant"
+  },
+  "12901": {
+    "background": "RED!!!",
+    "body": "Drip",
+    "color": "Orange",
+    "face": "O_0",
+    "hand": "Melted"
   }
 }
