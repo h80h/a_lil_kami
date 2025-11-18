@@ -5,4 +5,4 @@ i don't find any kamigotchi player share a kami finder they built, so i practice
 check this open source full onchain game if interested in:
 https://github.com/Asphodel-OS/kamigotchi
 
-for now i only know how to copy data from browser console, so this project can't show the latest minted kamigotchi nft any time, but i will try to update once a day, i love kamigotchi world ♡
+for now i only want to make it a static site, and it will update in 30min if there're new kami ♡
