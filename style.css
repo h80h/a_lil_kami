@@ -567,10 +567,19 @@ button {
   }
 
   .nft-card {
-    padding: 3px 10px;
+    padding: 3px 10px 8px 10px;
   }
 
   .rank-badge {
+    margin-bottom: 3px;
+  }
+
+  .trait {
+    font-size: 9px;
+  }
+
+  .nft-card-content img,
+  .nft-id {
     margin-bottom: 3px;
   }
 }
@@ -591,7 +600,7 @@ button {
   
   .rank-badge {
     font-size: 12px;
-    margin-bottom: 9px;
+    margin-bottom: 6px;
     border-radius: 2px;
     width: 66px;
     height: 16px;
@@ -613,6 +622,7 @@ button {
   .trait {
     font-size: 11px;
     margin: 2px 0;
+    font-weight: bold;
   }
   
   .nft-id {
@@ -634,6 +644,10 @@ button {
   #results {
     gap: 20px;
   }
+
+  .nft-card {
+    padding: 6px 10px;
+  }
 }
 @media (max-width: 326px) {
   #results {
@@ -642,7 +656,6 @@ button {
 
   .trait {
     font-size: 9px;
-    font-weight: bold;
   }
   
   .nft-id {
@@ -667,10 +680,6 @@ button {
 
   .nft-card-content {
     gap: 8px;
-  }
-
-  .nft-card {
-    padding: 6px 10px;
   }
 }
 
