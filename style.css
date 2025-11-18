@@ -29,7 +29,7 @@ body {
 }
 
 .container {
-    max-width: 1000px;
+    max-width: 960px;
     margin: 0 auto;
     padding: 30px;
     border-radius: 15px;
@@ -542,7 +542,29 @@ button {
     visibility: visible;
 }
 
+@media (min-width: 640px) and (max-width: 960px) and (min-height: 780px) {
+  .checkbox-label input[type="checkbox"] {
+    width: 24px;
+    height: 24px;
+  }
+
+  .trait-name {
+    font-size: 18px;
+  }
+
+  .trait-count {
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 640px) {
+  .container {
+    width: 450px;
+  }
+}
+
 @media (max-width: 390px) {
+  
   .loader {
     transform: translate(-50%, -50%) scale(0.35);
   }
@@ -592,6 +614,7 @@ button {
 
   .container{
     padding: 10px;
+    max-width: 360px;
   }
 
   #results {
@@ -600,7 +623,6 @@ button {
      is less than roughly 600px, giving max space for text. */
    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   }
-
 }
 
 @media (max-width: 326px) {
@@ -617,14 +639,20 @@ button {
   }
 
   .nft-card-content img {
-    width: 140px;
-    height: 140px;
+    width: 120px;
+    height: 120px;
   }
 
   .rank-badge {
     font-size: 11px;
     width: 62px;
   }
+
+  .container {
+    max-width: 300px;
+  }
+
+  
 }
 
 @media (max-width: 280px) {
@@ -632,7 +660,28 @@ button {
    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
   }
 
-  .nft-card-content {
+  .container {
+    max-width: 240px;
+  }
+
+  /* .nft-card-content {
     flex-direction: column;
+  } */
+
+  .trait {
+    font-size: 8px;
+  }
+  
+  .nft-id {
+    font-size: 9px;
+  }
+
+  .nft-card img {
+    width: 100px;
+    height: 100px;
+  }
+
+  #searchInput {
+    width: 130px;
   }
 }
