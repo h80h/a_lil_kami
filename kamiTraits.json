@@ -90368,5 +90368,12 @@
     "color": "Red",
     "face": "x_x ",
     "hand": "Paws"
+  },
+  "12911": {
+    "background": "Blue",
+    "body": "Drip",
+    "color": "Blue",
+    "face": "Jiangshi Hat",
+    "hand": "Plugs"
   }
 }
