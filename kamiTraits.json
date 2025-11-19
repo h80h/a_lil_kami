@@ -90459,5 +90459,75 @@
     "color": "Green",
     "face": "O_o",
     "hand": "Melted"
+  },
+  "12924": {
+    "background": "Default Green",
+    "body": "Bee",
+    "color": "Pink",
+    "face": "Disapproval",
+    "hand": "Scorpion"
+  },
+  "12925": {
+    "background": "Pink",
+    "body": "Lightbulb",
+    "color": "Red",
+    "face": "O_o",
+    "hand": "Paws"
+  },
+  "12926": {
+    "background": "Yellow",
+    "body": "Bee",
+    "color": "Orange",
+    "face": "Teddy",
+    "hand": "Spectral"
+  },
+  "12927": {
+    "background": "Blue",
+    "body": "Orb",
+    "color": "Green",
+    "face": ".w.",
+    "hand": "Wrenches"
+  },
+  "12928": {
+    "background": "BOG",
+    "body": "Ghost",
+    "color": "Yellow",
+    "face": "Impacted",
+    "hand": "Beetle"
+  },
+  "12929": {
+    "background": "Default Green",
+    "body": "Lightbulb",
+    "color": "Red",
+    "face": "Lenny 2",
+    "hand": "Wrenches"
+  },
+  "12930": {
+    "background": "Purple",
+    "body": "Caterpillar",
+    "color": "Grey",
+    "face": ".w.",
+    "hand": "UFO Catcher"
+  },
+  "12931": {
+    "background": "Yellow",
+    "body": "Lotus",
+    "color": "Red",
+    "face": "v_v",
+    "hand": "Guns"
+  },
+  "12932": {
+    "background": "Mustard",
+    "body": "Caterpillar",
+    "color": "Yellow",
+    "face": "._.",
+    "hand": "Plugs"
+  },
+  "12933": {
+    "background": "Alt Green",
+    "body": "Amphora",
+    "color": "White",
+    "face": "^-^",
+    "hand": "Spectral"
   }
 }
