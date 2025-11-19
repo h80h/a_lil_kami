@@ -90536,5 +90536,33 @@
     "color": "Pink",
     "face": "Ou0",
     "hand": "Plugs"
+  },
+  "12935": {
+    "background": "Orange",
+    "body": "Caterpillar",
+    "color": "Blue",
+    "face": "x_x ",
+    "hand": "Guns"
+  },
+  "12936": {
+    "background": "Default Green",
+    "body": "Lightbulb",
+    "color": "Yellow",
+    "face": "Sideeye",
+    "hand": "Coins"
+  },
+  "12937": {
+    "background": "Blue",
+    "body": "Ghost",
+    "color": "Orange",
+    "face": "^-^",
+    "hand": "Crab"
+  },
+  "12938": {
+    "background": "Default Green",
+    "body": "Orb",
+    "color": "Lime Green",
+    "face": "Disapproval",
+    "hand": "Toasters"
   }
 }
