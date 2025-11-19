@@ -90438,5 +90438,12 @@
     "color": "White",
     "face": "-_-",
     "hand": "Coins"
+  },
+  "12923": {
+    "background": "Hot Pink",
+    "body": "Plant",
+    "color": "Green",
+    "face": "O_o",
+    "hand": "Melted"
   }
 }
