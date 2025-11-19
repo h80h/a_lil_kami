@@ -90564,5 +90564,82 @@
     "color": "Lime Green",
     "face": "Disapproval",
     "hand": "Toasters"
+  },
+  "12939": {
+    "background": "Yellow",
+    "body": "Battery",
+    "color": "Grey",
+    "face": ":3",
+    "hand": "Wassie Flipper"
+  },
+  "12940": {
+    "background": "Default Green",
+    "body": "Caterpillar",
+    "color": "Green",
+    "face": "v_v",
+    "hand": "Coins"
+  },
+  "12941": {
+    "background": "Purple",
+    "body": "Bee",
+    "color": "White",
+    "face": "O_0",
+    "hand": "Orbs"
+  },
+  "12942": {
+    "background": "Blue",
+    "body": "Shrimp",
+    "color": "Grey",
+    "face": ">_>",
+    "hand": "Tentacles"
+  },
+  "12943": {
+    "background": "Mustard",
+    "body": "Tube",
+    "color": "1BIT WR",
+    "face": "Teddy",
+    "hand": "Wrenches"
+  },
+  "12944": {
+    "background": "Orange",
+    "body": "Lotus",
+    "color": "Green",
+    "face": ".w.",
+    "hand": "Spinning Coins"
+  },
+  "12945": {
+    "background": "Pink",
+    "body": "Battery",
+    "color": "Lime Green",
+    "face": "^-^",
+    "hand": "Coins"
+  },
+  "12946": {
+    "background": "White!",
+    "body": "Caterpillar",
+    "color": "Yellow",
+    "face": "._.",
+    "hand": "Mole Cricket"
+  },
+  "12947": {
+    "background": "Rust",
+    "body": "Battery",
+    "color": "Red",
+    "face": "O_o",
+    "hand": "Beetle"
+  },
+  "12948": {
+    "background": "Blue",
+    "body": "Jellyfish",
+    "color": "Grey",
+    "face": "Drip",
+    "hand": "Orbs"
+  },
+  "12949": {
+    "background": "Orange",
+    "body": "Battery",
+    "color": "Orange",
+    "face": "Jiangshi Hat",
+    "hand": "Scorpion"
   }
 }
