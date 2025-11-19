@@ -90382,5 +90382,12 @@
     "color": "Grey",
     "face": "Unamused",
     "hand": "Beetle"
+  },
+  "12915": {
+    "background": "Default Green",
+    "body": "Soda Cup",
+    "color": "Orange",
+    "face": "O_0",
+    "hand": "Fan Blades"
   }
 }
