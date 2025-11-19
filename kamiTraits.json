@@ -90529,5 +90529,12 @@
     "color": "White",
     "face": "^-^",
     "hand": "Spectral"
+  },
+  "12934": {
+    "background": "Mustard",
+    "body": "Orb",
+    "color": "Pink",
+    "face": "Ou0",
+    "hand": "Plugs"
   }
 }
