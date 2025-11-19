@@ -90431,5 +90431,12 @@
     "color": "Green",
     "face": "v_v",
     "hand": "UFO Catcher"
+  },
+  "12922": {
+    "background": "Hot Pink",
+    "body": "Drip",
+    "color": "White",
+    "face": "-_-",
+    "hand": "Coins"
   }
 }
