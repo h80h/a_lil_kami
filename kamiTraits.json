@@ -90389,5 +90389,26 @@
     "color": "Orange",
     "face": "O_0",
     "hand": "Fan Blades"
+  },
+  "12916": {
+    "background": "Blue-Grey",
+    "body": "Battery",
+    "color": "Orange",
+    "face": ">_>",
+    "hand": "Eyeballs"
+  },
+  "12917": {
+    "background": "Alt Green",
+    "body": "Lightbulb",
+    "color": "Green",
+    "face": "o_O",
+    "hand": "Plugs"
+  },
+  "12918": {
+    "background": "Blue-Grey",
+    "body": "Plant",
+    "color": "Green",
+    "face": "o_o",
+    "hand": "Melted"
   }
 }
