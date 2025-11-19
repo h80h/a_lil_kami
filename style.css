@@ -29,7 +29,7 @@ body {
 }
 
 .container {
-    max-width: 960px;
+    max-width: 870px;
     margin: 0 auto;
     padding: 30px;
     border-radius: 15px;
@@ -422,8 +422,8 @@ button {
 
 #results {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
   margin-top: 20px;
 }
 
@@ -432,7 +432,7 @@ button {
   background: white;
   border: 2px solid #333;
   border-radius: 10px;
-  padding: 10px;
+  padding: 1px 8px 5px 8px;
   transition: transform 0.3s, box-shadow 0.3s;
   box-shadow: 0px 2px 2px rgba(0,0,0,0.2);
 }
@@ -440,13 +440,17 @@ button {
 .rank-badge {
   font-size: 9px;
   color: #937d1aff;
-  margin-bottom: 7px;
+  margin-bottom: 1px;
+  /* margin-left: -3px; */
   border-radius: 2px;
   width: 52px;
   height: 12px;
   padding: 1px 0 0 5px;
   background: rgba(255, 240, 31, 0.3);
   border: 1px solid rgba(147, 125, 26, 0.3);
+  /* position: absolute;
+  top: 1px;
+  left: 1px; */
 }
 
 .nft-card img {
@@ -542,7 +546,45 @@ button {
     visibility: visible;
 }
 
-@media (min-width: 640px) and (max-width: 960px) and (min-height: 780px) {
+/* NEW Badge Styling */
+.new-badge {
+    position: absolute;
+    top: 1px;
+    right: 3px;
+    /* background: linear-gradient(135deg, #cc5de8 0%, #9c36b5 100%); */
+    background: linear-gradient(135deg, #e8a6ee 0%, #bc63d2 100%);
+    color: white;
+    padding: 2px 2px 2px 3px;
+    border-radius: 20px;
+    font-weight: bold;
+    font-size: 7px;
+    letter-spacing: 0.5px;
+    z-index: 10;
+    animation: newBadgePulse 2s ease-in-out infinite;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+
+@keyframes newBadgeSparkle {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+.new-badge {
+    animation: newBadgeSparkle 1.5s ease-in-out infinite;
+}
+
+
+/* Make sure the NFT card can position the badge */
+.nft-card {
+    position: relative;
+}
+
+@media (max-width: 820px){
   .checkbox-label input[type="checkbox"] {
     width: 24px;
     height: 24px;
@@ -555,19 +597,42 @@ button {
   .trait-count {
     font-size: 16px;
   }
+
+  .container {
+    max-width: 720px;
+  }
+
+  .nft-id {
+    font-size: 9px;
+  }
+
+  .nft-card img {
+    width: 120px;
+    height: 120px;
+  }
+
+  #results {
+    gap: 20px;
+  }
 }
 
 @media (max-width: 640px) {
   .container {
-    width: 450px;
+    max-width: 400px;
+    padding: 10px 5px;
   }
 
   #results {
-    gap: 50px;
+    gap: 20px;
   }
 
   .nft-card {
     padding: 3px 10px 8px 10px;
+  }
+
+  .nft-card img {
+    width: 160px;
+    height: 160px;
   }
 
   .rank-badge {
@@ -582,6 +647,10 @@ button {
   .nft-id {
     margin-bottom: 3px;
   }
+
+  .new-badge {
+    top: 2px;
+  }
 }
 
 @media (max-width: 390px) {
@@ -594,13 +663,13 @@ button {
     display: flex;
     flex-direction: row;
     align-items: flex-start;
-    gap: 12px;
+    gap: 20px;
     width: 100%;
   }
   
   .rank-badge {
     font-size: 12px;
-    margin-bottom: 6px;
+    margin-bottom: 3px;
     border-radius: 2px;
     width: 66px;
     height: 16px;
@@ -609,7 +678,7 @@ button {
   .nft-card-content img {
     width: 160px;
     height: 160px;
-    flex-shrink: 0;
+    margin-bottom: 0;
   }
    
   .nft-details {
@@ -636,24 +705,30 @@ button {
     right: 10px;
   }
 
-  .container{
+  .container {
     padding: 10px;
     max-width: 360px;
   }
 
   #results {
-    gap: 20px;
+    gap: 15px;
   }
 
   .nft-card {
-    padding: 6px 10px;
+    padding: 3px 10px 10px 10px;
   }
-}
-@media (max-width: 326px) {
+
   #results {
    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
   }
 
+  .new-badge {
+    font-size: 10px;
+    top: 3px;
+    right: 3px;
+  }
+}
+@media (max-width: 326px) {
   .trait {
     font-size: 9px;
   }
@@ -671,7 +746,8 @@ button {
   .rank-badge {
     font-size: 10px;
     width: 58px;
-    margin-bottom: 6px;
+    margin-bottom: 1px;
+    height: 14px;
   }
 
   .container {
@@ -680,6 +756,15 @@ button {
 
   .nft-card-content {
     gap: 8px;
+  }
+
+  .new-badge {
+    font-size: 8px;
+    top: 2px;
+  }
+
+  .nft-card {
+    padding: 2px 9px 9px 9px;
   }
 }
 
@@ -717,14 +802,16 @@ button {
   }
 
   .nft-card {
-    padding: 6px 7px;
+    padding: 2px 7px 7px 7px;
   }
 
   .scroll-to-top {
     right: 5px;
   }
 
-  #results {
-    gap: 15px;
+  .new-badge {
+    font-size: 6px;
+    top: 2px;
+    right: 3px;
   }
 }

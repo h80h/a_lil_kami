@@ -8,10 +8,11 @@ let traitCounts = {}; // Store trait occurrence counts
 let nftRarityScores = {}; // Store calculated rarity scores for each NFT
 let currentSortOrder = 'latest'; // 'latest', 'oldest', 'rarity'
 let isFiltering = false; // Track if filter is active
-let nftObserver = null; // NEW: Global variable to manage the Intersection Observer
+let nftObserver = null; // Global variable to manage the Intersection Observer
 const INITIAL_LOAD_COUNT = 50; // Load first 50 NFTs
 const LAZY_LOAD_COUNT = 30; // Load 30 more when scrolling
 let isLoading = false; // Prevent multiple simultaneous loads
+let metadataInfo = {}; // NEW: Store metadata for NEW badges
 
 // Smooth loader display
 function showLoader() {
@@ -144,7 +145,25 @@ async function loadData() {
         
         const traitsResponse = await fetch('kamiTraits.json');
         if (!traitsResponse.ok) {
-            throw new Error(`Failed to load kamiTraits.json: ${imagesResponse.status}`);
+            throw new Error(`Failed to load kamiTraits.json: ${traitsResponse.status}`);
+        }
+        
+        // NEW: Load metadata for NEW badges
+        try {
+            const metadataResponse = await fetch('kamiMetadata.json');
+            if (metadataResponse.ok) {
+                metadataInfo = await metadataResponse.json();
+                console.log(`✨ Found ${metadataInfo.newKamiIds?.length || 0} new Kamigotchi!`);
+                if (metadataInfo.newKamiIds?.length > 0) {
+                    console.log(`   New IDs: ${metadataInfo.newKamiIds.join(', ')}`);
+                }
+            } else {
+                console.log('ℹ️  No metadata file found, NEW badges disabled');
+                metadataInfo = { newKamiIds: [] };
+            }
+        } catch (metaError) {
+            console.log('ℹ️  Could not load metadata:', metaError.message);
+            metadataInfo = { newKamiIds: [] };
         }
         
         imagesData = await imagesResponse.json();
@@ -512,6 +531,9 @@ function displayNFT(id, showCloseButton = false) {
     const rank = rarityData ? rarityData.rank : '?';
     const score = rarityData ? rarityData.score.toFixed(2) : '?';
     
+    // NEW: Check if this Kamigotchi is new
+    const isNew = metadataInfo.newKamiIds && metadataInfo.newKamiIds.includes(Number(id));
+    
     const card = document.createElement('div');
     card.className = 'nft-card';
     card.dataset.nftId = id;
@@ -536,8 +558,13 @@ function displayNFT(id, showCloseButton = false) {
     const closeButtonHTML = showCloseButton ? 
         `<button class="close-btn" onclick="removeSelectedID('${id}')" title="Remove this Kamigotchi">×</button>` : '';
     
+    // NEW: Add NEW badge if applicable
+    const newBadgeHTML = isNew ? 
+        `<div class="new-badge" title="Recently Added!">NEW</div>` : '';
+    
     card.innerHTML = `
     ${closeButtonHTML}
+    ${newBadgeHTML}
     <div class="rank-badge ${rankClass}" title="Rarity Rank: #${rank} | Score: ${score}">
         ${rank}
     </div>
@@ -667,11 +694,11 @@ function filterByTraits() {
     
     resultsDiv.innerHTML = '';
     
-    if (filteredNFTIds.length === 0) {
-        resultsDiv.innerHTML = '<div class="no-results">No Kamigotchi match your selected traits</div>';
-        isFiltering = false;
-        return;
-    }
+    // if (filteredNFTIds.length === 0) {
+    //     resultsDiv.innerHTML = '<div class="no-results">No Kamigotchi match your selected traits</div>';
+    //     isFiltering = false;
+    //     return;
+    // }
     
     // --- START OF NEW/MODIFIED SECTION: Interactive Count Header ---
     
@@ -713,7 +740,15 @@ function filterByTraits() {
     });
 
     // --- END OF NEW/MODIFIED SECTION ---
-
+    // Check if no results found AFTER showing the count header
+    if (filteredNFTIds.length === 0) {
+        const noResultsDiv = document.createElement('div');
+        noResultsDiv.className = 'no-results';
+        noResultsDiv.textContent = 'No Kamigotchi match your selected traits';
+        resultsDiv.appendChild(noResultsDiv);
+        isFiltering = false;
+        return;
+    }
     // Reset load index
     currentLoadIndex = 0;
     
