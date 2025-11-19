@@ -90410,5 +90410,19 @@
     "color": "Green",
     "face": "o_o",
     "hand": "Melted"
+  },
+  "12919": {
+    "background": "Hot Pink",
+    "body": "Soda Cup",
+    "color": "Orange",
+    "face": ">_>",
+    "hand": "Wassie Flipper"
+  },
+  "12920": {
+    "background": "Purple",
+    "body": "Broken CRT Monitor",
+    "color": "Lime Green",
+    "face": "O_0",
+    "hand": "Spectral"
   }
 }
