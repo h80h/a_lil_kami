@@ -90641,5 +90641,19 @@
     "color": "Orange",
     "face": "Jiangshi Hat",
     "hand": "Scorpion"
+  },
+  "12950": {
+    "background": "Grey!",
+    "body": "Ghost",
+    "color": "Blue",
+    "face": "Impacted",
+    "hand": "Fan Blades"
+  },
+  "12951": {
+    "background": "Mustard",
+    "body": "Drip",
+    "color": "Blue",
+    "face": "Concerned",
+    "hand": "Wrenches"
   }
 }
