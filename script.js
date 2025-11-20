@@ -1,18 +1,18 @@
 let imagesData = {};
 let traitsData = {};
 let selectedIDs = new Set();
-let allNFTIds = []; // Store all NFT IDs
-let filteredNFTIds = []; // Store filtered NFT IDs
-let currentLoadIndex = 0; // Track loading progress
-let traitCounts = {}; // Store trait occurrence counts
-let nftRarityScores = {}; // Store calculated rarity scores for each NFT
-let currentSortOrder = 'latest'; // 'latest', 'oldest', 'rarity'
-let isFiltering = false; // Track if filter is active
-let nftObserver = null; // Global variable to manage the Intersection Observer
-const INITIAL_LOAD_COUNT = 50; // Load first 50 NFTs
-const LAZY_LOAD_COUNT = 30; // Load 30 more when scrolling
-let isLoading = false; // Prevent multiple simultaneous loads
-let metadataInfo = {}; // NEW: Store metadata for NEW badges
+let allNFTIds = [];
+let filteredNFTIds = [];
+let currentLoadIndex = 0;
+let traitCounts = {};
+let nftRarityScores = {};
+let currentSortOrder = 'latest';
+let isFiltering = false;
+let nftObserver = null;
+const INITIAL_LOAD_COUNT = 50;
+const LAZY_LOAD_COUNT = 30;
+let isLoading = false;
+let metadataInfo = {};
 
 // Smooth loader display
 function showLoader() {
@@ -37,12 +37,19 @@ function showContainer() {
     }, 50);
 }
 
+// Helper function to get trait name from data (handles both old and new format)
+function getTraitName(traitData) {
+    return typeof traitData === 'string' ? traitData : traitData.name;
+}
+
 // Calculate trait occurrence counts
 function calculateTraitCounts() {
     const counts = {};
     
     Object.values(traitsData).forEach(nft => {
-        Object.entries(nft).forEach(([category, traitName]) => {
+        Object.entries(nft).forEach(([category, traitData]) => {
+            const traitName = getTraitName(traitData);
+            
             if (!counts[category]) {
                 counts[category] = {};
             }
@@ -64,8 +71,8 @@ function calculateRarityScores() {
     Object.entries(traitsData).forEach(([id, traits]) => {
         let rarityScore = 0;
         
-        // Calculate rarity score: sum of (1 / trait_frequency) for each trait
-        Object.entries(traits).forEach(([category, traitName]) => {
+        Object.entries(traits).forEach(([category, traitData]) => {
+            const traitName = getTraitName(traitData);
             const traitCount = traitCounts[category][traitName];
             const traitRarity = 1 / (traitCount / totalNFTs);
             rarityScore += traitRarity;
@@ -74,9 +81,8 @@ function calculateRarityScores() {
         scores[id] = rarityScore;
     });
     
-    // Normalize and rank
     const sortedByScore = Object.entries(scores)
-        .sort((a, b) => b[1] - a[1]); // Highest score first
+        .sort((a, b) => b[1] - a[1]);
     
     const rankedScores = {};
     sortedByScore.forEach(([id, score], index) => {
@@ -118,16 +124,12 @@ function setupSortButtons() {
             
             currentSortOrder = newSort;
             
-            // Update active button
             sortButtons.forEach(b => b.classList.remove('active'));
             e.target.classList.add('active');
             
-            // Re-sort and reload current view (filtered or all)
             if (isFiltering) {
-                // Re-apply filter with new sort order
                 filterByTraits();
             } else {
-                // Reload all NFTs with new sort
                 allNFTIds = getSortedNFTIds();
                 loadInitialNFTs();
             }
@@ -148,7 +150,6 @@ async function loadData() {
             throw new Error(`Failed to load kamiTraits.json: ${traitsResponse.status}`);
         }
         
-        // NEW: Load metadata for NEW badges
         try {
             const metadataResponse = await fetch('kamiMetadata.json');
             if (metadataResponse.ok) {
@@ -169,13 +170,8 @@ async function loadData() {
         imagesData = await imagesResponse.json();
         traitsData = await traitsResponse.json();
         
-        // Calculate trait counts for rarity sorting
         traitCounts = calculateTraitCounts();
-        
-        // Calculate rarity scores and ranks for all NFTs
         nftRarityScores = calculateRarityScores();
-        
-        // Get all IDs sorted in descending order (latest first) by default
         allNFTIds = getSortedNFTIds();
         
         setupSortButtons();
@@ -199,42 +195,29 @@ async function loadData() {
     }
 }
 
-// Lines 218-220
 function loadInitialNFTs() {
     const resultsDiv = document.getElementById('results');
+    resultsDiv.textContent = '';
     
-    // Optimization: Use textContent = '' for fast clearing
-    resultsDiv.textContent = ''; 
-    
-    
-    // Determine which IDs to display
     const idsToDisplay = isFiltering ? filteredNFTIds : allNFTIds;
     
-    // Add count header
     const title = isFiltering ? 'Found matching Kamigotchi' : 'Showing all Kamigotchi';
     const countDiv = createCountHeader(idsToDisplay.length, title);
     resultsDiv.appendChild(countDiv);
     
-    // Load first batch
     currentLoadIndex = 0;
     loadMoreNFTs();
-    
-    // Setup infinite scroll
     setupInfiniteScroll();
 }
 
-// Load more NFTs
 function loadMoreNFTs() {
     if (isLoading) return;
     
     isLoading = true;
     const resultsDiv = document.getElementById('results');
-    
-    // Use filtered IDs if filtering is active, otherwise use all IDs
     const idsToDisplay = isFiltering ? filteredNFTIds : allNFTIds;
     const endIndex = Math.min(currentLoadIndex + LAZY_LOAD_COUNT, idsToDisplay.length);
     
-    // Use requestAnimationFrame for smooth rendering
     requestAnimationFrame(() => {
         const fragment = document.createDocumentFragment();
         
@@ -246,13 +229,10 @@ function loadMoreNFTs() {
         resultsDiv.appendChild(fragment);
         currentLoadIndex = endIndex;
         isLoading = false;
-        
-        // Update loading indicator
         updateLoadingIndicator();
     });
 }
 
-// Create loading indicator
 function createLoadingIndicator() {
     const indicator = document.createElement('div');
     indicator.id = 'loadingIndicator';
@@ -262,7 +242,6 @@ function createLoadingIndicator() {
     return indicator;
 }
 
-// Update loading indicator
 function updateLoadingIndicator() {
     let indicator = document.getElementById('loadingIndicator');
     
@@ -277,14 +256,11 @@ function updateLoadingIndicator() {
     }
 }
 
-// Setup infinite scroll
 function setupInfiniteScroll() {
-    // Optimization: Disconnect the previous observer if it exists
     if (nftObserver) {
         nftObserver.disconnect();
     }
     
-    // Use the global variable
     nftObserver = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
             const idsToDisplay = isFiltering ? filteredNFTIds : allNFTIds;
@@ -293,23 +269,19 @@ function setupInfiniteScroll() {
             }
         });
     }, {
-        rootMargin: '200px' // Start loading 200px before reaching the bottom
+        rootMargin: '200px'
     });
     
-    // Observe the last card
     const observeLastCard = () => {
         const cards = document.querySelectorAll('.nft-card');
         if (cards.length > 0) {
             const lastCard = cards[cards.length - 1];
-            // Use the global variable to observe
-            nftObserver.observe(lastCard); 
+            nftObserver.observe(lastCard);
         }
     };
     
-    // Initial observation
     setTimeout(observeLastCard, 100);
     
-    // Re-observe after each load
     const originalLoadMore = loadMoreNFTs;
     loadMoreNFTs = function() {
         originalLoadMore();
@@ -317,7 +289,6 @@ function setupInfiniteScroll() {
     };
 }
 
-// Create count header helper (simplified without sort info) - Used for initial load
 function createCountHeader(count, title) {
     const countDiv = document.createElement('div');
     countDiv.className = 'count-header';
@@ -327,52 +298,52 @@ function createCountHeader(count, title) {
     return countDiv;
 }
 
-// ✨ MODIFIED: Remove a single selected trait (used by count-header buttons)
 function removeSelectedTrait(event) {
-    // We use currentTarget because the click handler is on the button, not the span inside it.
-    const btn = event.currentTarget; 
+    const btn = event.currentTarget;
     const traitType = btn.dataset.traitType;
     const traitValue = btn.dataset.traitValue;
     
-    // 1. Find the corresponding checkbox and uncheck it
     const checkbox = document.querySelector(
         `.trait-checkbox[data-trait-type="${traitType}"][data-trait-value="${traitValue}"]`
     );
     
     if (checkbox) {
         checkbox.checked = false;
-        
-        // 2. Trigger the filter refresh cycle
-        // updateSelectedTraitsDisplay() now handles calling filterByTraits
-        updateSelectedTraitsDisplay(); 
-        
-        // The button will be automatically removed when filterByTraits redraws the count-header
+        updateSelectedTraitsDisplay();
     }
 }
 
-// ✨ MODIFIED: Update selected traits display (Now only a trigger)
 function updateSelectedTraitsDisplay() {
-    // 1. Hide the old display element as requested
     const selectedTraitsDiv = document.getElementById('selectedTraitsDisplay');
     if (selectedTraitsDiv) {
-        selectedTraitsDiv.style.display = 'none'; 
+        selectedTraitsDiv.style.display = 'none';
     }
-    
-    // 2. Automatically trigger filtering (which now handles the new count-header display)
     filterByTraits();
 }
 
-// Create filter controls with dropdown and checkboxes (SORTED BY RARITY)
 function createFilterControls() {
     const filterControls = document.getElementById('filterControls');
     const allTraits = {};
+    const traitDetails = {};
     
     Object.values(traitsData).forEach(nft => {
-        Object.keys(nft).forEach(traitType => {
+        Object.entries(nft).forEach(([traitType, traitData]) => {
             if (!allTraits[traitType]) {
                 allTraits[traitType] = new Set();
+                traitDetails[traitType] = {};
             }
-            allTraits[traitType].add(nft[traitType]);
+            
+            const traitName = getTraitName(traitData);
+            allTraits[traitType].add(traitName);
+            
+            if (typeof traitData === 'object' && traitData.name) {
+                if (!traitDetails[traitType][traitName]) {
+                    traitDetails[traitType][traitName] = {
+                        affinity: traitData.affinity || null,
+                        stats: traitData.stats || {}
+                    };
+                }
+            }
         });
     });
     
@@ -430,11 +401,10 @@ function createFilterControls() {
         checkboxContainer.className = 'checkbox-container';
         checkboxContainer.dataset.traitType = traitType;
         
-        // Sort by rarity (least common first = most rare)
         const sortedValues = [...allTraits[traitType]].sort((a, b) => {
             const countA = traitCounts[traitType][a] || 0;
             const countB = traitCounts[traitType][b] || 0;
-            return countA - countB; // Ascending = rarest first
+            return countA - countB;
         });
         
         sortedValues.forEach(value => {
@@ -451,16 +421,37 @@ function createFilterControls() {
             checkbox.className = 'trait-checkbox';
             checkbox.dataset.traitType = traitType;
             checkbox.dataset.traitValue = value;
-            
-            // Set up change listener to update display AND filter
-            // It now calls updateSelectedTraitsDisplay, which calls filterByTraits
             checkbox.addEventListener('change', updateSelectedTraitsDisplay);
+            
+            const details = traitDetails[traitType][value] || {};
+            
+            let affinityHTML = '';
+            if (details.affinity && (traitType === 'body' || traitType === 'hand')) {
+                affinityHTML = `<span class="trait-affinity ${details.affinity}" title="Affinity">${details.affinity}</span>`;
+            }
+            
+            let statsHTML = '';
+            if (details.stats && Object.keys(details.stats).length > 0) {
+                const statBadges = Object.entries(details.stats)
+                    .map(([statName, value]) => {
+                        const sign = value > 0 ? '+' : '';
+                        return `<span class="trait-stat ${statName}" title="${statName.charAt(0).toUpperCase() + statName.slice(1)}">${statName.slice(0, 3).toUpperCase()} ${sign}${value}</span>`;
+                    })
+                    .join('');
+                statsHTML = `<span class="trait-stats">${statBadges}</span>`;
+            }
             
             const span = document.createElement('span');
             span.className = 'trait-label-text';
             span.innerHTML = `
-                <span class="trait-name">${value}</span>
-                <span class="trait-count">${count} (${percentage}%)</span>
+                <span class="trait-name-row">
+                    <span class="trait-name">${value}</span>
+                    ${affinityHTML}
+                </span>
+                <span class="trait-info-row">
+                    <span class="trait-count">${count} (${percentage}%)</span>
+                    ${statsHTML}
+                </span>
             `;
             
             checkboxWrapper.appendChild(checkbox);
@@ -531,14 +522,12 @@ function displayNFT(id, showCloseButton = false) {
     const rank = rarityData ? rarityData.rank : '?';
     const score = rarityData ? rarityData.score.toFixed(2) : '?';
     
-    // NEW: Check if this Kamigotchi is new
     const isNew = metadataInfo.newKamiIds && metadataInfo.newKamiIds.includes(Number(id));
     
     const card = document.createElement('div');
     card.className = 'nft-card';
     card.dataset.nftId = id;
     
-    // Determine rank badge color based on rarity tier
     let rankClass = 'rank-common';
     const totalNFTs = Object.keys(traitsData).length;
     const rankPercentile = (rank / totalNFTs) * 100;
@@ -549,16 +538,18 @@ function displayNFT(id, showCloseButton = false) {
     else if (rankPercentile <= 40) rankClass = 'rank-uncommon';
     
     const traitsHTML = Object.entries(traits)
-        .map(([key, value]) => `
-            <div class="trait">
-                <p>${key.charAt(0).toUpperCase() + key.slice(1)}: ${value}</p>
-            </div>
-        `).join('');
+        .map(([key, traitData]) => {
+            const traitName = getTraitName(traitData);
+            return `
+                <div class="trait">
+                    <p>${key.charAt(0).toUpperCase() + key.slice(1)}: ${traitName}</p>
+                </div>
+            `;
+        }).join('');
     
     const closeButtonHTML = showCloseButton ? 
         `<button class="close-btn" onclick="removeSelectedID('${id}')" title="Remove this Kamigotchi">×</button>` : '';
     
-    // NEW: Add NEW badge if applicable
     const newBadgeHTML = isNew ? 
         `<div class="new-badge" title="Recently Added!">NEW</div>` : '';
     
@@ -639,34 +630,23 @@ function clearAllSelectedIDs() {
     document.getElementById('searchInput').value = '';
 }
 
-// Lines 661-665
 function filterByTraits() {
     const resultsDiv = document.getElementById('results');
-    
-    // Optimization: Clear the content efficiently first
-    resultsDiv.textContent = ''; 
+    resultsDiv.textContent = '';
 
     const checkboxes = document.querySelectorAll('.trait-checkbox:checked');
     
     if (checkboxes.length === 0) {
-        // ... (unchanged)
         isFiltering = false;
         loadInitialNFTs();
         return;
     }
     
-    // Display a filtering message (must be added back after clearing textContent)
     const filteringMessage = document.createElement('div');
     filteringMessage.className = 'no-results';
     filteringMessage.textContent = 'Filtering...';
     resultsDiv.appendChild(filteringMessage);
 
-    // ... (rest of the function is unchanged until line 700)
-
-    // After filtering and before adding results:
-    
-
-    
     const selectedTraits = {};
     checkboxes.forEach(checkbox => {
         const traitType = checkbox.dataset.traitType;
@@ -678,48 +658,35 @@ function filterByTraits() {
         selectedTraits[traitType].push(traitValue);
     });
     
-    // Filter NFTs based on selected traits
     let matchingNFTs = Object.keys(traitsData)
         .filter(id => {
             const nftTraits = traitsData[id];
             return Object.entries(selectedTraits).every(([traitType, selectedValues]) => {
-                // An NFT matches this type if its trait value is one of the selected values
-                return selectedValues.includes(nftTraits[traitType]);
+                const nftTraitName = getTraitName(nftTraits[traitType]);
+                return selectedValues.includes(nftTraitName);
             });
         });
     
-    // Apply current sort order to filtered results
     filteredNFTIds = getSortedNFTIds(matchingNFTs);
     isFiltering = true;
     
-    resultsDiv.innerHTML = '';
+    resultsDiv.textContent = '';
     
-    // if (filteredNFTIds.length === 0) {
-    //     resultsDiv.innerHTML = '<div class="no-results">No Kamigotchi match your selected traits</div>';
-    //     isFiltering = false;
-    //     return;
-    // }
-    
-    // --- START OF NEW/MODIFIED SECTION: Interactive Count Header ---
-    
-    // 1. Build the filter summary HTML using single, clickable buttons
     let summaryButtonsHTML = '';
     
     Object.entries(selectedTraits).forEach(([type, values]) => {
         values.forEach(value => {
-            // Create a button for each trait value
             summaryButtonsHTML += `
                 <button class="count-header-trait-btn" 
                         data-trait-type="${type}" 
                         data-trait-value="${value}"
                         title="Click to remove filter: ${type}: ${value}">
-                    ${type}: ${value} x
+                    ${type}: ${value} ×
                 </button>
             `;
         });
     });
     
-    // 2. Create the count header and insert the buttons
     const countDiv = document.createElement('div');
     countDiv.className = 'count-header';
     countDiv.innerHTML = `
@@ -729,18 +696,12 @@ function filterByTraits() {
         </div>
     `;
 
-    // Line 704
-    resultsDiv.textContent = ''; // Clear the "Filtering..." message before adding results
-
     resultsDiv.appendChild(countDiv);
     
-    // 3. Attach event listeners to the new buttons, using the existing removal function
     countDiv.querySelectorAll('.count-header-trait-btn').forEach(btn => {
         btn.addEventListener('click', removeSelectedTrait);
     });
 
-    // --- END OF NEW/MODIFIED SECTION ---
-    // Check if no results found AFTER showing the count header
     if (filteredNFTIds.length === 0) {
         const noResultsDiv = document.createElement('div');
         noResultsDiv.className = 'no-results';
@@ -749,10 +710,8 @@ function filterByTraits() {
         isFiltering = false;
         return;
     }
-    // Reset load index
-    currentLoadIndex = 0;
     
-    // Load filtered results with infinite scroll
+    currentLoadIndex = 0;
     loadMoreNFTs();
     setupInfiniteScroll();
 }
@@ -776,7 +735,6 @@ function clearFilters() {
     
     updateSelectedTraitsDisplay();
     
-    // Clear filtering state and reload all NFTs
     isFiltering = false;
     filteredNFTIds = [];
     loadInitialNFTs();
@@ -787,41 +745,28 @@ document.getElementById('searchInput').addEventListener('keypress', (e) => {
     if (e.key === 'Enter') searchByID();
 });
 document.getElementById('clearSearchBtn').addEventListener('click', clearAllSelectedIDs);
-// document.getElementById('filterBtn').addEventListener('click', filterByTraits);
 document.getElementById('clearBtn').addEventListener('click', clearFilters);
 
-// Scroll to top functionality
 function setupScrollToTop() {
     const scrollBtn = document.getElementById('scrollToTop');
     let lastScrollTop = 0;
-    let scrollTimeout;
     
     window.addEventListener('scroll', () => {
         const currentScroll = window.pageYOffset;
         
-        // Clear previous timeout
-        clearTimeout(scrollTimeout);
-        
-        // Show button if scrolled down more than 300px
         if (currentScroll > 300) {
-            // Check scroll direction
             if (currentScroll > lastScrollTop) {
-                // Scrolling DOWN - show button
                 scrollBtn.classList.add('show');
             } else {
-                // Scrolling UP - hide button
                 scrollBtn.classList.remove('show');
             }
         } else {
-            // Near top of page - hide button
             scrollBtn.classList.remove('show');
         }
         
-        // Update last scroll position
         lastScrollTop = currentScroll;
     });
     
-    // Smooth scroll to top when clicked
     scrollBtn.addEventListener('click', () => {
         window.scrollTo({
             top: 0,
@@ -830,7 +775,69 @@ function setupScrollToTop() {
     });
 }
 
-// Call this function when the page loads
 document.addEventListener('DOMContentLoaded', setupScrollToTop);
+
+// Inject enhanced styles
+const enhancedStyles = `
+.trait-name-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+}
+
+.trait-info-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.trait-affinity {
+    display: inline-block;
+    padding: 2px 6px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.trait-stats {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.trait-stat {
+    display: inline-block;
+    padding: 2px 5px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+}
+
+.checkbox-label .trait-label-text {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.checkbox-label {
+    padding: 8px 10px !important;
+    min-height: 50px;
+    align-items: flex-start !important;
+}
+`;
+
+if (!document.getElementById('enhanced-trait-styles')) {
+    const styleTag = document.createElement('style');
+    styleTag.id = 'enhanced-trait-styles';
+    styleTag.textContent = enhancedStyles;
+    document.head.appendChild(styleTag);
+}
 
 loadData();

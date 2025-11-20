@@ -585,7 +585,92 @@ button {
     position: relative;
 }
 
+.trait-name-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+}
 
+.trait-info-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.trait-affinity {
+    display: inline-block;
+    padding: 2px 6px;
+    color: white;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.trait-affinity.NORMAL {
+  background: rgb(192, 194, 205);
+}
+
+.trait-affinity.SCRAP {
+  background: #d38d50;
+}
+
+.trait-affinity.EERIE {
+  background: #b575d0;
+}
+
+.trait-affinity.INSECT {
+  background: #a1c181;
+}
+
+.trait-stats {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.trait-stat {
+    display: inline-block;
+    padding: 2px 5px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    color: #fff;
+}
+
+
+
+.trait-stat.harmony {
+  background: #9cbcd2;
+}
+
+.trait-stat.health {
+  background: #d7bce8;
+}
+
+.trait-stat.power {
+  background: #f9db6d;
+}
+
+.trait-stat.violence {
+  background: #df829b;
+}
+
+.checkbox-label .trait-label-text {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.checkbox-label {
+    padding: 8px 10px !important;
+    min-height: 50px;
+    align-items: flex-start !important;
+}
 
 @media (max-width: 820px){
   .checkbox-label input[type="checkbox"] {
