@@ -90718,5 +90718,19 @@
     "color": "Blue",
     "face": "o_o",
     "hand": "Wrenches"
+  },
+  "12961": {
+    "background": "BOG",
+    "body": "Bee",
+    "color": "Orange",
+    "face": "Jiangshi Hat",
+    "hand": "Wassie Flipper"
+  },
+  "12962": {
+    "background": "Blue",
+    "body": "Bee",
+    "color": "Orange",
+    "face": "^-^",
+    "hand": "Paws"
   }
 }
