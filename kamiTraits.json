@@ -90655,5 +90655,61 @@
     "color": "Blue",
     "face": "Concerned",
     "hand": "Wrenches"
+  },
+  "12952": {
+    "background": "Alt Green",
+    "body": "Plant",
+    "color": "Yellow",
+    "face": ".w.",
+    "hand": "Beetle"
+  },
+  "12953": {
+    "background": "Orange",
+    "body": "Suit",
+    "color": "Grey",
+    "face": "^-^",
+    "hand": "Scorpion"
+  },
+  "12954": {
+    "background": "Alt Green",
+    "body": "Ghost",
+    "color": "Pink",
+    "face": "^-^",
+    "hand": "Beetle"
+  },
+  "12955": {
+    "background": "Rust",
+    "body": "Lightbulb",
+    "color": "Blue",
+    "face": "O_o",
+    "hand": "Plugs"
+  },
+  "12956": {
+    "background": "Mustard",
+    "body": "Soda Cup",
+    "color": "White",
+    "face": "v_v",
+    "hand": "Wassie Flipper"
+  },
+  "12957": {
+    "background": "Orange",
+    "body": "Snake",
+    "color": "Blue",
+    "face": "o_o",
+    "hand": "Tentacles"
+  },
+  "12958": {
+    "background": "Yellow",
+    "body": "Jellyfish",
+    "color": "Red",
+    "face": "o_o",
+    "hand": "Coins"
+  },
+  "12959": {
+    "background": "Mustard",
+    "body": "Drip",
+    "color": "Yellow",
+    "face": "Unamused",
+    "hand": "Spectral"
   }
 }
