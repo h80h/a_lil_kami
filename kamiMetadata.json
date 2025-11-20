@@ -1,6 +1,9 @@
 {
-  "lastUpdate": "2025-11-20T21:05:16.727Z",
-  "previousMaxId": 12974,
-  "newKamiIds": [],
-  "totalCount": 12974
+  "lastUpdate": "2025-11-20T23:31:18.068Z",
+  "previousMaxId": 12976,
+  "newKamiIds": [
+    12975,
+    12976
+  ],
+  "totalCount": 12976
 }
