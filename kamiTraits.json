@@ -90809,5 +90809,12 @@
     "color": "Pink",
     "face": "O_o",
     "hand": "Spectral"
+  },
+  "12974": {
+    "background": "Pink",
+    "body": "Eyes",
+    "color": "Green",
+    "face": "Wassie",
+    "hand": "Wrenches"
   }
 }
