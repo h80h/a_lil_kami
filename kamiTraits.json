@@ -90711,5 +90711,12 @@
     "color": "Yellow",
     "face": "Unamused",
     "hand": "Spectral"
+  },
+  "12960": {
+    "background": "Blue-Grey",
+    "body": "Working CRT Monitor ",
+    "color": "Blue",
+    "face": "o_o",
+    "hand": "Wrenches"
   }
 }
