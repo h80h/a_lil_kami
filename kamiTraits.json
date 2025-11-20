@@ -90760,5 +90760,19 @@
     "color": "Blue",
     "face": "Impacted",
     "hand": "Mole Cricket"
+  },
+  "12967": {
+    "background": "Blue-Grey",
+    "body": "Cube",
+    "color": "Orange",
+    "face": "^-^",
+    "hand": "Toasters"
+  },
+  "12968": {
+    "background": "Alt Green",
+    "body": "Soda Cup",
+    "color": "Yellow",
+    "face": "Teddy",
+    "hand": "Mole Cricket"
   }
 }
