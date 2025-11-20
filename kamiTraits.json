@@ -90774,5 +90774,40 @@
     "color": "Yellow",
     "face": "Teddy",
     "hand": "Mole Cricket"
+  },
+  "12969": {
+    "background": "Yellow",
+    "body": "Magatama",
+    "color": "Grey",
+    "face": "O_0",
+    "hand": "Fan Blades"
+  },
+  "12970": {
+    "background": "Rust",
+    "body": "Battery",
+    "color": "Green",
+    "face": "v_v",
+    "hand": "Wassie Flipper"
+  },
+  "12971": {
+    "background": "White!",
+    "body": "Working CRT Monitor ",
+    "color": "Yellow",
+    "face": "x_x ",
+    "hand": "Wrenches"
+  },
+  "12972": {
+    "background": "Yellow",
+    "body": "Drip",
+    "color": "Red",
+    "face": "v_v",
+    "hand": "Melted"
+  },
+  "12973": {
+    "background": "GREY!!!!",
+    "body": "Bee",
+    "color": "Pink",
+    "face": "O_o",
+    "hand": "Spectral"
   }
 }
