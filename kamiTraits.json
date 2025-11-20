@@ -90746,5 +90746,19 @@
     "color": "Yellow",
     "face": "v_v",
     "hand": "Paws"
+  },
+  "12965": {
+    "background": "Yellow",
+    "body": "Plant",
+    "color": "Green",
+    "face": "O_0",
+    "hand": "Plant"
+  },
+  "12966": {
+    "background": "Pink",
+    "body": "Orb",
+    "color": "Blue",
+    "face": "Impacted",
+    "hand": "Mole Cricket"
   }
 }
