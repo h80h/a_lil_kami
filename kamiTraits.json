@@ -90739,5 +90739,12 @@
     "color": "Green",
     "face": "v_v",
     "hand": "Spinning Coins"
+  },
+  "12964": {
+    "background": "Purple",
+    "body": "Octopus",
+    "color": "Yellow",
+    "face": "v_v",
+    "hand": "Paws"
   }
 }
