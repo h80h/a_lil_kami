@@ -90732,5 +90732,12 @@
     "color": "Orange",
     "face": "^-^",
     "hand": "Paws"
+  },
+  "12963": {
+    "background": "Pink",
+    "body": "Jellyfish",
+    "color": "Green",
+    "face": "v_v",
+    "hand": "Spinning Coins"
   }
 }
