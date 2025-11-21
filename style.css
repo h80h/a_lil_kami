@@ -84,7 +84,7 @@ h2 {
   align-items: center;
   justify-content: center;
   transition: all;
-  z-index: 10;
+  z-index: 11;
   line-height: 1;
   padding: 2px 0 0 0.3px;
 }
