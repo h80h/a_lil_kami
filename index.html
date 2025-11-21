@@ -1,63 +1,75 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>a lil kami</title>
-    <link rel="stylesheet" href="style.css">
-    <script src="script.js" defer></script>
-    <link rel="preload" href="fonts/dogicapixel-0pwtcunc-webfont.woff2" as="font" type="font/woff2" crossorigin>
-    <link rel="icon" type="image/png" href="/favicon/favicon-96x96.png" sizes="96x96" />
-    <link rel="icon" type="image/svg+xml" href="/favicon/favicon.svg" />
-    <link rel="shortcut icon" href="/favicon/favicon.ico" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/favicon/apple-touch-icon.png" />
-    <meta name="apple-mobile-web-app-title" content="a lil kami" />
-    <link rel="manifest" href="/favicon/site.webmanifest" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Kamigotchi, a cute spirit, you can view them all here.">
+  <meta name="keywords" content="kami, kamigotchi, asphodel, fully onchain game, idle-RPG">
+  <meta name="author" content="h80h">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta property="og:title" content="a lil kami">
+  <meta property="og:description" content="kamigotchi nft collection viewer">
+  <meta property="og:url" content="https://kami.h80h.xyz">
+  <meta property="og:image" content="https://kami.h80h.xyz/card.webp">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="a lil kami">
+  <title>a lil kami</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="script.js" defer></script>
+  <link rel="preload" href="fonts/dogicapixel-0pwtcunc-webfont.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="icon" type="image/png" href="/favicon/favicon-96x96.png" sizes="96x96" />
+  <link rel="icon" type="image/svg+xml" href="/favicon/favicon.svg" />
+  <link rel="shortcut icon" href="/favicon/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/favicon/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="a lil kami" />
+  <link rel="manifest" href="/favicon/site.webmanifest" />
 </head>
 <body>
-    <img src="kami_loading.gif" alt="" class="loader">
-    <div class="container" style="display: none;" none;>
-        <!-- Search by ID -->
-        <div class="search-section">
-          <input type="text" id="searchInput" placeholder="Enter NFT ID..." autocomplete="off">
-          <div id="searchBtn">
-            <svg id="searchBtn_svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 26 26"><title>search</title><path d="M9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.44,13.73L14.71,14H15.5L20.5,19L19,20.5L14,15.5V14.71L13.73,14.44C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3M9.5,5C7,5 5,7 5,9.5C5,12 7,14 9.5,14C12,14 14,12 14,9.5C14,7 12,5 9.5,5Z" /></svg>
-          </div>
-          <div id="clearSearchBtn">
-            <svg id="clearSearchBtn_svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 28"><title>clean</title><path d="M20.62,2C23.97,7.61 12.47,20.15 12.47,20.15L9.6,17.28L4.91,22L2.77,19.86L20.62,2Z" /></svg>
-          </div>
+  <img src="kami_loading.gif" alt="" class="loader">
+  <div class="container" style="display: none;" none;>
+      <!-- Search by ID -->
+      <div class="search-section">
+        <input type="text" id="searchInput" placeholder="Enter NFT ID..." autocomplete="off">
+        <div id="searchBtn">
+          <svg id="searchBtn_svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 26 26"><title>search</title><path d="M9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.44,13.73L14.71,14H15.5L20.5,19L19,20.5L14,15.5V14.71L13.73,14.44C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3M9.5,5C7,5 5,7 5,9.5C5,12 7,14 9.5,14C12,14 14,12 14,9.5C14,7 12,5 9.5,5Z" /></svg>
         </div>
-
-        <!-- Selected IDs Display -->
-        <div id="selectedIDs" class="selected-ids"></div>
-
-        <!-- Filter by Traits -->
-        <div class="filter-section">
-          <div id="filterControls"></div>
-          
-          <!-- Selected Traits Display -->
-          <div id="selectedTraitsDisplay" class="selected-traits-display" style="display: none;"></div>
-          <div class="filter-buttons">
-            <!-- <button id="filterBtn">Apply</button> -->
-            <button id="clearBtn">Clear</button>
-          </div>
+        <div id="clearSearchBtn">
+          <svg id="clearSearchBtn_svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 28"><title>clean</title><path d="M20.62,2C23.97,7.61 12.47,20.15 12.47,20.15L9.6,17.28L4.91,22L2.77,19.86L20.62,2Z" /></svg>
         </div>
+      </div>
 
-        <div class="sort-section">
-          <div class="sort-label">Sort Order:</div>
-          <div class="sort-buttons">
-              <button class="sort-btn active" data-sort="latest">Latest!</button>
-              <button class="sort-btn" data-sort="oldest">Oldest!</button>
-              <button class="sort-btn" data-sort="rarity">Rarest!</button>
-              <button class="sort-btn" data-sort="harmony">Harmony</button>
-              <button class="sort-btn" data-sort="health">Health</button>
-              <button class="sort-btn" data-sort="power">Power</button>
-              <button class="sort-btn" data-sort="violence">Violence</button>
-        </div>
+      <!-- Selected IDs Display -->
+      <div id="selectedIDs" class="selected-ids"></div>
 
-        <!-- Results Display -->
-        <div id="results"></div>
+      <!-- Filter by Traits -->
+      <div class="filter-section">
+        <div id="filterControls"></div>
         
+        <!-- Selected Traits Display -->
+        <div id="selectedTraitsDisplay" class="selected-traits-display" style="display: none;"></div>
+        <div class="filter-buttons">
+          <!-- <button id="filterBtn">Apply</button> -->
+          <button id="clearBtn">Clear</button>
+        </div>
+      </div>
+
+      <div class="sort-section">
+        <div class="sort-label">Sort Order:</div>
+        <div class="sort-buttons">
+            <button class="sort-btn active" data-sort="latest">Latest!</button>
+            <button class="sort-btn" data-sort="oldest">Oldest!</button>
+            <button class="sort-btn" data-sort="rarity">Rarest!</button>
+            <button class="sort-btn" data-sort="harmony">Harmony</button>
+            <button class="sort-btn" data-sort="health">Health</button>
+            <button class="sort-btn" data-sort="power">Power</button>
+            <button class="sort-btn" data-sort="violence">Violence</button>
+      </div>
+
+      <!-- Results Display -->
+      <div id="results"></div>        
     </div>
   <div id="scrollToTop" class="scroll-to-top" title="Back to top">
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><title>arrow-up</title><path d="M13,20H11V8L5.5,13.5L4.08,12.08L12,4.16L19.92,12.08L18.5,13.5L13,8V20Z" /></svg>
