@@ -1,5 +1,6 @@
 let imagesData = {};
 let traitsData = {};
+let kamiStatsData = {}; // NEW: Stats data
 let selectedIDs = new Set();
 let allNFTIds = [];
 let filteredNFTIds = [];
@@ -95,7 +96,7 @@ function calculateRarityScores() {
     return rankedScores;
 }
 
-// Get sorted NFT IDs based on current sort order
+// UPDATED: Get sorted NFT IDs based on current sort order (with stats support)
 function getSortedNFTIds(idsToSort) {
     const ids = idsToSort || Object.keys(traitsData);
     
@@ -107,6 +108,31 @@ function getSortedNFTIds(idsToSort) {
         case 'rarity':
             return ids.sort((a, b) => {
                 return nftRarityScores[a].rank - nftRarityScores[b].rank;
+            });
+        // NEW: Stat-based sorting
+        case 'harmony':
+            return ids.sort((a, b) => {
+                const statA = kamiStatsData[a]?.stats.harmony || 0;
+                const statB = kamiStatsData[b]?.stats.harmony || 0;
+                return statB - statA;
+            });
+        case 'health':
+            return ids.sort((a, b) => {
+                const statA = kamiStatsData[a]?.stats.health || 0;
+                const statB = kamiStatsData[b]?.stats.health || 0;
+                return statB - statA;
+            });
+        case 'power':
+            return ids.sort((a, b) => {
+                const statA = kamiStatsData[a]?.stats.power || 0;
+                const statB = kamiStatsData[b]?.stats.power || 0;
+                return statB - statA;
+            });
+        case 'violence':
+            return ids.sort((a, b) => {
+                const statA = kamiStatsData[a]?.stats.violence || 0;
+                const statB = kamiStatsData[b]?.stats.violence || 0;
+                return statB - statA;
             });
         default:
             return ids.sort((a, b) => Number(b) - Number(a));
@@ -137,7 +163,7 @@ function setupSortButtons() {
     });
 }
 
-// Load JSON files
+// UPDATED: Load JSON files (including stats)
 async function loadData() {
     try {
         const imagesResponse = await fetch('kamiImage.json');
@@ -148,6 +174,21 @@ async function loadData() {
         const traitsResponse = await fetch('kamiTraits.json');
         if (!traitsResponse.ok) {
             throw new Error(`Failed to load kamiTraits.json: ${traitsResponse.status}`);
+        }
+        
+        // NEW: Load stats data
+        try {
+            const statsResponse = await fetch('kamiStats.json');
+            if (statsResponse.ok) {
+                kamiStatsData = await statsResponse.json();
+                console.log(`✅ Loaded stats data for ${Object.keys(kamiStatsData).length} Kamigotchi`);
+            } else {
+                console.log('ℹ️  Stats file not found - stat sorting disabled');
+                kamiStatsData = {};
+            }
+        } catch (statsError) {
+            console.log('ℹ️  Could not load stats:', statsError.message);
+            kamiStatsData = {};
         }
         
         try {
@@ -294,6 +335,7 @@ function createCountHeader(count, title) {
     countDiv.className = 'count-header';
     countDiv.innerHTML = `
         <div style="font-size: 14px;">${title}: ${count}</div>
+        <div class="note">** dear mobile user, long press to show og stats **<div>
     `;
     return countDiv;
 }
@@ -509,9 +551,11 @@ function filterTraitOptions(traitType, searchTerm) {
     }
 }
 
+// UPDATED: Display NFT with stats
 function displayNFT(id, showCloseButton = false) {
     const imageUrl = imagesData[id];
     const traits = traitsData[id];
+    const stats = kamiStatsData[id]; // NEW: Get stats
     
     if (!imageUrl || !traits) {
         console.warn(`NFT #${id} not found in data`);
@@ -525,7 +569,7 @@ function displayNFT(id, showCloseButton = false) {
     const isNew = metadataInfo.newKamiIds && metadataInfo.newKamiIds.includes(Number(id));
     
     const card = document.createElement('div');
-    card.className = 'nft-card';
+    card.className = 'nft-card hover_wrapper';
     card.dataset.nftId = id;
     
     let rankClass = 'rank-common';
@@ -536,6 +580,35 @@ function displayNFT(id, showCloseButton = false) {
     else if (rankPercentile <= 5) rankClass = 'rank-epic';
     else if (rankPercentile <= 15) rankClass = 'rank-rare';
     else if (rankPercentile <= 40) rankClass = 'rank-uncommon';
+    
+    // NEW: Create stats display if available
+    let statsHTML = '';
+    if (stats) {
+        statsHTML = `
+            <div class="kami-stats">
+                <div class="stat-row one">
+                    <div class="stat-item health">
+                        
+                        <div class="stat-value">${stats.stats.health}</div>
+                    </div>
+                    <div class="stat-item power">
+                        
+                        <div class="stat-value">${stats.stats.power}</div>
+                    </div>
+                </div>
+                <div class="stat-row">
+                    <div class="stat-item violence">
+                        
+                        <div class="stat-value">${stats.stats.violence}</div>
+                    </div>
+                    <div class="stat-item harmony">
+                        
+                        <div class="stat-value">${stats.stats.harmony}</div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
     
     const traitsHTML = Object.entries(traits)
         .map(([key, traitData]) => {
@@ -559,15 +632,41 @@ function displayNFT(id, showCloseButton = false) {
     <div class="rank-badge ${rankClass}" title="Rarity Rank: #${rank} | Score: ${score}">
         ${rank}
     </div>
+    ${statsHTML}
     <div class="nft-card-content">
         <img src="${imageUrl}" alt="NFT #${id}" loading="lazy" onerror="this.src='https://via.placeholder.com/250?text=Image+Not+Found'">
-        <div class="nft-details">
+        <div class="nft-details hover_wrapper">
             <div class="nft-id">Kamigotchi ${id}</div>
             ${traitsHTML}
         </div>
     </div>
 `;
     
+   card.addEventListener('click', (event) => {
+    // 1. Stop the event from "bubbling up" to the document listener below
+    event.stopPropagation();
+    
+    // 2. Toggle the visibility class
+    statsHTML.classList.toggle('is-active');
+});
+
+    // B. Listen for clicks on the entire document (page)
+    document.addEventListener('click', (event) => {
+    // Check if the tapContent is currently visible
+    if (statsHTML.classList.contains('is-active')) {
+        
+        // The .contains() method checks if the clicked element (event.target) 
+        // is inside the tapTarget container (or is the tapTarget itself).
+        // If it returns FALSE, the click was OUTSIDE the container.
+        const isClickInsideContainer = card.contains(event.target);
+        
+        if (!isClickInsideContainer) {
+            // If the click was outside AND the content is active, hide it.
+            statsHTML.classList.remove('is-active');
+        }
+    }
+});
+
     return card;
 }
 
@@ -777,7 +876,7 @@ function setupScrollToTop() {
 
 document.addEventListener('DOMContentLoaded', setupScrollToTop);
 
-// Inject enhanced styles
+// NEW: Inject enhanced styles for stats display
 const enhancedStyles = `
 .trait-name-row {
     display: flex;
@@ -830,6 +929,34 @@ const enhancedStyles = `
     padding: 8px 10px !important;
     min-height: 50px;
     align-items: flex-start !important;
+}
+
+.stat-row {
+    display: flex;
+    gap: 8px;
+}
+
+.stat-row.one {
+    margin-bottom: 10px;
+}
+
+.stat-item {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 0px;
+    border-radius: 15px;
+    font-size: 11px;
+    margin: 0px 10px;
+    height: 25px;
+    border: 2px solid #999;
+}
+    
+.stat-value {
+    margin: auto;
+    width: 0
+    color: #333;
 }
 `;
 

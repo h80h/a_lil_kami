@@ -111,7 +111,7 @@ button {
 
 #clearBtn,
 .sort-btn {
-  width: 55px;
+  width: 60px;
   height: 37px;
   color: white;
   border: none;
@@ -179,6 +179,11 @@ button {
 
 .sort-buttons {
   cursor: default;
+}
+
+.sort-btn {
+  flex: 1;
+  margin-bottom: 10px;
 }
 
 #clearBtn,
@@ -408,6 +413,12 @@ button {
   border-radius: 8px;
   border: 2px solid #999;
   margin-bottom: 10px;
+}
+
+.note {
+  font-size: 11px;
+  color: #333;
+  margin-top: 10px;
 }
 
 /* Loading indicator */
@@ -644,19 +655,23 @@ button {
 
 
 
-.trait-stat.harmony {
+.trait-stat.harmony,
+.stat-item.harmony {
   background: #9cbcd2;
 }
 
-.trait-stat.health {
+.trait-stat.health,
+.stat-item.health {
   background: #d7bce8;
 }
 
-.trait-stat.power {
+.trait-stat.power,
+.stat-item.power {
   background: #f9db6d;
 }
 
-.trait-stat.violence {
+.trait-stat.violence,
+.stat-item.violence {
   background: #df829b;
 }
 
@@ -670,6 +685,40 @@ button {
     padding: 8px 10px !important;
     min-height: 50px;
     align-items: flex-start !important;
+}
+
+.hover_wrapper {
+  position: relative; /* Establishes the reference point for the message */
+  display: inline-block; /* Keeps container size tight to content */
+  cursor: help;
+
+  -webkit-user-select: none;
+}
+
+.kami-stats {
+  border-radius: 8px;
+  width: 100%;
+  background: #fff;
+  border: 2px solid #999;
+  position: absolute;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s, visibility 0.3s;
+  
+  padding: 8px 0px;
+  border-radius: 4px;
+  z-index: 10;
+
+  bottom: 0%;
+  left: 50%;
+  transform: translate(-50%, -10px);
+}
+
+.hover_wrapper:hover .kami-stats,
+.hover_wrapper.is-active .kami-stats {
+  opacity: 0.9;
+  visibility: visible;
+  transform: translate(-50%, -5px);
 }
 
 @media (max-width: 820px){
