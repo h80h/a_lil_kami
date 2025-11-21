@@ -1,6 +1,6 @@
 let imagesData = {};
 let traitsData = {};
-let kamiStatsData = {}; // NEW: Stats data
+let kamiStatsData = {};
 let selectedIDs = new Set();
 let allNFTIds = [];
 let filteredNFTIds = [];
@@ -96,7 +96,7 @@ function calculateRarityScores() {
     return rankedScores;
 }
 
-// UPDATED: Get sorted NFT IDs based on current sort order (with stats support)
+// Get sorted NFT IDs based on current sort order (with stats support)
 function getSortedNFTIds(idsToSort) {
     const ids = idsToSort || Object.keys(traitsData);
     
@@ -109,7 +109,6 @@ function getSortedNFTIds(idsToSort) {
             return ids.sort((a, b) => {
                 return nftRarityScores[a].rank - nftRarityScores[b].rank;
             });
-        // NEW: Stat-based sorting
         case 'harmony':
             return ids.sort((a, b) => {
                 const statA = kamiStatsData[a]?.stats.harmony || 0;
@@ -163,7 +162,7 @@ function setupSortButtons() {
     });
 }
 
-// UPDATED: Load JSON files (including stats)
+// Load JSON files (including stats)
 async function loadData() {
     try {
         const imagesResponse = await fetch('kamiImage.json');
@@ -176,7 +175,6 @@ async function loadData() {
             throw new Error(`Failed to load kamiTraits.json: ${traitsResponse.status}`);
         }
         
-        // NEW: Load stats data
         try {
             const statsResponse = await fetch('kamiStats.json');
             if (statsResponse.ok) {
@@ -335,7 +333,7 @@ function createCountHeader(count, title) {
     countDiv.className = 'count-header';
     countDiv.innerHTML = `
         <div style="font-size: 14px;">${title}: ${count}</div>
-        <div class="note">** dear mobile user, long press to show og stats **<div>
+        <div class="note">** dear mobile user, click card to show og stats **<div>
     `;
     return countDiv;
 }
@@ -351,15 +349,32 @@ function removeSelectedTrait(event) {
     
     if (checkbox) {
         checkbox.checked = false;
-        updateSelectedTraitsDisplay();
+        // FIXED: Pass true to force re-evaluation of filters
+        updateSelectedTraitsDisplay(true);
     }
 }
 
-function updateSelectedTraitsDisplay() {
+// FIXED: Added forceUpdate parameter to ensure proper filter re-evaluation
+function updateSelectedTraitsDisplay(forceUpdate = false) {
     const selectedTraitsDiv = document.getElementById('selectedTraitsDisplay');
     if (selectedTraitsDiv) {
         selectedTraitsDiv.style.display = 'none';
     }
+    
+    // FIXED: Re-evaluate all checked checkboxes to ensure proper state
+    const checkboxes = document.querySelectorAll('.trait-checkbox:checked');
+    
+    // If no checkboxes are selected and we're currently filtering, reset to non-filtered view
+    if (checkboxes.length === 0 && (isFiltering || forceUpdate)) {
+        isFiltering = false;
+        filteredNFTIds = [];
+        // Re-sort allNFTIds with current sort order before loading
+        allNFTIds = getSortedNFTIds(Object.keys(traitsData));
+        loadInitialNFTs();
+        return;
+    }
+    
+    // Otherwise, apply filters normally
     filterByTraits();
 }
 
@@ -463,7 +478,7 @@ function createFilterControls() {
             checkbox.className = 'trait-checkbox';
             checkbox.dataset.traitType = traitType;
             checkbox.dataset.traitValue = value;
-            checkbox.addEventListener('change', updateSelectedTraitsDisplay);
+            checkbox.addEventListener('change', () => updateSelectedTraitsDisplay(false));
             
             const details = traitDetails[traitType][value] || {};
             
@@ -551,11 +566,11 @@ function filterTraitOptions(traitType, searchTerm) {
     }
 }
 
-// UPDATED: Display NFT with stats
+// Display NFT with stats
 function displayNFT(id, showCloseButton = false) {
     const imageUrl = imagesData[id];
     const traits = traitsData[id];
-    const stats = kamiStatsData[id]; // NEW: Get stats
+    const stats = kamiStatsData[id];
     
     if (!imageUrl || !traits) {
         console.warn(`NFT #${id} not found in data`);
@@ -581,7 +596,6 @@ function displayNFT(id, showCloseButton = false) {
     else if (rankPercentile <= 15) rankClass = 'rank-rare';
     else if (rankPercentile <= 40) rankClass = 'rank-uncommon';
     
-    // NEW: Create stats display if available
     let statsHTML = '';
     if (stats) {
         statsHTML = `
@@ -642,30 +656,23 @@ function displayNFT(id, showCloseButton = false) {
     </div>
 `;
     
-   card.addEventListener('click', (event) => {
-    // 1. Stop the event from "bubbling up" to the document listener below
-    event.stopPropagation();
-    
-    // 2. Toggle the visibility class
-    statsHTML.classList.toggle('is-active');
-});
-
-    // B. Listen for clicks on the entire document (page)
-    document.addEventListener('click', (event) => {
-    // Check if the tapContent is currently visible
-    if (statsHTML.classList.contains('is-active')) {
-        
-        // The .contains() method checks if the clicked element (event.target) 
-        // is inside the tapTarget container (or is the tapTarget itself).
-        // If it returns FALSE, the click was OUTSIDE the container.
-        const isClickInsideContainer = card.contains(event.target);
-        
-        if (!isClickInsideContainer) {
-            // If the click was outside AND the content is active, hide it.
-            statsHTML.classList.remove('is-active');
+    card.addEventListener('click', (event) => {
+        event.stopPropagation();
+        const statsElement = card.querySelector('.kami-stats');
+        if (statsElement) {
+            statsElement.classList.toggle('is-active');
         }
-    }
-});
+    });
+
+    document.addEventListener('click', (event) => {
+        const statsElement = card.querySelector('.kami-stats');
+        if (statsElement && statsElement.classList.contains('is-active')) {
+            const isClickInsideContainer = card.contains(event.target);
+            if (!isClickInsideContainer) {
+                statsElement.classList.remove('is-active');
+            }
+        }
+    });
 
     return card;
 }
@@ -737,6 +744,8 @@ function filterByTraits() {
     
     if (checkboxes.length === 0) {
         isFiltering = false;
+        // FIXED: Re-sort with current order when exiting filter mode
+        allNFTIds = getSortedNFTIds(Object.keys(traitsData));
         loadInitialNFTs();
         return;
     }
@@ -789,8 +798,9 @@ function filterByTraits() {
     const countDiv = document.createElement('div');
     countDiv.className = 'count-header';
     countDiv.innerHTML = `
-        <div id="count-summary" style="font-size: 14px; margin-bottom: 15px;">Found matching Kamigotchi: ${filteredNFTIds.length}</div>
-        <div id="filter-summary-buttons" class="filter-summary-buttons-container" style="display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px;">
+        <div id="count-summary" style="font-size: 14px;">Found matching Kamigotchi: ${filteredNFTIds.length}</div>
+        <div class="note">** dear mobile user, click card to show og stats **<div>
+        <div id="filter-summary-buttons" class="filter-summary-buttons-container" style="display: flex; flex-wrap: wrap; gap: 5px; margin: 10px;">
             ${summaryButtonsHTML}
         </div>
     `;
@@ -832,10 +842,10 @@ function clearFilters() {
     const allFilterGroups = document.querySelectorAll('.filter-group');
     allFilterGroups.forEach(group => group.style.display = 'none');
     
-    updateSelectedTraitsDisplay();
-    
     isFiltering = false;
     filteredNFTIds = [];
+    // FIXED: Re-sort with current order when clearing filters
+    allNFTIds = getSortedNFTIds(Object.keys(traitsData));
     loadInitialNFTs();
 }
 
@@ -876,7 +886,7 @@ function setupScrollToTop() {
 
 document.addEventListener('DOMContentLoaded', setupScrollToTop);
 
-// NEW: Inject enhanced styles for stats display
+// Inject enhanced styles for stats display
 const enhancedStyles = `
 .trait-name-row {
     display: flex;
