@@ -15,6 +15,11 @@ const LAZY_LOAD_COUNT = 30;
 let isLoading = false;
 let metadataInfo = {};
 
+// Cache-busting timestamp generator
+function getCacheBuster() {
+    return new Date().getTime();
+}
+
 // Smooth loader display
 function showLoader() {
     const loader = document.querySelector('.loader');
@@ -162,21 +167,42 @@ function setupSortButtons() {
     });
 }
 
-// Load JSON files (including stats)
+// Enhanced fetch function with cache-busting and proper headers
+async function fetchWithCacheBusting(url, options = {}) {
+    const cacheBuster = getCacheBuster();
+    const urlWithCacheBuster = `${url}?v=${cacheBuster}`;
+    
+    const fetchOptions = {
+        ...options,
+        headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0',
+            ...options.headers
+        },
+        cache: 'no-store'
+    };
+    
+    return fetch(urlWithCacheBuster, fetchOptions);
+}
+
+// Load JSON files with cache-busting
 async function loadData() {
     try {
-        const imagesResponse = await fetch('kamiImage.json');
+        console.log('🔄 Loading data with cache-busting...');
+        
+        const imagesResponse = await fetchWithCacheBusting('kamiImage.json');
         if (!imagesResponse.ok) {
             throw new Error(`Failed to load kamiImage.json: ${imagesResponse.status}`);
         }
         
-        const traitsResponse = await fetch('kamiTraits.json');
+        const traitsResponse = await fetchWithCacheBusting('kamiTraits.json');
         if (!traitsResponse.ok) {
             throw new Error(`Failed to load kamiTraits.json: ${traitsResponse.status}`);
         }
         
         try {
-            const statsResponse = await fetch('kamiStats.json');
+            const statsResponse = await fetchWithCacheBusting('kamiStats.json');
             if (statsResponse.ok) {
                 kamiStatsData = await statsResponse.json();
                 console.log(`✅ Loaded stats data for ${Object.keys(kamiStatsData).length} Kamigotchi`);
@@ -190,7 +216,7 @@ async function loadData() {
         }
         
         try {
-            const metadataResponse = await fetch('kamiMetadata.json');
+            const metadataResponse = await fetchWithCacheBusting('kamiMetadata.json');
             if (metadataResponse.ok) {
                 metadataInfo = await metadataResponse.json();
                 console.log(`✨ Found ${metadataInfo.newKamiIds?.length || 0} new Kamigotchi!`);
@@ -209,6 +235,9 @@ async function loadData() {
         imagesData = await imagesResponse.json();
         traitsData = await traitsResponse.json();
         
+        console.log(`✅ Loaded ${Object.keys(imagesData).length} images`);
+        console.log(`✅ Loaded ${Object.keys(traitsData).length} trait sets`);
+        
         traitCounts = calculateTraitCounts();
         nftRarityScores = calculateRarityScores();
         allNFTIds = getSortedNFTIds();
@@ -226,7 +255,8 @@ async function loadData() {
                 <strong>Troubleshooting:</strong><br>
                 1. Make sure you're running a local server (not opening HTML directly)<br>
                 2. Check that kamiImage.json and kamiTraits.json are in the same folder<br>
-                3. Check the browser console (F12) for more details
+                3. Check the browser console (F12) for more details<br>
+                4. Try doing a hard refresh (Ctrl+Shift+R or Cmd+Shift+R)
             </div>`;
     } finally {
         hideLoader();
@@ -349,32 +379,26 @@ function removeSelectedTrait(event) {
     
     if (checkbox) {
         checkbox.checked = false;
-        // FIXED: Pass true to force re-evaluation of filters
         updateSelectedTraitsDisplay(true);
     }
 }
 
-// FIXED: Added forceUpdate parameter to ensure proper filter re-evaluation
 function updateSelectedTraitsDisplay(forceUpdate = false) {
     const selectedTraitsDiv = document.getElementById('selectedTraitsDisplay');
     if (selectedTraitsDiv) {
         selectedTraitsDiv.style.display = 'none';
     }
     
-    // FIXED: Re-evaluate all checked checkboxes to ensure proper state
     const checkboxes = document.querySelectorAll('.trait-checkbox:checked');
     
-    // If no checkboxes are selected and we're currently filtering, reset to non-filtered view
     if (checkboxes.length === 0 && (isFiltering || forceUpdate)) {
         isFiltering = false;
         filteredNFTIds = [];
-        // Re-sort allNFTIds with current sort order before loading
         allNFTIds = getSortedNFTIds(Object.keys(traitsData));
         loadInitialNFTs();
         return;
     }
     
-    // Otherwise, apply filters normally
     filterByTraits();
 }
 
@@ -744,7 +768,6 @@ function filterByTraits() {
     
     if (checkboxes.length === 0) {
         isFiltering = false;
-        // FIXED: Re-sort with current order when exiting filter mode
         allNFTIds = getSortedNFTIds(Object.keys(traitsData));
         loadInitialNFTs();
         return;
@@ -844,7 +867,6 @@ function clearFilters() {
     
     isFiltering = false;
     filteredNFTIds = [];
-    // FIXED: Re-sort with current order when clearing filters
     allNFTIds = getSortedNFTIds(Object.keys(traitsData));
     loadInitialNFTs();
 }
@@ -976,5 +998,22 @@ if (!document.getElementById('enhanced-trait-styles')) {
     styleTag.textContent = enhancedStyles;
     document.head.appendChild(styleTag);
 }
+
+// Clear any cached service workers on load
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then(function(registrations) {
+        for (let registration of registrations) {
+            registration.unregister();
+        }
+    });
+}
+
+// Force reload data on page visibility change (when user returns to tab)
+document.addEventListener('visibilitychange', function() {
+    if (!document.hidden && performance.getEntriesByType('navigation')[0]?.type === 'reload') {
+        console.log('🔄 Page became visible after reload, ensuring fresh data...');
+        location.reload(true);
+    }
+});
 
 loadData();

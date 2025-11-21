@@ -691,7 +691,7 @@ button {
   position: relative; /* Establishes the reference point for the message */
   display: inline-block; /* Keeps container size tight to content */
   cursor: help;
-
+  user-select: none;
   -webkit-user-select: none;
 }
 
