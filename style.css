@@ -782,6 +782,7 @@ button {
     flex: 1;
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 4px;
     padding: 3px 0px;
     border-radius: 15px;
@@ -792,9 +793,8 @@ button {
 }
     
 .stat-value {
-    margin: auto;
-    width: 0;
     color: #333;
+    text-align: center;
 }
 
 @media (max-width: 820px){

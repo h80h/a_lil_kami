@@ -1125,34 +1125,6 @@ const enhancedStyles = `
     align-items: flex-start !important;
 }
 
-.stat-row {
-    display: flex;
-    gap: 8px;
-}
-
-.stat-row.one {
-    margin-bottom: 10px;
-}
-
-.stat-item {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    padding: 3px 0px;
-    border-radius: 15px;
-    font-size: 11px;
-    margin: 0px 10px;
-    height: 25px;
-    border: 2px solid #999;
-}
-    
-.stat-value {
-    margin: auto;
-    width: 0
-    color: #333;
-}
-
 .rank-stat-container {
     display: flex;
     align-items: center;
