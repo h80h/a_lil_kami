@@ -14,6 +14,7 @@ const INITIAL_LOAD_COUNT = 50;
 const LAZY_LOAD_COUNT = 30;
 let isLoading = false;
 let metadataInfo = {};
+let isRefreshing = false;
 
 // Cache-busting timestamp generator
 function getCacheBuster() {
@@ -69,24 +70,50 @@ function calculateTraitCounts() {
     return counts;
 }
 
-// Calculate rarity score for each NFT using statistical rarity
+// OpenRarity implementation
 function calculateRarityScores() {
     const totalNFTs = Object.keys(traitsData).length;
     const scores = {};
     
+    // Step 1: Calculate Information Content (IC) for each trait
+    // IC = -log(probability) where probability = trait_count / total_nfts
+    const traitIC = {};
+    Object.entries(traitCounts).forEach(([category, traits]) => {
+        traitIC[category] = {};
+        Object.entries(traits).forEach(([traitName, count]) => {
+            const probability = count / totalNFTs;
+            // Information Content: higher IC = rarer trait
+            traitIC[category][traitName] = -Math.log(probability);
+        });
+    });
+    
+    // Step 2: Calculate max IC per trait category for normalization
+    const maxICPerCategory = {};
+    Object.entries(traitIC).forEach(([category, traits]) => {
+        maxICPerCategory[category] = Math.max(...Object.values(traits));
+    });
+    
+    // Step 3: Calculate normalized rarity score for each NFT
     Object.entries(traitsData).forEach(([id, traits]) => {
-        let rarityScore = 0;
+        let normalizedScore = 0;
         
         Object.entries(traits).forEach(([category, traitData]) => {
             const traitName = getTraitName(traitData);
-            const traitCount = traitCounts[category][traitName];
-            const traitRarity = 1 / (traitCount / totalNFTs);
-            rarityScore += traitRarity;
+            const ic = traitIC[category][traitName];
+            const maxIC = maxICPerCategory[category];
+            
+            // Normalize IC by dividing by max IC in category
+            // This ensures each trait category contributes equally
+            const normalizedIC = ic / maxIC;
+            normalizedScore += normalizedIC;
         });
         
-        scores[id] = rarityScore;
+        // Average across all trait categories for final score
+        const numTraitCategories = Object.keys(traits).length;
+        scores[id] = normalizedScore / numTraitCategories;
     });
     
+    // Step 4: Rank NFTs by score (higher score = rarer)
     const sortedByScore = Object.entries(scores)
         .sort((a, b) => b[1] - a[1]);
     
@@ -189,7 +216,7 @@ async function fetchWithCacheBusting(url, options = {}) {
 // Load JSON files with cache-busting
 async function loadData() {
     try {
-        console.log('🔄 Loading data with cache-busting...');
+        console.log('📄 Loading data with cache-busting...');
         
         const imagesResponse = await fetchWithCacheBusting('kamiImage.json');
         if (!imagesResponse.ok) {
@@ -239,7 +266,9 @@ async function loadData() {
         console.log(`✅ Loaded ${Object.keys(traitsData).length} trait sets`);
         
         traitCounts = calculateTraitCounts();
+        console.log('🔢 Calculating OpenRarity scores...');
         nftRarityScores = calculateRarityScores();
+        console.log('✅ OpenRarity calculation complete!');
         allNFTIds = getSortedNFTIds();
         
         setupSortButtons();
@@ -256,11 +285,114 @@ async function loadData() {
                 1. Make sure you're running a local server (not opening HTML directly)<br>
                 2. Check that kamiImage.json and kamiTraits.json are in the same folder<br>
                 3. Check the browser console (F12) for more details<br>
-                4. Try doing a hard refresh (Ctrl+Shift+R or Cmd+Shift+R)
+                4. Try clicking the refresh button
             </div>`;
     } finally {
         hideLoader();
         showContainer();
+    }
+}
+
+// Refresh data without reloading entire page
+async function refreshData() {
+    if (isRefreshing) return;
+    
+    isRefreshing = true;
+    const refreshBtn = document.getElementById('refreshDataBtn');
+    const originalText = refreshBtn.innerHTML;
+    
+    refreshBtn.disabled = true;
+    
+    try {
+        console.log('🔄 Refreshing data...');
+        
+        // Save current state
+        const currentFilters = [];
+        document.querySelectorAll('.trait-checkbox:checked').forEach(cb => {
+            currentFilters.push({
+                type: cb.dataset.traitType,
+                value: cb.dataset.traitValue
+            });
+        });
+        
+        // Reload all data
+        const imagesResponse = await fetchWithCacheBusting('kamiImage.json');
+        const traitsResponse = await fetchWithCacheBusting('kamiTraits.json');
+        
+        if (!imagesResponse.ok || !traitsResponse.ok) {
+            throw new Error('Failed to fetch updated data');
+        }
+        
+        imagesData = await imagesResponse.json();
+        traitsData = await traitsResponse.json();
+        
+        // Reload optional files
+        try {
+            const statsResponse = await fetchWithCacheBusting('kamiStats.json');
+            if (statsResponse.ok) {
+                kamiStatsData = await statsResponse.json();
+            }
+        } catch (e) {
+            console.log('Stats not updated');
+        }
+        
+        try {
+            const metadataResponse = await fetchWithCacheBusting('kamiMetadata.json');
+            if (metadataResponse.ok) {
+                metadataInfo = await metadataResponse.json();
+            }
+        } catch (e) {
+            console.log('Metadata not updated');
+        }
+        
+        // Recalculate everything with OpenRarity
+        traitCounts = calculateTraitCounts();
+        console.log('🔢 Recalculating OpenRarity scores...');
+        nftRarityScores = calculateRarityScores();
+        console.log('✅ OpenRarity recalculation complete!');
+        allNFTIds = getSortedNFTIds();
+        
+        // Rebuild filter controls with updated data
+        const filterControls = document.getElementById('filterControls');
+        filterControls.innerHTML = '';
+        createFilterControls();
+        
+        // Restore filters if they still exist
+        currentFilters.forEach(filter => {
+            const checkbox = document.querySelector(
+                `.trait-checkbox[data-trait-type="${filter.type}"][data-trait-value="${filter.value}"]`
+            );
+            if (checkbox) {
+                checkbox.checked = true;
+            }
+        });
+        
+        // Reload display
+        if (currentFilters.length > 0) {
+            filterByTraits();
+        } else {
+            isFiltering = false;
+            loadInitialNFTs();
+        }
+        
+        console.log('✅ Data refreshed successfully!');
+        
+        // Show success feedback
+        refreshBtn.innerHTML = `<svg id="refreshComplete" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><mask id="SVGkzXYXbbR"><g fill="none" stroke="#fff" stroke-dasharray="24" stroke-dashoffset="24" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M2 13.5l4 4l10.75 -10.75"><animate fill="freeze" attributeName="stroke-dashoffset" dur="0.4s" values="24;0"/></path><path stroke="#000" stroke-width="6" d="M7.5 13.5l4 4l10.75 -10.75"><animate fill="freeze" attributeName="stroke-dashoffset" begin="0.4s" dur="0.4s" values="24;0"/></path><path d="M7.5 13.5l4 4l10.75 -10.75"><animate fill="freeze" attributeName="stroke-dashoffset" begin="0.4s" dur="0.4s" values="24;0"/></path></g></mask><rect width="24" height="24" fill="currentColor" mask="url(#SVGkzXYXbbR)"/></svg>`;
+        setTimeout(() => {
+            refreshBtn.innerHTML = originalText;
+            refreshBtn.disabled = false;
+            refreshBtn.style.opacity = '1';
+            isRefreshing = false;
+        }, 2000);
+        
+    } catch (error) {
+        console.error('Error refreshing data:', error);
+        alert('Failed to refresh data. Please try again.');
+        refreshBtn.innerHTML = originalText;
+        refreshBtn.disabled = false;
+        refreshBtn.style.opacity = '1';
+        isRefreshing = false;
     }
 }
 
@@ -590,7 +722,13 @@ function filterTraitOptions(traitType, searchTerm) {
     }
 }
 
-// Display NFT with stats
+// Helper function to get stat color class based on current sort
+function getStatColorClass() {
+    const statSorts = ['harmony', 'health', 'power', 'violence'];
+    return statSorts.includes(currentSortOrder) ? currentSortOrder : '';
+}
+
+// Display NFT with stats and OpenRarity rank
 function displayNFT(id, showCloseButton = false) {
     const imageUrl = imagesData[id];
     const traits = traitsData[id];
@@ -603,7 +741,7 @@ function displayNFT(id, showCloseButton = false) {
     
     const rarityData = nftRarityScores[id];
     const rank = rarityData ? rarityData.rank : '?';
-    const score = rarityData ? rarityData.score.toFixed(2) : '?';
+    const score = rarityData ? rarityData.score.toFixed(4) : '?';
     
     const isNew = metadataInfo.newKamiIds && metadataInfo.newKamiIds.includes(Number(id));
     
@@ -619,6 +757,16 @@ function displayNFT(id, showCloseButton = false) {
     else if (rankPercentile <= 5) rankClass = 'rank-epic';
     else if (rankPercentile <= 15) rankClass = 'rank-rare';
     else if (rankPercentile <= 40) rankClass = 'rank-uncommon';
+    
+    // Get stat color class
+    const statColorClass = getStatColorClass();
+    
+    // Get the stat value for the current sort
+    const statValue = stats?.stats[currentSortOrder] || '';
+
+    // Build stat color indicator HTML (only show if sorting by a stat)
+    const statColorHTML = statColorClass ? 
+        `<div class="stat-color-box ${statColorClass}" title="${statColorClass.charAt(0).toUpperCase() + statColorClass.slice(1)} Sort">${statValue}</div>` : '';
     
     let statsHTML = '';
     if (stats) {
@@ -667,8 +815,11 @@ function displayNFT(id, showCloseButton = false) {
     card.innerHTML = `
     ${closeButtonHTML}
     ${newBadgeHTML}
-    <div class="rank-badge ${rankClass}" title="Rarity Rank: #${rank} | Score: ${score}">
-        ${rank}
+    <div class="rank-stat-container">
+        <div class="rank-badge ${rankClass}" title="OpenRarity Rank: #${rank} | Score: ${score}">
+            ${rank}
+        </div>
+        ${statColorHTML}
     </div>
     ${statsHTML}
     <div class="nft-card-content">
@@ -871,6 +1022,14 @@ function clearFilters() {
     loadInitialNFTs();
 }
 
+// Setup refresh button
+function setupRefreshButton() {
+    const refreshBtn = document.getElementById('refreshDataBtn');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', refreshData);
+    }
+}
+
 document.getElementById('searchBtn').addEventListener('click', searchByID);
 document.getElementById('searchInput').addEventListener('keypress', (e) => {
     if (e.key === 'Enter') searchByID();
@@ -906,7 +1065,10 @@ function setupScrollToTop() {
     });
 }
 
-document.addEventListener('DOMContentLoaded', setupScrollToTop);
+document.addEventListener('DOMContentLoaded', () => {
+    setupScrollToTop();
+    setupRefreshButton();
+});
 
 // Inject enhanced styles for stats display
 const enhancedStyles = `
@@ -990,6 +1152,35 @@ const enhancedStyles = `
     width: 0
     color: #333;
 }
+
+.rank-stat-container {
+    display: flex;
+    align-items: center;
+    gap: 1px;
+    margin-bottom: 1px;
+}
+
+.stat-color-box {
+    border-radius: 2px;
+    border: 1px solid rgba(147, 125, 26, 0.3);
+    flex-shrink: 0;
+}
+
+.stat-color-box.harmony {
+    background: #9cbcd2;
+}
+
+.stat-color-box.health {
+    background: #d7bce8;
+}
+
+.stat-color-box.power {
+    background: #f9db6d;
+}
+
+.stat-color-box.violence {
+    background: #df829b;
+}
 `;
 
 if (!document.getElementById('enhanced-trait-styles')) {
@@ -1007,13 +1198,5 @@ if ('serviceWorker' in navigator) {
         }
     });
 }
-
-// Force reload data on page visibility change (when user returns to tab)
-document.addEventListener('visibilitychange', function() {
-    if (!document.hidden && performance.getEntriesByType('navigation')[0]?.type === 'reload') {
-        console.log('🔄 Page became visible after reload, ensuring fresh data...');
-        location.reload(true);
-    }
-});
 
 loadData();
