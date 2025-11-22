@@ -812,11 +812,35 @@ function displayNFT(id, showCloseButton = false) {
     const newBadgeHTML = isNew ? 
         `<div class="new-badge" title="Recently Added!">NEW</div>` : '';
     
+    // Check if mobile view
+const isMobile = window.innerWidth <= 390;
+
+// Build the card HTML based on screen size
+if (isMobile) {
     card.innerHTML = `
     ${closeButtonHTML}
     ${newBadgeHTML}
     <div class="rank-stat-container">
-        <div class="rank-badge ${rankClass}" title="OpenRarity Rank: #${rank} | Score: ${score}">
+        <div class="rank-badge ${rankClass}" title="Rarity Rank: #${rank} | Score: ${score}">
+            ${rank}
+        </div>
+        ${statColorHTML}
+    </div>
+    <div class="nft-card-content">
+        <img src="${imageUrl}" alt="NFT #${id}" loading="lazy" onerror="this.src='https://via.placeholder.com/250?text=Image+Not+Found'">
+        <div class="nft-details hover_wrapper">
+            <div class="nft-id">Kamigotchi ${id}</div>
+            ${traitsHTML}
+            ${statsHTML}
+        </div>
+    </div>
+    `;
+} else {
+    card.innerHTML = `
+    ${closeButtonHTML}
+    ${newBadgeHTML}
+    <div class="rank-stat-container">
+        <div class="rank-badge ${rankClass}" title="Rarity Rank: #${rank} | Score: ${score}">
             ${rank}
         </div>
         ${statColorHTML}
@@ -829,7 +853,8 @@ function displayNFT(id, showCloseButton = false) {
             ${traitsHTML}
         </div>
     </div>
-`;
+    `;
+}
     
     card.addEventListener('click', (event) => {
         event.stopPropagation();
