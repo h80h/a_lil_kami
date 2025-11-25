@@ -7,7 +7,7 @@ let filteredNFTIds = [];
 let currentLoadIndex = 0;
 let traitCounts = {};
 let nftRarityScores = {};
-let currentSortOrder = 'latest';
+let currentSortOrder = 'latest'; // Default sort
 let isFiltering = false;
 let nftObserver = null;
 const INITIAL_LOAD_COUNT = 50;
@@ -15,6 +15,140 @@ const LAZY_LOAD_COUNT = 30;
 let isLoading = false;
 let metadataInfo = {};
 let isRefreshing = false;
+
+// --- URL SYNCHRONIZATION FUNCTIONS ---
+
+// Converts the current checked trait filters into a URL-safe string (e.g., 'body:A,B;hand:C')
+function getTraitStringFromState() {
+    const checkboxes = document.querySelectorAll('.trait-checkbox:checked');
+    const selected = {};
+    checkboxes.forEach(checkbox => {
+        const type = checkbox.dataset.traitType;
+        const value = checkbox.dataset.traitValue;
+        if (!selected[type]) {
+            selected[type] = [];
+        }
+        // Encode the value to handle spaces and special chars
+        selected[type].push(encodeURIComponent(value));
+    });
+
+    return Object.entries(selected)
+        .map(([type, values]) => `${type}:${values.join(',')}`)
+        .join(';');
+}
+
+// Updates the browser URL based on the current app state
+function updateURL(replace = false) {
+    const params = new URLSearchParams();
+
+    // 1. Sort Order
+    if (currentSortOrder && currentSortOrder !== 'latest') {
+        params.set('sort', currentSortOrder);
+    }
+
+    // 2. Trait Filters
+    const traitString = getTraitStringFromState();
+    if (traitString) {
+        params.set('traits', traitString);
+    }
+
+    // 3. Selected IDs (for comparison area)
+    const idArray = Array.from(selectedIDs).sort((a, b) => Number(a) - Number(b));
+    if (idArray.length > 0) {
+        params.set('ids', idArray.join(','));
+    }
+
+    const queryString = params.toString();
+    let newUrl;
+
+    // Check if the query string is empty to prevent trailing '?'
+    if (queryString) {
+        newUrl = `${window.location.pathname}?${queryString}${window.location.hash}`;
+    } else {
+        newUrl = `${window.location.pathname}${window.location.hash}`;
+    }
+    
+    if (replace) {
+        history.replaceState(null, '', newUrl); // Use replaceState on initial load
+    } else {
+        history.pushState(null, '', newUrl); // Use pushState on user action
+    }
+}
+
+// Loads state from the URL and applies it (checks checkboxes, sets sort, populates IDs)
+function loadStateFromURL() {
+    const params = new URLSearchParams(window.location.search);
+
+    // 1. Load Sort Order
+    const urlSort = params.get('sort');
+    if (urlSort) {
+        currentSortOrder = urlSort;
+        // Update button visual state later in loadData/handlePopState
+    }
+
+    // 2. Load Selected IDs
+    const urlIDs = params.get('ids');
+    if (urlIDs) {
+        const ids = urlIDs.split(',').map(id => id.trim()).filter(id => id);
+        selectedIDs = new Set(ids);
+    }
+    
+    // 3. Load Trait Filters (Must happen AFTER filter controls are created)
+    let hasFilters = false;
+    const urlTraits = params.get('traits');
+    if (urlTraits) {
+        const traitGroups = urlTraits.split(';');
+        traitGroups.forEach(group => {
+            const [type, valuesString] = group.split(':');
+            if (type && valuesString) {
+                const values = valuesString.split(',').map(v => decodeURIComponent(v));
+                values.forEach(value => {
+                    // Checkbox may not exist yet if called too early, but we rely on it running AFTER createFilterControls
+                    const checkbox = document.querySelector(
+                        `.trait-checkbox[data-trait-type="${type}"][data-trait-value="${value}"]`
+                    );
+                    if (checkbox) {
+                        checkbox.checked = true;
+                        hasFilters = true;
+                    }
+                });
+            }
+        });
+    }
+    
+    return hasFilters;
+}
+
+// Handles browser back/forward button clicks
+function handlePopState() {
+    // 1. Load state from the new URL
+    const hasFilters = loadStateFromURL();
+
+    // 2. Update UI elements based on loaded state
+    updateSelectedIDsDisplay(); 
+
+    // Update sort button visual state
+    document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+    const sortButton = document.querySelector(`.sort-btn[data-sort="${currentSortOrder}"]`);
+    if (sortButton) sortButton.classList.add('active');
+
+    // 3. Re-render the main NFT grid
+    if (hasFilters) {
+        filterByTraits(); // Will filter based on the newly checked boxes
+    } else if (isFiltering) {
+        // If we were filtering, but the new URL cleared filters
+        isFiltering = false;
+        allNFTIds = getSortedNFTIds();
+        loadInitialNFTs();
+    } else {
+        // Just apply the new sort order
+        allNFTIds = getSortedNFTIds();
+        loadInitialNFTs();
+    }
+}
+
+// --- END URL SYNCHRONIZATION FUNCTIONS ---
+
 
 // Cache-busting timestamp generator
 function getCacheBuster() {
@@ -48,141 +182,6 @@ function showContainer() {
 function getTraitName(traitData) {
     return typeof traitData === 'string' ? traitData : traitData.name;
 }
-
-// --- NEW URL Management Functions ---
-
-/**
- * Reads the current state (filters, sort, selected IDs) and updates the URL using history.pushState().
- */
-function updateURL() {
-    const params = new URLSearchParams();
-
-    // 1. Get selected traits (Filters)
-    const checkboxes = document.querySelectorAll('.trait-checkbox:checked');
-    const selectedTraits = {};
-    checkboxes.forEach(checkbox => {
-        const traitType = checkbox.dataset.traitType;
-        const traitValue = checkbox.dataset.traitValue;
-
-        if (!selectedTraits[traitType]) {
-            selectedTraits[traitType] = [];
-        }
-        selectedTraits[traitType].push(traitValue);
-    });
-
-    Object.entries(selectedTraits).forEach(([type, values]) => {
-        // Encode filters: 'type=value1|value2'
-        params.set(type, values.join('|'));
-    });
-
-    // 2. Get Sort Order
-    if (currentSortOrder !== 'latest') {
-        params.set('sort', currentSortOrder);
-    }
-
-    // 3. Get Selected IDs (Search)
-    if (selectedIDs.size > 0) {
-        params.set('select', Array.from(selectedIDs).join(','));
-    }
-
-    // FIX: Only append '?' if there are parameters
-    const queryString = params.toString();
-    let newUrl = window.location.pathname;
-
-    if (queryString.length > 0) {
-        newUrl += `?${queryString}`;
-    }
-
-    history.pushState({}, '', newUrl);
-}
-
-/**
- * Reads the URL parameters and applies the state (filters, sort, selected IDs) on page load.
- */
-function loadStateFromURL() {
-    const params = new URLSearchParams(window.location.search);
-
-    // --- 1. Load Selected IDs ---
-    const selectParam = params.get('select');
-    if (selectParam) {
-        selectParam.split(',').forEach(id => {
-            // Only add if data exists, to prevent errors on invalid IDs
-            if (id && traitsData[id]) { 
-                selectedIDs.add(id);
-            }
-        });
-        // Display is updated in loadData after controls are created
-    }
-
-    // --- 2. Load Sort Order ---
-    const sortParam = params.get('sort');
-    if (sortParam) {
-        const sortButton = document.querySelector(`.sort-btn[data-sort="${sortParam}"]`);
-        if (sortButton) {
-            currentSortOrder = sortParam;
-            document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
-            sortButton.classList.add('active');
-        }
-    }
-
-    // --- 3. Load Traits (Filters) ---
-    let filtersApplied = false;
-    params.forEach((value, key) => {
-        // If the key is not 'sort' or 'select', assume it's a trait category
-        if (key !== 'sort' && key !== 'select') {
-            const traitType = key;
-            const traitValues = value.split('|');
-
-            traitValues.forEach(traitValue => {
-                const checkbox = document.querySelector(
-                    // Ensure the trait value is properly selected, often lowercased or exact
-                    `.trait-checkbox[data-trait-type="${traitType}"][data-trait-value="${traitValue}"]`
-                );
-                if (checkbox) {
-                    checkbox.checked = true;
-                    filtersApplied = true;
-                }
-            });
-        }
-    });
-
-    // If filters were applied, trigger the filtering logic, skipping URL update
-    if (filtersApplied) {
-        // Re-sorting is implicitly handled by getSortedNFTIds called within filterByTraits
-        filterByTraits(true); 
-        return true; // Indicate filters were loaded
-    }
-    return false; // Indicate no filters were loaded
-}
-
-// Listener for back/forward navigation
-window.addEventListener('popstate', () => {
-    // Clear current state first
-    document.querySelectorAll('.trait-checkbox:checked').forEach(cb => cb.checked = false);
-    selectedIDs.clear();
-    
-    // Re-load state from the new URL
-    const filtersLoaded = loadStateFromURL();
-    updateSelectedIDsDisplay(); 
-
-    // Re-apply sorting/loading if no filters were present in the URL
-    if (!filtersLoaded) {
-        const params = new URLSearchParams(window.location.search);
-        const sortParam = params.get('sort') || 'latest';
-        
-        // Reset sort button state
-        document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
-        const sortButton = document.querySelector(`.sort-btn[data-sort="${sortParam}"]`);
-        if (sortButton) {
-            sortButton.classList.add('active');
-        }
-        
-        currentSortOrder = sortParam;
-        allNFTIds = getSortedNFTIds(Object.keys(traitsData));
-        loadInitialNFTs();
-    }
-});
-
 
 // Calculate trait occurrence counts
 function calculateTraitCounts() {
@@ -273,9 +272,8 @@ function getSortedNFTIds(idsToSort) {
         case 'oldest':
             return ids.sort((a, b) => Number(a) - Number(b));
         case 'rarity':
-            // Rarity rank is 1-indexed (lower rank = rarer)
             return ids.sort((a, b) => {
-                return (nftRarityScores[a]?.rank || Infinity) - (nftRarityScores[b]?.rank || Infinity);
+                return nftRarityScores[a].rank - nftRarityScores[b].rank;
             });
         case 'harmony':
             return ids.sort((a, b) => {
@@ -310,34 +308,28 @@ function getSortedNFTIds(idsToSort) {
 function setupSortButtons() {
     const sortButtons = document.querySelectorAll('.sort-btn');
     
-    // Ensure the currentSortOrder is visually active on initial setup (may be set by URL load)
-    sortButtons.forEach(b => {
-        if (b.dataset.sort === currentSortOrder) {
-            b.classList.add('active');
-        } else {
-            b.classList.remove('active');
-        }
-    });
-
     sortButtons.forEach(btn => {
         btn.addEventListener('click', (e) => {
             const newSort = e.target.dataset.sort;
-            if (newSort === currentSortOrder) return;
             
-            currentSortOrder = newSort;
-            
-            sortButtons.forEach(b => b.classList.remove('active'));
-            e.target.classList.add('active');
-            
-            // --- MODIFIED: Update URL after sorting ---
-            updateURL(); 
-            // ------------------------------------------
-
-            if (isFiltering) {
-                filterByTraits();
-            } else {
-                allNFTIds = getSortedNFTIds();
-                loadInitialNFTs();
+            // Check if we are clearing the sort back to default
+            if (newSort === 'latest' && currentSortOrder === 'latest') {
+                 // Do nothing if already on default and trying to set default
+                 return;
+            } else if (newSort !== currentSortOrder) {
+                currentSortOrder = newSort;
+                
+                sortButtons.forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                
+                updateURL(); // <<< URL Update
+                
+                if (isFiltering) {
+                    filterByTraits();
+                } else {
+                    allNFTIds = getSortedNFTIds();
+                    loadInitialNFTs();
+                }
             }
         });
     });
@@ -366,7 +358,6 @@ async function fetchWithCacheBusting(url, options = {}) {
 async function loadData() {
     try {
         console.log('📄 Loading data with cache-busting...');
-        showLoader(); // Ensure loader is visible during async operations
         
         const imagesResponse = await fetchWithCacheBusting('kamiImage.json');
         if (!imagesResponse.ok) {
@@ -420,21 +411,30 @@ async function loadData() {
         nftRarityScores = calculateRarityScores();
         console.log('✅ OpenRarity calculation complete!');
         
-        // Setup controls before loading state
+        // Setup controls
         setupSortButtons();
         createFilterControls();
         
-        // --- MODIFIED: Load state from URL after controls are built ---
-        const filtersLoaded = loadStateFromURL();
-        updateSelectedIDsDisplay(); // Always update selection display
+        // --- URL Integration START ---
+        const initialFilterActive = loadStateFromURL(); 
         
-        // If filters were loaded, loadInitialNFTs is called within loadStateFromURL -> filterByTraits
-        // If no filters were loaded, we use the sort order set by the URL (or default 'latest')
-        if (!filtersLoaded) {
-            allNFTIds = getSortedNFTIds();
-            loadInitialNFTs();
+        // Update sort button visual state based on URL
+        document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+        const sortButton = document.querySelector(`.sort-btn[data-sort="${currentSortOrder}"]`);
+        if (sortButton) sortButton.classList.add('active');
+
+        updateSelectedIDsDisplay(); // Display IDs loaded from URL
+        
+        allNFTIds = getSortedNFTIds(); // Sort all IDs initially
+
+        if (initialFilterActive) {
+            filterByTraits(); // Apply filters if URL had them
+        } else {
+            loadInitialNFTs(); // Normal load
         }
-        // -------------------------------------------------------------
+        
+        updateURL(true); // Replace initial URL with the canonical state
+        // --- URL Integration END ---
         
     } catch (error) {
         console.error('Detailed error:', error);
@@ -467,15 +467,9 @@ async function refreshData() {
     try {
         console.log('🔄 Refreshing data...');
         
-        // Save current state for restoration after refresh
-        const currentFilters = [];
-        document.querySelectorAll('.trait-checkbox:checked').forEach(cb => {
-            currentFilters.push({
-                type: cb.dataset.traitType,
-                value: cb.dataset.traitValue
-            });
-        });
-        const currentSelectedIDs = Array.from(selectedIDs);
+        // Save current filters
+        const currentFilters = getTraitStringFromState();
+        const currentSort = currentSortOrder;
         
         // Reload all data
         const imagesResponse = await fetchWithCacheBusting('kamiImage.json');
@@ -512,43 +506,35 @@ async function refreshData() {
         console.log('🔢 Recalculating OpenRarity scores...');
         nftRarityScores = calculateRarityScores();
         console.log('✅ OpenRarity recalculation complete!');
-        // Do not update allNFTIds here, let filter/loadInitial handle it based on current sort
+        
+        // Restore sort and filters
+        currentSortOrder = currentSort;
+        allNFTIds = getSortedNFTIds();
         
         // Rebuild filter controls with updated data
         const filterControls = document.getElementById('filterControls');
         filterControls.innerHTML = '';
         createFilterControls();
         
-        // Restore filters 
-        currentFilters.forEach(filter => {
-            const checkbox = document.querySelector(
-                // Use traitValue.toLowerCase() if filterTraitOptions uses lowercase, but here we assume original case from dataset is needed for selection
-                `.trait-checkbox[data-trait-type="${filter.type}"][data-trait-value="${filter.value}"]`
-            );
-            if (checkbox) {
-                checkbox.checked = true;
-            }
-        });
-        
-        // Restore selected IDs
-        selectedIDs.clear();
-        currentSelectedIDs.forEach(id => {
-            if (traitsData[id]) selectedIDs.add(id);
-        });
-        updateSelectedIDsDisplay();
-        
-        // Reload display
-        if (currentFilters.length > 0) {
-            filterByTraits(); // This internally calls getSortedNFTIds and loads
+        // Restore filters by manually setting the checkboxes
+        if (currentFilters) {
+             const params = new URLSearchParams();
+             params.set('traits', currentFilters);
+             
+             // Temporarily set the URL search string to reload the state
+             const originalSearch = window.location.search;
+             history.replaceState(null, '', `?${params.toString()}`);
+             loadStateFromURL();
+             history.replaceState(null, '', originalSearch); // Restore original URL
+             
+             filterByTraits();
+             
         } else {
             isFiltering = false;
-            allNFTIds = getSortedNFTIds(Object.keys(traitsData)); // Ensure allNFTIds is sorted correctly
             loadInitialNFTs();
         }
         
-        // --- ADDED: Update URL to reflect clean state after refresh (including sort) ---
-        updateURL();
-        // -------------------------------------------------------------------------------
+        updateURL(true); // Ensure final URL reflects current state
         
         console.log('✅ Data refreshed successfully!');
         
@@ -563,7 +549,12 @@ async function refreshData() {
         
     } catch (error) {
         console.error('Error refreshing data:', error);
-        alert('Failed to refresh data. Please try again.');
+        // Using custom modal/message box instead of alert()
+        const messageBox = document.getElementById('messageBox');
+        messageBox.textContent = 'Failed to refresh data. Please try again.';
+        messageBox.style.display = 'block';
+        setTimeout(() => messageBox.style.display = 'none', 3000);
+
         refreshBtn.innerHTML = originalText;
         refreshBtn.disabled = false;
         refreshBtn.style.opacity = '1';
@@ -573,35 +564,13 @@ async function refreshData() {
 
 function loadInitialNFTs() {
     const resultsDiv = document.getElementById('results');
-    // Clear only the cards, keep the header if it exists
-    const existingHeader = resultsDiv.querySelector('.count-header');
-    if (existingHeader) {
-        // Remove everything but the header if it exists
-        while (resultsDiv.children.length > 1) {
-            resultsDiv.removeChild(resultsDiv.lastChild);
-        }
-    } else {
-        resultsDiv.textContent = '';
-    }
+    resultsDiv.textContent = '';
     
     const idsToDisplay = isFiltering ? filteredNFTIds : allNFTIds;
     
     const title = isFiltering ? 'Found matching Kamigotchi' : 'Showing all Kamigotchi';
     const countDiv = createCountHeader(idsToDisplay.length, title);
-    
-    if (!existingHeader) {
-        resultsDiv.appendChild(countDiv);
-    } else {
-        // Update existing header count
-        const countSpan = existingHeader.querySelector('div:first-child');
-        if (countSpan) countSpan.textContent = `${title}: ${idsToDisplay.length}`;
-        
-        // ⚠️ FIX: Explicitly remove the filter summary container when no filters are active (isFiltering is false)
-        const summaryContainer = existingHeader.querySelector('.filter-summary-buttons-container');
-        if (summaryContainer) {
-            summaryContainer.remove();
-        }
-    }
+    resultsDiv.appendChild(countDiv);
     
     currentLoadIndex = 0;
     loadMoreNFTs();
@@ -651,8 +620,6 @@ function updateLoadingIndicator() {
     const idsToDisplay = isFiltering ? filteredNFTIds : allNFTIds;
     if (currentLoadIndex >= idsToDisplay.length) {
         indicator.style.display = 'none';
-    } else {
-        indicator.style.display = 'block';
     }
 }
 
@@ -673,32 +640,20 @@ function setupInfiniteScroll() {
     });
     
     const observeLastCard = () => {
-        // Find the last actual NFT card, excluding headers/indicators
         const cards = document.querySelectorAll('.nft-card');
         if (cards.length > 0) {
             const lastCard = cards[cards.length - 1];
-            // Disconnect and reconnect to the new last card
-            nftObserver.disconnect();
             nftObserver.observe(lastCard);
         }
     };
     
-    // Original implementation for loadMoreNFTs, modified to ensure the observer is updated
+    setTimeout(observeLastCard, 100);
+    
     const originalLoadMore = loadMoreNFTs;
     loadMoreNFTs = function() {
-        // Disconnect observer before adding new elements
-        if (nftObserver) nftObserver.disconnect();
-
-        originalLoadMore.call(this); // Execute the original loading logic
-        
-        // Re-observe the new last card after the DOM update
-        requestAnimationFrame(() => {
-            setTimeout(observeLastCard, 50); // Small delay to ensure all DOM elements are rendered
-        });
+        originalLoadMore();
+        setTimeout(observeLastCard, 100);
     };
-
-    // Call initially to observe the first set
-    observeLastCard();
 }
 
 function createCountHeader(count, title) {
@@ -722,31 +677,28 @@ function removeSelectedTrait(event) {
     
     if (checkbox) {
         checkbox.checked = false;
-        // Trigger the filtering process to update display and URL
-        updateSelectedTraitsDisplay(true); 
+        updateSelectedTraitsDisplay(true);
     }
 }
 
 function updateSelectedTraitsDisplay(forceUpdate = false) {
     const selectedTraitsDiv = document.getElementById('selectedTraitsDisplay');
     if (selectedTraitsDiv) {
-        // This element seems unused in the filter summary display but kept for original code compatibility
         selectedTraitsDiv.style.display = 'none';
     }
     
     const checkboxes = document.querySelectorAll('.trait-checkbox:checked');
-    
-    // --- MODIFIED: Always update URL when traits change ---
-    updateURL();
-    // ----------------------------------------------------
     
     if (checkboxes.length === 0 && (isFiltering || forceUpdate)) {
         isFiltering = false;
         filteredNFTIds = [];
         allNFTIds = getSortedNFTIds(Object.keys(traitsData));
         loadInitialNFTs();
+        updateURL(); // <<< URL Update
         return;
     }
+    
+    updateURL(); // <<< URL Update on change
     
     filterByTraits();
 }
@@ -844,14 +796,13 @@ function createFilterControls() {
             
             const checkboxWrapper = document.createElement('label');
             checkboxWrapper.className = 'checkbox-label';
-            // Use the original case for searching/filtering in the dataset value
-            checkboxWrapper.dataset.traitValue = value; 
+            checkboxWrapper.dataset.traitValue = value.toLowerCase();
             
             const checkbox = document.createElement('input');
             checkbox.type = 'checkbox';
             checkbox.className = 'trait-checkbox';
             checkbox.dataset.traitType = traitType;
-            checkbox.dataset.traitValue = value; // Keep original case for URL
+            checkbox.dataset.traitValue = value;
             checkbox.addEventListener('change', () => updateSelectedTraitsDisplay(false));
             
             const details = traitDetails[traitType][value] || {};
@@ -918,7 +869,7 @@ function filterTraitOptions(traitType, searchTerm) {
     let visibleCount = 0;
     
     checkboxLabels.forEach(label => {
-        const traitValue = label.dataset.traitValue.toLowerCase(); // select search to lowercased trait value
+        const traitValue = label.dataset.traitValue;
         if (searchLower === '' || traitValue.includes(searchLower)) {
             label.style.display = 'flex';
             visibleCount++;
@@ -1082,7 +1033,6 @@ if (isMobile) {
         }
     });
 
-    // Global listener for closing stats panel (less efficient, but matches original logic)
     document.addEventListener('click', (event) => {
         const statsElement = card.querySelector('.kami-stats');
         if (statsElement && statsElement.classList.contains('is-active')) {
@@ -1101,24 +1051,25 @@ function updateSelectedIDsDisplay() {
     
     if (selectedIDs.size === 0) {
         selectedIDsDiv.style.display = 'none';
-        return;
+    } else {
+        selectedIDsDiv.style.display = 'block';
+        selectedIDsDiv.innerHTML = '';
+        
+        const cardsContainer = document.createElement('div');
+        cardsContainer.className = 'selected-cards-grid';
+
+        // Sort selected IDs numerically for consistent display and URL generation
+        const sortedIDs = Array.from(selectedIDs).sort((a, b) => Number(a) - Number(b));
+        
+        sortedIDs.forEach(id => {
+            const card = displayNFT(id, true);
+            if (card) cardsContainer.appendChild(card);
+        });
+        
+        selectedIDsDiv.appendChild(cardsContainer);
     }
     
-    selectedIDsDiv.style.display = 'block';
-    selectedIDsDiv.innerHTML = '';
-    
-    const cardsContainer = document.createElement('div');
-    cardsContainer.className = 'selected-cards-grid';
-
-    // Sort selected IDs for consistent display (e.g., numerically)
-    const sortedSelectedIDs = Array.from(selectedIDs).sort((a, b) => Number(a) - Number(b));
-
-    sortedSelectedIDs.forEach(id => {
-        const card = displayNFT(id, true);
-        if (card) cardsContainer.appendChild(card);
-    });
-    
-    selectedIDsDiv.appendChild(cardsContainer);
+    updateURL(); // Update URL whenever IDs change
 }
 
 function searchByID() {
@@ -1126,17 +1077,29 @@ function searchByID() {
     const id = searchInput.value.trim();
     
     if (!id) {
-        alert('Please enter an NFT ID');
+        // Using custom modal/message box instead of alert()
+        const messageBox = document.getElementById('messageBox');
+        messageBox.textContent = 'Please enter an NFT ID';
+        messageBox.style.display = 'block';
+        setTimeout(() => messageBox.style.display = 'none', 3000);
         return;
     }
     
     if (!imagesData[id] || !traitsData[id]) {
-        alert(`Kamigotchi #${id} not found. Please check the ID and try again.`);
+        // Using custom modal/message box instead of alert()
+        const messageBox = document.getElementById('messageBox');
+        messageBox.textContent = `Kamigotchi #${id} not found. Please check the ID and try again.`;
+        messageBox.style.display = 'block';
+        setTimeout(() => messageBox.style.display = 'none', 3000);
         return;
     }
     
     if (selectedIDs.has(id)) {
-        alert(`Kamigotchi #${id} is already added!`);
+        // Using custom modal/message box instead of alert()
+        const messageBox = document.getElementById('messageBox');
+        messageBox.textContent = `Kamigotchi #${id} is already added!`;
+        messageBox.style.display = 'block';
+        setTimeout(() => messageBox.style.display = 'none', 3000);
         return;
     }
     
@@ -1144,18 +1107,14 @@ function searchByID() {
     updateSelectedIDsDisplay();
     searchInput.value = '';
     
-    // --- MODIFIED: Update URL after adding ID ---
-    updateURL();
-    // -------------------------------------------
+    updateURL(); // <<< URL Update
 }
 
 function removeSelectedID(id) {
     selectedIDs.delete(id);
     updateSelectedIDsDisplay();
     
-    // --- MODIFIED: Update URL after removing ID ---
-    updateURL();
-    // --------------------------------------------
+    updateURL(); // <<< URL Update
 }
 
 window.removeSelectedID = removeSelectedID;
@@ -1165,20 +1124,12 @@ function clearAllSelectedIDs() {
     updateSelectedIDsDisplay();
     document.getElementById('searchInput').value = '';
     
-    // --- MODIFIED: Update URL after clearing all IDs ---
-    updateURL();
-    // -------------------------------------------------
+    updateURL(); // <<< URL Update
 }
 
-/**
- * Filters NFTs based on checked traits and displays results.
- * @param {boolean} skipURLUpdate - If true, skips updating the URL (used when loading state from URL).
- */
-function filterByTraits(skipURLUpdate = false) {
+function filterByTraits() {
     const resultsDiv = document.getElementById('results');
-    
-    // ⚠️ FIX: Clear everything upfront to ensure old summary buttons are removed
-    resultsDiv.textContent = ''; 
+    resultsDiv.textContent = '';
 
     const checkboxes = document.querySelectorAll('.trait-checkbox:checked');
     
@@ -1186,13 +1137,14 @@ function filterByTraits(skipURLUpdate = false) {
         isFiltering = false;
         allNFTIds = getSortedNFTIds(Object.keys(traitsData));
         loadInitialNFTs();
-        
-        // --- MODIFIED: If no filters, update URL to clear filter params ---
-        if (!skipURLUpdate) updateURL(); 
-        // ------------------------------------------------------------------
         return;
     }
     
+    const filteringMessage = document.createElement('div');
+    filteringMessage.className = 'no-results';
+    filteringMessage.textContent = 'Filtering...';
+    resultsDiv.appendChild(filteringMessage);
+
     const selectedTraits = {};
     checkboxes.forEach(checkbox => {
         const traitType = checkbox.dataset.traitType;
@@ -1204,20 +1156,11 @@ function filterByTraits(skipURLUpdate = false) {
         selectedTraits[traitType].push(traitValue);
     });
     
-    // Filter NFTs: Must have AT LEAST ONE of the selected values for EACH selected trait type.
     let matchingNFTs = Object.keys(traitsData)
         .filter(id => {
             const nftTraits = traitsData[id];
-            
-            // Check every selected trait type
             return Object.entries(selectedTraits).every(([traitType, selectedValues]) => {
-                // Get the trait value for this NFT
-                const nftTraitData = nftTraits[traitType];
-                if (!nftTraitData) return false; // NFT must have this trait type
-                
-                const nftTraitName = getTraitName(nftTraitData);
-                
-                // Check if the NFT's trait name is one of the selected values
+                const nftTraitName = getTraitName(nftTraits[traitType]);
                 return selectedValues.includes(nftTraitName);
             });
         });
@@ -1225,8 +1168,10 @@ function filterByTraits(skipURLUpdate = false) {
     filteredNFTIds = getSortedNFTIds(matchingNFTs);
     isFiltering = true;
     
-    // Rebuild summary header
+    resultsDiv.textContent = '';
+    
     let summaryButtonsHTML = '';
+    
     Object.entries(selectedTraits).forEach(([type, values]) => {
         values.forEach(value => {
             summaryButtonsHTML += `
@@ -1252,7 +1197,6 @@ function filterByTraits(skipURLUpdate = false) {
 
     resultsDiv.appendChild(countDiv);
     
-    // Re-register event listeners for the newly created buttons
     countDiv.querySelectorAll('.count-header-trait-btn').forEach(btn => {
         btn.addEventListener('click', removeSelectedTrait);
     });
@@ -1263,14 +1207,9 @@ function filterByTraits(skipURLUpdate = false) {
         noResultsDiv.textContent = 'No Kamigotchi match your selected traits';
         resultsDiv.appendChild(noResultsDiv);
         isFiltering = false;
-        
         return;
     }
     
-    // --- ADDED: Only run updateURL if not skipped (i.e., not a page load from URL) ---
-    if (!skipURLUpdate) updateURL();
-    // ---------------------------------------------------------------------------------
-
     currentLoadIndex = 0;
     loadMoreNFTs();
     setupInfiniteScroll();
@@ -1298,9 +1237,7 @@ function clearFilters() {
     allNFTIds = getSortedNFTIds(Object.keys(traitsData));
     loadInitialNFTs();
     
-    // --- MODIFIED: Update URL after clearing filters ---
-    updateURL();
-    // -------------------------------------------------
+    updateURL(); // <<< URL Update
 }
 
 // Setup refresh button
@@ -1349,6 +1286,8 @@ function setupScrollToTop() {
 document.addEventListener('DOMContentLoaded', () => {
     setupScrollToTop();
     setupRefreshButton();
+    // Add event listener for browser history changes
+    window.addEventListener('popstate', handlePopState);
 });
 
 // Inject enhanced styles for stats display
@@ -1434,6 +1373,22 @@ const enhancedStyles = `
 .stat-color-box.violence {
     background: #df829b;
 }
+
+/* Custom Message Box Style (For replacing alert()) */
+#messageBox {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #f8d7da;
+    color: #721c24;
+    padding: 10px 20px;
+    border: 1px solid #f5c6cb;
+    border-radius: 5px;
+    z-index: 1000;
+    display: none;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
 `;
 
 if (!document.getElementById('enhanced-trait-styles')) {
@@ -1441,6 +1396,11 @@ if (!document.getElementById('enhanced-trait-styles')) {
     styleTag.id = 'enhanced-trait-styles';
     styleTag.textContent = enhancedStyles;
     document.head.appendChild(styleTag);
+
+    // Create a message box element (to replace alert)
+    const messageBox = document.createElement('div');
+    messageBox.id = 'messageBox';
+    document.body.appendChild(messageBox);
 }
 
 // Clear any cached service workers on load
