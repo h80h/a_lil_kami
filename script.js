@@ -80,7 +80,7 @@ function updateURL() {
         params.set('sort', currentSortOrder);
     }
 
-    // 3. Get Selected IDs (Search/Comparison)
+    // 3. Get Selected IDs (Search)
     if (selectedIDs.size > 0) {
         params.set('select', Array.from(selectedIDs).join(','));
     }
@@ -102,7 +102,7 @@ function updateURL() {
 function loadStateFromURL() {
     const params = new URLSearchParams(window.location.search);
 
-    // --- 1. Load Selected IDs (Comparison) ---
+    // --- 1. Load Selected IDs ---
     const selectParam = params.get('select');
     if (selectParam) {
         selectParam.split(',').forEach(id => {
@@ -426,7 +426,7 @@ async function loadData() {
         
         // --- MODIFIED: Load state from URL after controls are built ---
         const filtersLoaded = loadStateFromURL();
-        updateSelectedIDsDisplay(); // Always update comparison display
+        updateSelectedIDsDisplay(); // Always update selection display
         
         // If filters were loaded, loadInitialNFTs is called within loadStateFromURL -> filterByTraits
         // If no filters were loaded, we use the sort order set by the URL (or default 'latest')
@@ -522,7 +522,7 @@ async function refreshData() {
         // Restore filters 
         currentFilters.forEach(filter => {
             const checkbox = document.querySelector(
-                // Use traitValue.toLowerCase() if filterTraitOptions uses lowercase, but here we assume original case from dataset is needed for comparison
+                // Use traitValue.toLowerCase() if filterTraitOptions uses lowercase, but here we assume original case from dataset is needed for selection
                 `.trait-checkbox[data-trait-type="${filter.type}"][data-trait-value="${filter.value}"]`
             );
             if (checkbox) {
@@ -530,7 +530,7 @@ async function refreshData() {
             }
         });
         
-        // Restore comparison IDs
+        // Restore selected IDs
         selectedIDs.clear();
         currentSelectedIDs.forEach(id => {
             if (traitsData[id]) selectedIDs.add(id);
@@ -851,7 +851,7 @@ function createFilterControls() {
             checkbox.type = 'checkbox';
             checkbox.className = 'trait-checkbox';
             checkbox.dataset.traitType = traitType;
-            checkbox.dataset.traitValue = value; // Keep original case for URL/comparison
+            checkbox.dataset.traitValue = value; // Keep original case for URL
             checkbox.addEventListener('change', () => updateSelectedTraitsDisplay(false));
             
             const details = traitDetails[traitType][value] || {};
