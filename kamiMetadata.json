@@ -1,14 +1,9 @@
 {
-  "lastUpdate": "2026-01-08T12:13:59.022Z",
-  "previousMaxId": 14524,
+  "lastUpdate": "2026-01-08T14:43:58.379Z",
+  "previousMaxId": 14525,
   "newKamiIds": [
-    14519,
-    14520,
-    14521,
-    14522,
-    14523,
-    14524
+    14525
   ],
-  "totalCount": 14524,
+  "totalCount": 14525,
   "lastExtractionAttempts": 1
 }
