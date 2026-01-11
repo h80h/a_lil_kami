@@ -544828,5 +544828,120 @@
         "power": 3
       }
     }
+  },
+  "14631": {
+    "background": {
+      "name": "Mustard",
+      "stats": {
+        "harmony": 1,
+        "health": 10
+      }
+    },
+    "body": {
+      "name": "Lotus",
+      "affinity": "EERIE",
+      "stats": {
+        "harmony": 4,
+        "health": 20
+      }
+    },
+    "color": {
+      "name": "White",
+      "stats": {
+        "harmony": 3
+      }
+    },
+    "face": {
+      "name": "._.",
+      "stats": {
+        "harmony": 1,
+        "power": 1,
+        "violence": 1
+      }
+    },
+    "hand": {
+      "name": "Coins",
+      "affinity": "NORMAL",
+      "stats": {
+        "health": 50
+      }
+    }
+  },
+  "14632": {
+    "background": {
+      "name": "Pink",
+      "stats": {
+        "harmony": 1,
+        "health": 10
+      }
+    },
+    "body": {
+      "name": "Tube",
+      "affinity": "NORMAL",
+      "stats": {
+        "harmony": 1,
+        "health": 10,
+        "power": 1,
+        "violence": 2
+      }
+    },
+    "color": {
+      "name": "Red",
+      "stats": {
+        "violence": 2
+      }
+    },
+    "face": {
+      "name": "o_o",
+      "stats": {
+        "health": 30
+      }
+    },
+    "hand": {
+      "name": "Paws",
+      "affinity": "NORMAL",
+      "stats": {
+        "harmony": 2,
+        "violence": 2
+      }
+    }
+  },
+  "14633": {
+    "background": {
+      "name": "Rust",
+      "stats": {
+        "health": 10,
+        "power": 1
+      }
+    },
+    "body": {
+      "name": "Lightbulb",
+      "affinity": "SCRAP",
+      "stats": {
+        "harmony": 1,
+        "power": 3
+      }
+    },
+    "color": {
+      "name": "Purple",
+      "stats": {
+        "power": 3
+      }
+    },
+    "face": {
+      "name": "n_n",
+      "stats": {
+        "health": 10,
+        "power": 2
+      }
+    },
+    "hand": {
+      "name": "Mudra",
+      "affinity": "EERIE",
+      "stats": {
+        "health": 30,
+        "power": 6
+      }
+    }
   }
 }

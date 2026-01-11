@@ -876784,5 +876784,201 @@
         }
       ]
     }
+  },
+  "14631": {
+    "id": 14631,
+    "stats": {
+      "harmony": 19,
+      "health": 130,
+      "power": 11,
+      "violence": 11
+    },
+    "bonuses": {
+      "harmony": [
+        {
+          "trait": "background",
+          "name": "Mustard",
+          "bonus": 1
+        },
+        {
+          "trait": "body",
+          "name": "Lotus",
+          "bonus": 4
+        },
+        {
+          "trait": "color",
+          "name": "White",
+          "bonus": 3
+        },
+        {
+          "trait": "face",
+          "name": "._.",
+          "bonus": 1
+        }
+      ],
+      "health": [
+        {
+          "trait": "background",
+          "name": "Mustard",
+          "bonus": 10
+        },
+        {
+          "trait": "body",
+          "name": "Lotus",
+          "bonus": 20
+        },
+        {
+          "trait": "hand",
+          "name": "Coins",
+          "bonus": 50
+        }
+      ],
+      "power": [
+        {
+          "trait": "face",
+          "name": "._.",
+          "bonus": 1
+        }
+      ],
+      "violence": [
+        {
+          "trait": "face",
+          "name": "._.",
+          "bonus": 1
+        }
+      ]
+    }
+  },
+  "14632": {
+    "id": 14632,
+    "stats": {
+      "harmony": 14,
+      "health": 100,
+      "power": 11,
+      "violence": 16
+    },
+    "bonuses": {
+      "harmony": [
+        {
+          "trait": "background",
+          "name": "Pink",
+          "bonus": 1
+        },
+        {
+          "trait": "body",
+          "name": "Tube",
+          "bonus": 1
+        },
+        {
+          "trait": "hand",
+          "name": "Paws",
+          "bonus": 2
+        }
+      ],
+      "health": [
+        {
+          "trait": "background",
+          "name": "Pink",
+          "bonus": 10
+        },
+        {
+          "trait": "body",
+          "name": "Tube",
+          "bonus": 10
+        },
+        {
+          "trait": "face",
+          "name": "o_o",
+          "bonus": 30
+        }
+      ],
+      "power": [
+        {
+          "trait": "body",
+          "name": "Tube",
+          "bonus": 1
+        }
+      ],
+      "violence": [
+        {
+          "trait": "body",
+          "name": "Tube",
+          "bonus": 2
+        },
+        {
+          "trait": "color",
+          "name": "Red",
+          "bonus": 2
+        },
+        {
+          "trait": "hand",
+          "name": "Paws",
+          "bonus": 2
+        }
+      ]
+    }
+  },
+  "14633": {
+    "id": 14633,
+    "stats": {
+      "harmony": 11,
+      "health": 100,
+      "power": 25,
+      "violence": 10
+    },
+    "bonuses": {
+      "harmony": [
+        {
+          "trait": "body",
+          "name": "Lightbulb",
+          "bonus": 1
+        }
+      ],
+      "health": [
+        {
+          "trait": "background",
+          "name": "Rust",
+          "bonus": 10
+        },
+        {
+          "trait": "face",
+          "name": "n_n",
+          "bonus": 10
+        },
+        {
+          "trait": "hand",
+          "name": "Mudra",
+          "bonus": 30
+        }
+      ],
+      "power": [
+        {
+          "trait": "background",
+          "name": "Rust",
+          "bonus": 1
+        },
+        {
+          "trait": "body",
+          "name": "Lightbulb",
+          "bonus": 3
+        },
+        {
+          "trait": "color",
+          "name": "Purple",
+          "bonus": 3
+        },
+        {
+          "trait": "face",
+          "name": "n_n",
+          "bonus": 2
+        },
+        {
+          "trait": "hand",
+          "name": "Mudra",
+          "bonus": 6
+        }
+      ],
+      "violence": []
+    }
   }
 }
