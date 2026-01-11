@@ -876980,5 +876980,182 @@
       ],
       "violence": []
     }
+  },
+  "14634": {
+    "id": 14634,
+    "stats": {
+      "harmony": 14,
+      "health": 100,
+      "power": 13,
+      "violence": 14
+    },
+    "bonuses": {
+      "harmony": [
+        {
+          "trait": "background",
+          "name": "Mustard",
+          "bonus": 1
+        },
+        {
+          "trait": "color",
+          "name": "Blue",
+          "bonus": 2
+        },
+        {
+          "trait": "face",
+          "name": "O_0",
+          "bonus": 1
+        }
+      ],
+      "health": [
+        {
+          "trait": "background",
+          "name": "Mustard",
+          "bonus": 10
+        },
+        {
+          "trait": "body",
+          "name": "Jellyfish",
+          "bonus": 20
+        },
+        {
+          "trait": "face",
+          "name": "O_0",
+          "bonus": 20
+        }
+      ],
+      "power": [
+        {
+          "trait": "body",
+          "name": "Jellyfish",
+          "bonus": 3
+        }
+      ],
+      "violence": [
+        {
+          "trait": "hand",
+          "name": "Scorpion",
+          "bonus": 4
+        }
+      ]
+    }
+  },
+  "14635": {
+    "id": 14635,
+    "stats": {
+      "harmony": 15,
+      "health": 90,
+      "power": 17,
+      "violence": 12
+    },
+    "bonuses": {
+      "harmony": [
+        {
+          "trait": "face",
+          "name": "Ou0",
+          "bonus": 5
+        }
+      ],
+      "health": [
+        {
+          "trait": "body",
+          "name": "Jellyfish",
+          "bonus": 20
+        },
+        {
+          "trait": "hand",
+          "name": "Spectral",
+          "bonus": 20
+        }
+      ],
+      "power": [
+        {
+          "trait": "background",
+          "name": "Yellow",
+          "bonus": 1
+        },
+        {
+          "trait": "body",
+          "name": "Jellyfish",
+          "bonus": 3
+        },
+        {
+          "trait": "color",
+          "name": "Yellow",
+          "bonus": 1
+        },
+        {
+          "trait": "hand",
+          "name": "Spectral",
+          "bonus": 2
+        }
+      ],
+      "violence": [
+        {
+          "trait": "background",
+          "name": "Yellow",
+          "bonus": 1
+        },
+        {
+          "trait": "color",
+          "name": "Yellow",
+          "bonus": 1
+        }
+      ]
+    }
+  },
+  "14636": {
+    "id": 14636,
+    "stats": {
+      "harmony": 12,
+      "health": 70,
+      "power": 16,
+      "violence": 19
+    },
+    "bonuses": {
+      "harmony": [
+        {
+          "trait": "body",
+          "name": "Shrimp",
+          "bonus": 2
+        }
+      ],
+      "health": [
+        {
+          "trait": "background",
+          "name": "Default Green",
+          "bonus": 20
+        }
+      ],
+      "power": [
+        {
+          "trait": "body",
+          "name": "Shrimp",
+          "bonus": 3
+        },
+        {
+          "trait": "face",
+          "name": "Serious Teddy",
+          "bonus": 3
+        }
+      ],
+      "violence": [
+        {
+          "trait": "color",
+          "name": "Red",
+          "bonus": 2
+        },
+        {
+          "trait": "face",
+          "name": "Serious Teddy",
+          "bonus": 2
+        },
+        {
+          "trait": "hand",
+          "name": "Tentacles",
+          "bonus": 5
+        }
+      ]
+    }
   }
 }
