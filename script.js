@@ -16,14 +16,6 @@ let isLoading = false;
 let metadataInfo = {};
 let isRefreshing = false;
 
-const debounce = (func, wait) => {
-    let timeout;
-    return (...args) => {
-        clearTimeout(timeout);
-        timeout = setTimeout(() => func.apply(this, args), wait);
-    };
-};
-
 // --- URL SYNCHRONIZATION FUNCTIONS ---
 
 // Converts the current checked trait filters into a URL-safe string (e.g., 'body:A,B;hand:C')
@@ -588,11 +580,6 @@ function loadInitialNFTs() {
 function loadMoreNFTs() {
     if (isLoading) return;
     
-    if (currentLoadIndex > 100) {
-        const oldCards = resultsDiv.querySelectorAll('.nft-card:nth-child(-n+30)');
-        oldCards.forEach(card => card.innerHTML = '<div style="height:300px"></div>');
-    }   
-
     isLoading = true;
     const resultsDiv = document.getElementById('results');
     const idsToDisplay = isFiltering ? filteredNFTIds : allNFTIds;
@@ -694,7 +681,7 @@ function removeSelectedTrait(event) {
     }
 }
 
-const updateSelectedTraitsDisplay = debounce((forceUpdate = false) => {
+function updateSelectedTraitsDisplay(forceUpdate = false) {
     const selectedTraitsDiv = document.getElementById('selectedTraitsDisplay');
     if (selectedTraitsDiv) {
         selectedTraitsDiv.style.display = 'none';
@@ -714,7 +701,7 @@ const updateSelectedTraitsDisplay = debounce((forceUpdate = false) => {
     updateURL(); // <<< URL Update on change
     
     filterByTraits();
-}, 250);
+}
 
 function createFilterControls() {
     const filterControls = document.getElementById('filterControls');
