@@ -877157,5 +877157,74 @@
         }
       ]
     }
+  },
+  "14637": {
+    "id": 14637,
+    "stats": {
+      "harmony": 16,
+      "health": 60,
+      "power": 15,
+      "violence": 17
+    },
+    "bonuses": {
+      "harmony": [
+        {
+          "trait": "body",
+          "name": "Tube",
+          "bonus": 1
+        },
+        {
+          "trait": "hand",
+          "name": "Plant",
+          "bonus": 5
+        }
+      ],
+      "health": [
+        {
+          "trait": "body",
+          "name": "Tube",
+          "bonus": 10
+        }
+      ],
+      "power": [
+        {
+          "trait": "background",
+          "name": "Yellow",
+          "bonus": 1
+        },
+        {
+          "trait": "body",
+          "name": "Tube",
+          "bonus": 1
+        },
+        {
+          "trait": "face",
+          "name": "Serious Teddy",
+          "bonus": 3
+        }
+      ],
+      "violence": [
+        {
+          "trait": "background",
+          "name": "Yellow",
+          "bonus": 1
+        },
+        {
+          "trait": "body",
+          "name": "Tube",
+          "bonus": 2
+        },
+        {
+          "trait": "color",
+          "name": "Red",
+          "bonus": 2
+        },
+        {
+          "trait": "face",
+          "name": "Serious Teddy",
+          "bonus": 2
+        }
+      ]
+    }
   }
 }
