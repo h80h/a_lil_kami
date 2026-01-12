@@ -367,18 +367,18 @@ async function loadData() {
     try {
         console.log('📄 Loading data with cache-busting...');
         
-        const imagesResponse = await fetchWithCacheBusting('kamiImage.json');
+        const imagesResponse = await fetchWithCacheBusting('api/data/kamiImage.json');
         if (!imagesResponse.ok) {
             throw new Error(`Failed to load kamiImage.json: ${imagesResponse.status}`);
         }
         
-        const traitsResponse = await fetchWithCacheBusting('kamiTraits.json');
+        const traitsResponse = await fetchWithCacheBusting('api/data/kamiTraits.json');
         if (!traitsResponse.ok) {
             throw new Error(`Failed to load kamiTraits.json: ${traitsResponse.status}`);
         }
         
         try {
-            const statsResponse = await fetchWithCacheBusting('kamiStats.json');
+            const statsResponse = await fetchWithCacheBusting('api/data/kamiStats.json');
             if (statsResponse.ok) {
                 kamiStatsData = await statsResponse.json();
                 console.log(`✅ Loaded stats data for ${Object.keys(kamiStatsData).length} Kamigotchi`);
@@ -392,7 +392,7 @@ async function loadData() {
         }
         
         try {
-            const metadataResponse = await fetchWithCacheBusting('kamiMetadata.json');
+            const metadataResponse = await fetchWithCacheBusting('api/data/kamiMetadata.json');
             if (metadataResponse.ok) {
                 metadataInfo = await metadataResponse.json();
                 console.log(`✨ Found ${metadataInfo.newKamiIds?.length || 0} new Kamigotchi!`);
@@ -480,8 +480,8 @@ async function refreshData() {
         const currentSort = currentSortOrder;
         
         // Reload all data
-        const imagesResponse = await fetchWithCacheBusting('kamiImage.json');
-        const traitsResponse = await fetchWithCacheBusting('kamiTraits.json');
+        const imagesResponse = await fetchWithCacheBusting('api/data/kamiImage.json');
+        const traitsResponse = await fetchWithCacheBusting('api/data/kamiTraits.json');
         
         if (!imagesResponse.ok || !traitsResponse.ok) {
             throw new Error('Failed to fetch updated data');
@@ -492,7 +492,7 @@ async function refreshData() {
         
         // Reload optional files
         try {
-            const statsResponse = await fetchWithCacheBusting('kamiStats.json');
+            const statsResponse = await fetchWithCacheBusting('api/data/kamiStats.json');
             if (statsResponse.ok) {
                 kamiStatsData = await statsResponse.json();
             }
@@ -501,7 +501,7 @@ async function refreshData() {
         }
         
         try {
-            const metadataResponse = await fetchWithCacheBusting('kamiMetadata.json');
+            const metadataResponse = await fetchWithCacheBusting('api/data/kamiMetadata.json');
             if (metadataResponse.ok) {
                 metadataInfo = await metadataResponse.json();
             }

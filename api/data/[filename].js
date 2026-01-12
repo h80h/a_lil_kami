@@ -33,24 +33,38 @@ export default async function handler(req, res) {
       });
     }
     
-    // Fetch from Vercel Blob Storage
-    const blobUrl = `https://blob.vercel-storage.com/${filename}`;
-    
-    const response = await fetch(blobUrl, {
+    // List all blobs to find the actual URL
+    const listResponse = await fetch('https://blob.vercel-storage.com', {
       headers: {
         'Authorization': `Bearer ${token}`
       }
     });
     
+    if (!listResponse.ok) {
+      throw new Error(`Failed to list blobs: ${listResponse.status}`);
+    }
+    
+    const listData = await listResponse.json();
+    
+    // Find the blob with matching pathname (just the filename, no path)
+    const blob = listData.blobs?.find(b => {
+      const blobFilename = b.pathname.split('/').pop(); // Get just filename
+      return blobFilename === filename;
+    });
+    
+    if (!blob) {
+      return res.status(404).json({ 
+        error: 'File not found',
+        filename: filename,
+        availableFiles: listData.blobs?.map(b => b.pathname) || [],
+        message: 'Data has not been extracted yet. Check GitHub Actions or try again in a few minutes.'
+      });
+    }
+    
+    // Fetch using the actual public blob URL (no auth needed for public blobs)
+    const response = await fetch(blob.url);
+    
     if (!response.ok) {
-      if (response.status === 404) {
-        return res.status(404).json({ 
-          error: 'File not found',
-          filename: filename,
-          message: 'Data has not been extracted yet. Please wait for the first GitHub Actions run or check if the extraction succeeded.'
-        });
-      }
-      
       throw new Error(`Blob fetch failed: ${response.status} ${response.statusText}`);
     }
     

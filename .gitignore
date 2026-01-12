@@ -2,6 +2,7 @@
 node_modules/
 extract-kamigotchi.js
 test-full-with-upload.js
+test-api-route.js
 
 # Environment variables
 .env
