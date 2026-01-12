@@ -1,17 +1,24 @@
 {
-  "name": "kamigotchi_nft",
+  "name": "kamigotchi-extractor",
   "version": "1.0.0",
   "description": "",
   "main": "script.js",
+  "type": "commonjs",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "echo 'Static site - no build required'"
+    "build": "echo 'Static site - no build required'",
+    "extract": "node extract-kamigotchi-github.js"
   },
-  
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "jsdom": "^27.2.0"
+    "dotenv": "^17.2.3",
+    "ethers": "^6.15.0",
+    "jsdom": "^27.2.0",
+    "playwright": "^1.57.0"
+  },
+  "engines": {
+    "node": ">=18.x"
   }
 }

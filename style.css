@@ -116,7 +116,6 @@ button {
   color: white;
   border: none;
   border-radius: 10px;
-  font-size: 11px;
   cursor: pointer;
   transition: background 0.3s;
 }
@@ -161,10 +160,8 @@ button {
 }
 
 #clearBtn {
+  font-size: 11px;
   background: #95a5a6;
-}
-
-#clearBtn {
   box-shadow: 1px 5px 0 0 rgba(25, 58, 43, 0.7);
 }
 

@@ -1,3 +1,11 @@
 .vercel
 node_modules/
 extract-kamigotchi.js
+test-full-with-upload.js
+
+# Environment variables
+.env
+.env.local
+
+# Logs
+extraction.log
