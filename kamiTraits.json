@@ -545093,5 +545093,42 @@
         "harmony": 5
       }
     }
+  },
+  "14638": {
+    "background": {
+      "name": "Blue-Grey",
+      "stats": {
+        "violence": 2
+      }
+    },
+    "body": {
+      "name": "Eyes",
+      "affinity": "EERIE",
+      "stats": {
+        "power": 6
+      }
+    },
+    "color": {
+      "name": "Pink",
+      "stats": {
+        "power": 2
+      }
+    },
+    "face": {
+      "name": "o_O",
+      "stats": {
+        "health": 10,
+        "power": 1,
+        "violence": 1
+      }
+    },
+    "hand": {
+      "name": "Beetle",
+      "affinity": "INSECT",
+      "stats": {
+        "harmony": 2,
+        "violence": 2
+      }
+    }
   }
 }

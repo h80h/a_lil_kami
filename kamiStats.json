@@ -877226,5 +877226,64 @@
         }
       ]
     }
+  },
+  "14638": {
+    "id": 14638,
+    "stats": {
+      "harmony": 12,
+      "health": 60,
+      "power": 19,
+      "violence": 15
+    },
+    "bonuses": {
+      "harmony": [
+        {
+          "trait": "hand",
+          "name": "Beetle",
+          "bonus": 2
+        }
+      ],
+      "health": [
+        {
+          "trait": "face",
+          "name": "o_O",
+          "bonus": 10
+        }
+      ],
+      "power": [
+        {
+          "trait": "body",
+          "name": "Eyes",
+          "bonus": 6
+        },
+        {
+          "trait": "color",
+          "name": "Pink",
+          "bonus": 2
+        },
+        {
+          "trait": "face",
+          "name": "o_O",
+          "bonus": 1
+        }
+      ],
+      "violence": [
+        {
+          "trait": "background",
+          "name": "Blue-Grey",
+          "bonus": 2
+        },
+        {
+          "trait": "face",
+          "name": "o_O",
+          "bonus": 1
+        },
+        {
+          "trait": "hand",
+          "name": "Beetle",
+          "bonus": 2
+        }
+      ]
+    }
   }
 }
