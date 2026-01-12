@@ -145,7 +145,7 @@ async function uploadToVercelBlob(filename, data) {
 async function fetchPreviousMetadata() {
   try {
     const token = process.env.VERCEL_BLOB_TOKEN;
-    const response = await fetch('https://blob.vercel-storage.com/kamiMetadata.json', {
+    const response = await fetch('https://5rlbyplg6mxh9kru.public.blob.vercel-storage.com/kamiMetadata.json', {
       headers: {
         'Authorization': `Bearer ${token}`
       }
