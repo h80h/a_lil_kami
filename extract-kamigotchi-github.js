@@ -252,8 +252,8 @@ async function runExtraction() {
       
       retries--;
       if (retries > 0) {
-        console.log(`⏳ Waiting 30 seconds... (${retries} attempts left)`);
-        await page.waitForTimeout(30000);
+        console.log(`⏳ Waiting 60 seconds... (${retries} attempts left)`);
+        await page.waitForTimeout(60000);
       }
     }
     
