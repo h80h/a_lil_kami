@@ -1,8 +1,9 @@
 // extract-kamigotchi-github.js
-// GitHub Actions compatible version with Vercel Blob upload
-// This script runs automatically every 90 minutes
+// GitHub Actions compatible version with Cloudflare R2 upload
+// This script runs automatically every 2 hours
 
 const { chromium } = require('playwright');
+const { S3Client, PutObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
 const fs = require('fs').promises;
 
 const BASE_STATS = {
@@ -11,6 +12,16 @@ const BASE_STATS = {
   power: 10,
   violence: 10
 };
+
+// Initialize Cloudflare R2 client
+const r2Client = new S3Client({
+  region: 'auto',
+  endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+  credentials: {
+    accessKeyId: process.env.R2_ACCESS_KEY_ID,
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+  },
+});
 
 /**
  * Calculate full stats for all Kamigotchi
@@ -84,84 +95,57 @@ async function calculateKamiStats(traitsData) {
 }
 
 /**
- * Upload file to Vercel Blob Storage using REST API with fixed pathname
- * Overwrites existing file if it already exists
+ * Upload file to Cloudflare R2
  */
-async function uploadToVercelBlob(filename, data) {
-  const token = process.env.VERCEL_BLOB_TOKEN;
+async function uploadToR2(filename, data) {
+  console.log(`📤 Uploading ${filename} to Cloudflare R2...`);
   
-  if (!token) {
-    throw new Error('❌ VERCEL_BLOB_TOKEN not set in environment variables');
-  }
-  
-  console.log(`📤 Uploading ${filename}...`);
-  
-  // First, try to delete the old file if it exists
-  try {
-    const deleteUrl = `https://blob.vercel-storage.com/${filename}`;
-    const deleteResponse = await fetch(deleteUrl, {
-      method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
-    
-    if (deleteResponse.ok) {
-      console.log(`   🗑️  Deleted old ${filename}`);
-    }
-  } catch (error) {
-    // File might not exist, that's okay
-    console.log(`   ℹ️  No old ${filename} to delete (first upload)`);
-  }
-  
-  // Now upload the new file
-  const url = `https://blob.vercel-storage.com/${filename}`;
-  
-  const response = await fetch(url, {
-    method: 'PUT',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      'x-content-type': 'application/json',
-      'x-add-random-suffix': '0'  // This prevents random suffix!
-    },
-    body: JSON.stringify(data)
+  const command = new PutObjectCommand({
+    Bucket: process.env.R2_BUCKET_NAME,
+    Key: filename,
+    Body: JSON.stringify(data),
+    ContentType: 'application/json',
+    CacheControl: 'public, max-age=300', // 5 minutes cache
   });
   
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Upload failed for ${filename}: ${response.status} - ${errorText}`);
+  try {
+    await r2Client.send(command);
+    console.log(`   ✅ ${filename} uploaded successfully`);
+  } catch (error) {
+    throw new Error(`Upload failed for ${filename}: ${error.message}`);
   }
-  
-  const result = await response.json();
-  console.log(`   ✅ ${filename} uploaded successfully`);
-  console.log(`   📍 URL: ${result.url}`);
-  return result;
 }
 
 /**
- * Fetch previous metadata from Vercel Blob
+ * Fetch previous metadata from Cloudflare R2
  */
 async function fetchPreviousMetadata() {
   try {
-    const token = process.env.VERCEL_BLOB_TOKEN;
-    const response = await fetch('https://5rlbyplg6mxh9kru.public.blob.vercel-storage.com/kamiMetadata.json', {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
+    console.log('📋 Fetching previous metadata from R2...');
+    
+    const command = new GetObjectCommand({
+      Bucket: process.env.R2_BUCKET_NAME,
+      Key: 'kamiMetadata.json',
     });
     
-    if (response.ok) {
-      return await response.json();
-    }
+    const response = await r2Client.send(command);
+    const body = await response.Body.transformToString();
+    const metadata = JSON.parse(body);
+    
+    console.log(`   ✅ Found previous metadata (max ID: ${metadata.previousMaxId})`);
+    return metadata;
   } catch (error) {
-    console.log('ℹ️  No previous metadata found (first run)');
+    if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
+      console.log('   ℹ️  No previous metadata found (first run)');
+    } else {
+      console.log(`   ⚠️  Error fetching metadata: ${error.message}`);
+    }
+    
+    return {
+      previousMaxId: null,
+      isFirstRun: true
+    };
   }
-  
-  return {
-    previousMaxId: null,
-    isFirstRun: true
-  };
 }
 
 /**
@@ -177,6 +161,7 @@ async function runExtraction() {
     console.log('='.repeat(60));
     console.log(`Started at: ${new Date().toISOString()}`);
     console.log(`Repository: https://github.com/h80h/a_lil_kami`);
+    console.log(`Storage: Cloudflare R2`);
     console.log('='.repeat(60));
     
     // Launch Playwright browser
@@ -220,10 +205,14 @@ async function runExtraction() {
     }, { timeout: 60000 });
     
     console.log('⏳ Waiting for data to load...');
+    console.log('📊 Loading Kamigotchi data (this may take 2-3 minutes for large datasets)...');
     
-    // Wait for data with retries
+    // Wait for data with stability checks - optimized for 15000+ items
     let dataLoaded = false;
-    let retries = 6; // 6 attempts * 10 seconds = 1 minute max
+    let retries = 20; // 20 attempts * 15 seconds = 5 minutes max
+    let previousCount = 0;
+    let stableCount = 0;
+    const targetStableChecks = 3;
     
     while (retries > 0 && !dataLoaded) {
       const testResult = await page.evaluate(() => {
@@ -245,15 +234,33 @@ async function runExtraction() {
       });
       
       if (testResult.success && testResult.count > 0) {
-        console.log(`✅ Data loaded! Found ${testResult.count} Kamigotchi (max ID: ${testResult.maxId})`);
-        dataLoaded = true;
-        break;
+        const percentOfMax = ((testResult.count / 22222) * 100).toFixed(1);
+        console.log(`   📈 Progress: ${testResult.count} Kamigotchi loaded (${percentOfMax}% of max 22,222) | Max ID: ${testResult.maxId}`);
+        
+        // Check if count is stable
+        if (testResult.count === previousCount) {
+          stableCount++;
+          console.log(`   ⏸️  Count stable (${stableCount}/${targetStableChecks} checks)`);
+          
+          if (stableCount >= targetStableChecks) {
+            console.log(`\n✅ Data fully loaded and stable!`);
+            console.log(`   Total: ${testResult.count} Kamigotchi`);
+            console.log(`   Max ID: ${testResult.maxId}`);
+            dataLoaded = true;
+            break;
+          }
+        } else {
+          const increase = testResult.count - previousCount;
+          stableCount = 0;
+          previousCount = testResult.count;
+          console.log(`   🔄 Loading... (+${increase} new)`);
+        }
       }
       
       retries--;
-      if (retries > 0) {
-        console.log(`⏳ Waiting 60 seconds... (${retries} attempts left)`);
-        await page.waitForTimeout(60000);
+      if (retries > 0 && !dataLoaded) {
+        console.log(`   ⏳ Waiting 15 seconds for more data... (${retries} attempts left)\n`);
+        await page.waitForTimeout(15000);
       }
     }
     
@@ -364,17 +371,18 @@ async function runExtraction() {
       newKamiIds: newKamiIds.sort((a, b) => a - b),
       totalCount: allIds.length,
       extractedBy: 'GitHub Actions',
-      extractionDuration: Math.round((Date.now() - startTime) / 1000)
+      extractionDuration: Math.round((Date.now() - startTime) / 1000),
+      storageProvider: 'Cloudflare R2'
     };
     
-    // Upload all files to Vercel Blob
-    console.log('\n📤 Uploading to Vercel Blob Storage...');
+    // Upload all files to Cloudflare R2
+    console.log('\n📤 Uploading to Cloudflare R2...');
     
-    await uploadToVercelBlob('kamiImage.json', imageMap);
-    await uploadToVercelBlob('kamiTraits.json', traitsMap);
-    await uploadToVercelBlob('kamiStats.json', kamiStats);
-    await uploadToVercelBlob('kamiRankings.json', statRankings);
-    await uploadToVercelBlob('kamiMetadata.json', metadata);
+    await uploadToR2('kamiImage.json', imageMap);
+    await uploadToR2('kamiTraits.json', traitsMap);
+    await uploadToR2('kamiStats.json', kamiStats);
+    await uploadToR2('kamiRankings.json', statRankings);
+    await uploadToR2('kamiMetadata.json', metadata);
     
     const duration = Math.round((Date.now() - startTime) / 1000);
     
@@ -384,6 +392,7 @@ Kamigotchi Data Extraction Log
 ${'='.repeat(60)}
 Timestamp: ${new Date().toISOString()}
 Duration: ${duration} seconds
+Storage: Cloudflare R2
 ${'='.repeat(60)}
 
 RESULTS:
@@ -393,7 +402,7 @@ RESULTS:
 - Current max ID: ${currentMaxId}
 - New IDs: ${newKamiIds.join(', ') || 'none'}
 
-FILES UPLOADED:
+FILES UPLOADED TO R2:
 ✅ kamiImage.json (${imageCount} entries)
 ✅ kamiTraits.json (${traitsCount} entries with stats)
 ✅ kamiStats.json (${Object.keys(kamiStats).length} calculated stats)
@@ -412,6 +421,7 @@ Extraction completed successfully! 🎉
     console.log(`Duration: ${duration} seconds`);
     console.log(`Total Kamigotchi: ${allIds.length}`);
     console.log(`New Kamigotchi: ${newKamiIds.length}`);
+    console.log(`Storage: Cloudflare R2`);
     console.log('='.repeat(60));
     
   } catch (error) {
