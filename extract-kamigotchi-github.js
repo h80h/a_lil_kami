@@ -212,7 +212,7 @@ async function runExtraction() {
     let retries = 10; // 10 attempts * 60 seconds = 10 minutes max
     let previousCount = 0;
     let stableCount = 0;
-    const targetStableChecks = 3;
+    const targetStableChecks = 1;
     
     while (retries > 0 && !dataLoaded) {
       const testResult = await page.evaluate(() => {
