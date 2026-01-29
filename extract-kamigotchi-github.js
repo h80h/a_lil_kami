@@ -202,14 +202,14 @@ async function runExtraction() {
     await page.waitForFunction(() => {
       return typeof window.network !== 'undefined' && 
              window.network?.explorer?.kamis?.all;
-    }, { timeout: 60000 });
+    }, { timeout: 120000 });
     
     console.log('⏳ Waiting for data to load...');
     console.log('📊 Loading Kamigotchi data (this may take 2-3 minutes for large datasets)...');
     
     // Wait for data with stability checks - optimized for 15000+ items
     let dataLoaded = false;
-    let retries = 20; // 20 attempts * 15 seconds = 5 minutes max
+    let retries = 10; // 10 attempts * 60 seconds = 10 minutes max
     let previousCount = 0;
     let stableCount = 0;
     const targetStableChecks = 3;
@@ -259,8 +259,8 @@ async function runExtraction() {
       
       retries--;
       if (retries > 0 && !dataLoaded) {
-        console.log(`   ⏳ Waiting 15 seconds for more data... (${retries} attempts left)\n`);
-        await page.waitForTimeout(15000);
+        console.log(`   ⏳ Waiting 60 seconds for more data... (${retries} attempts left)\n`);
+        await page.waitForTimeout(60000);
       }
     }
     
