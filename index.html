@@ -48,15 +48,13 @@
     <div id="selectedIDs" class="selected-ids"></div>
 
     <!-- Filter by Traits -->
-    <div class="filter-section">
+    <div class="trait-filter-section">
       <div id="filterControls"></div>
       
       <!-- Selected Traits Display -->
       <div id="selectedTraitsDisplay" class="selected-traits-display" style="display: none;"></div>
-      <div class="filter-buttons">
-        <!-- <button id="filterBtn">Apply</button> -->
-        <button id="clearBtn">Clear</button>
-      </div>
+      <button id="clearBtn">CLEAR</button>
+      <button id="affinityFilterToggle">Affinity</button>
     </div>
 
     <div class="sort-section">
@@ -69,6 +67,32 @@
           <button class="sort-btn health" data-sort="health">Health</button>
           <button class="sort-btn power" data-sort="power">Power</button>
           <button class="sort-btn violence" data-sort="violence">Violence</button>
+          <button id="cloneFilterBtn">Clones</button>
+      </div>
+    </div>
+
+    <div class="affinity-filter-section" style="display: none;"">
+      <div id="affinityFilterLabel">Affinity:</div>
+      <div id="affinityFilterContainer">
+        <div id="bodyAffinity">
+          <div id="bodyAffinityLabel">Body:</div>
+          <div class="affinity-filter-buttons">
+              <button class="affinity-btn">EERIE</button>
+              <button class="affinity-btn">SCRAP</button>
+              <button class="affinity-btn">INSECT</button>
+              <button class="affinity-btn">NORMAL</button>
+          </div>
+        </div>
+        <div id="handAffinity">
+          <div id="handAffinityLabel">Hand:</div>
+          <div class="affinity-filter-buttons">
+              <button class="affinity-btn">EERIE</button>
+              <button class="affinity-btn">SCRAP</button>
+              <button class="affinity-btn">INSECT</button>
+              <button class="affinity-btn">NORMAL</button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Results Display -->

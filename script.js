@@ -1,14 +1,25 @@
 let imagesData = {};
 let traitsData = {};
 let kamiStatsData = {};
+let affinityData = {}; // NEW: Store body and hand affinity for each NFT
 let selectedIDs = new Set();
 let allNFTIds = [];
 let filteredNFTIds = [];
 let currentLoadIndex = 0;
 let traitCounts = {};
 let nftRarityScores = {};
+
+let traitSignatures = {}; // Store trait signatures for clone detection
+
 let currentSortOrder = 'latest'; // Default sort
 let isFiltering = false;
+
+let isShowingClonesOnly = false; // New flag for clone filter
+
+// NEW: Track selected affinity filters
+let selectedBodyAffinities = new Set();
+let selectedHandAffinities = new Set();
+
 let nftObserver = null;
 const INITIAL_LOAD_COUNT = 50;
 const LAZY_LOAD_COUNT = 30;
@@ -18,23 +29,43 @@ let isRefreshing = false;
 
 // --- URL SYNCHRONIZATION FUNCTIONS ---
 
-// Converts the current checked trait filters into a URL-safe string (e.g., 'body:A,B;hand:C')
+// MODIFIED: Exclude traits from the URL if they are already represented by an active Affinity
 function getTraitStringFromState() {
     const checkboxes = document.querySelectorAll('.trait-checkbox:checked');
     const selected = {};
+    
     checkboxes.forEach(checkbox => {
         const type = checkbox.dataset.traitType;
         const value = checkbox.dataset.traitValue;
-        if (!selected[type]) {
-            selected[type] = [];
+
+        let isCoveredByAffinity = false;
+        if (type === 'body' || type === 'hand') {
+            const affinitySet = type === 'body' ? selectedBodyAffinities : selectedHandAffinities;
+            const traitData = Object.values(traitsData).find(nft => nft[type]?.name === value)?.[type];
+            if (traitData && affinitySet.has(traitData.affinity)) {
+                isCoveredByAffinity = true;
+            }
         }
-        // Encode the value to handle spaces and special chars
-        selected[type].push(encodeURIComponent(value));
+
+        if (!isCoveredByAffinity) {
+            if (!selected[type]) selected[type] = [];
+            selected[type].push(encodeURIComponent(value));
+        }
     });
 
-    return Object.entries(selected)
-        .map(([type, values]) => `${type}:${values.join(',')}`)
-        .join(';');
+    return Object.entries(selected).map(([type, values]) => `${type}:${values.join(',')}`).join(';');
+}
+
+// NEW: Get affinity filter state as URL string
+function getAffinityStringFromState() {
+    const parts = [];
+    if (selectedBodyAffinities.size > 0) {
+        parts.push(`body:${Array.from(selectedBodyAffinities).join(',')}`);
+    }
+    if (selectedHandAffinities.size > 0) {
+        parts.push(`hand:${Array.from(selectedHandAffinities).join(',')}`);
+    }
+    return parts.join(';');
 }
 
 // Updates the browser URL based on the current app state
@@ -56,6 +87,17 @@ function updateURL(replace = false) {
     const idArray = Array.from(selectedIDs).sort((a, b) => Number(a) - Number(b));
     if (idArray.length > 0) {
         params.set('ids', idArray.join(','));
+    }
+
+    // 4. Clone Filter
+    if (isShowingClonesOnly) {
+        params.set('clones', 'true');
+    }
+
+    // 5. NEW: Affinity Filters
+    const affinityString = getAffinityStringFromState();
+    if (affinityString) {
+        params.set('affinity', affinityString);
     }
 
     const queryString = params.toString();
@@ -83,7 +125,6 @@ function loadStateFromURL() {
     const urlSort = params.get('sort');
     if (urlSort) {
         currentSortOrder = urlSort;
-        // Update button visual state later in loadData/handlePopState
     }
 
     // 2. Load Selected IDs
@@ -93,7 +134,11 @@ function loadStateFromURL() {
         selectedIDs = new Set(ids);
     }
     
-    // 3. Load Trait Filters (Must happen AFTER filter controls are created)
+    // 3. Load Clone Filter
+    const urlClones = params.get('clones');
+    isShowingClonesOnly = (urlClones === 'true');
+
+    // 4. Load Trait Filters
     let hasFilters = false;
     const urlTraits = params.get('traits');
     if (urlTraits) {
@@ -103,10 +148,7 @@ function loadStateFromURL() {
             if (type && valuesString) {
                 const values = valuesString.split(',').map(v => decodeURIComponent(v));
                 values.forEach(value => {
-                    // Checkbox may not exist yet if called too early, but we rely on it running AFTER createFilterControls
-                    const checkbox = document.querySelector(
-                        `.trait-checkbox[data-trait-type="${type}"][data-trait-value="${value}"]`
-                    );
+                    const checkbox = document.querySelector(`.trait-checkbox[data-trait-type="${type}"][data-trait-value="${value}"]`);
                     if (checkbox) {
                         checkbox.checked = true;
                         hasFilters = true;
@@ -116,32 +158,67 @@ function loadStateFromURL() {
         });
     }
     
+    // 5. MODIFIED: Load Affinity and sync trait checkboxes
+    const urlAffinity = params.get('affinity');
+    if (urlAffinity) {
+        const affinityGroups = urlAffinity.split(';');
+        affinityGroups.forEach(group => {
+            const [type, valuesString] = group.split(':');
+            if (type && valuesString) {
+                const values = valuesString.split(',');
+                values.forEach(affinityValue => {
+                    if (type === 'body') selectedBodyAffinities.add(affinityValue);
+                    else if (type === 'hand') selectedHandAffinities.add(affinityValue);
+
+                    // Sync checkboxes: Check every trait belonging to this affinity
+                    Object.values(traitsData).forEach(nft => {
+                        const trait = nft[type];
+                        if (trait && typeof trait === 'object' && trait.affinity === affinityValue) {
+                            const cb = document.querySelector(`.trait-checkbox[data-trait-type="${type}"][data-trait-value="${trait.name}"]`);
+                            if (cb) cb.checked = true;
+                        }
+                    });
+                });
+                hasFilters = true;
+            }
+        });
+
+        // Set Expected Mode: Show section and activate buttons
+        const affinitySection = document.querySelector('.affinity-filter-section');
+        const toggleBtn = document.getElementById('affinityFilterToggle');
+        if (affinitySection && toggleBtn) {
+            affinitySection.style.display = 'block';
+            toggleBtn.classList.add('active');
+        }
+        updateAffinityButtonStates();
+    }
+    
     return hasFilters;
 }
 
 // Handles browser back/forward button clicks
 function handlePopState() {
-    // 1. Load state from the new URL
+    // 1. Sync state from URL
     const hasFilters = loadStateFromURL();
 
-    // 2. Update UI elements based on loaded state
+    // 2. Sync UI Elements
     updateSelectedIDsDisplay(); 
-
-    // Update sort button visual state
     document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
     const sortButton = document.querySelector(`.sort-btn[data-sort="${currentSortOrder}"]`);
     if (sortButton) sortButton.classList.add('active');
 
-    // 3. Re-render the main NFT grid
-    if (hasFilters) {
-        filterByTraits(); // Will filter based on the newly checked boxes
-    } else if (isFiltering) {
-        // If we were filtering, but the new URL cleared filters
-        isFiltering = false;
-        allNFTIds = getSortedNFTIds();
-        loadInitialNFTs();
+    const cloneBtn = document.getElementById('cloneFilterBtn');
+    if (cloneBtn) {
+        isShowingClonesOnly ? cloneBtn.classList.add('active') : cloneBtn.classList.remove('active');
+    }
+
+    // 3. Re-render
+    if (isShowingClonesOnly) {
+        filterClones(); // This now uses the centralized logic
+    } else if (hasFilters) {
+        filterByTraits(); // This now uses the centralized logic
     } else {
-        // Just apply the new sort order
+        isFiltering = false;
         allNFTIds = getSortedNFTIds();
         loadInitialNFTs();
     }
@@ -181,6 +258,51 @@ function showContainer() {
 // Helper function to get trait name from data (handles both old and new format)
 function getTraitName(traitData) {
     return typeof traitData === 'string' ? traitData : traitData.name;
+}
+
+// Create a unique signature for an NFT based on its traits
+function createTraitSignature(traits) {
+    // Sort trait categories alphabetically for consistent signatures
+    const sortedCategories = Object.keys(traits).sort();
+    
+    // Create a string signature: "category1:value1|category2:value2|..."
+    const signature = sortedCategories
+        .map(category => `${category}:${getTraitName(traits[category])}`)
+        .join('|');
+    
+    return signature;
+}
+
+// Build trait signatures for all NFTs and identify clones
+function buildTraitSignatures() {
+    const signatures = {};
+    const signatureGroups = {}; // Group IDs by signature
+    
+    Object.entries(traitsData).forEach(([id, traits]) => {
+        const signature = createTraitSignature(traits);
+        signatures[id] = signature;
+        
+        if (!signatureGroups[signature]) {
+            signatureGroups[signature] = [];
+        }
+        signatureGroups[signature].push(id);
+    });
+    
+    // Store clone information
+    const cloneInfo = {
+        signatures: signatures,
+        groups: signatureGroups,
+        cloneIds: new Set() // IDs that are clones (have duplicates)
+    };
+    
+    // Identify which IDs are clones (signatures that appear more than once)
+    Object.entries(signatureGroups).forEach(([signature, ids]) => {
+        if (ids.length > 1) {
+            ids.forEach(id => cloneInfo.cloneIds.add(id));
+        }
+    });
+    
+    return cloneInfo;
 }
 
 // Calculate trait occurrence counts
@@ -252,56 +374,143 @@ function calculateRarityScores() {
         .sort((a, b) => b[1] - a[1]);
     
     const rankedScores = {};
+    let currentRank = 1;
+    let previousScore = null;
+    let tieCount = 0;
+
     sortedByScore.forEach(([id, score], index) => {
+        // If score is different from previous, update rank
+        if (previousScore !== null && score !== previousScore) {
+            currentRank = index + 1;
+            tieCount = 0;
+        } else if (previousScore === score) {
+            tieCount++;
+        }
+        
         rankedScores[id] = {
             score: score,
-            rank: index + 1
+            rank: currentRank,
+            isTied: tieCount > 0 || (index < sortedByScore.length - 1 && sortedByScore[index + 1][1] === score)
         };
+        
+        previousScore = score;
     });
     
     return rankedScores;
 }
 
+// NEW: Extract affinity data from traits
+function extractAffinityData() {
+    const affinities = {};
+    
+    Object.entries(traitsData).forEach(([id, traits]) => {
+        affinities[id] = {
+            body: 'NORMAL', // default
+            hand: 'NORMAL'  // default
+        };
+        
+        // Extract body affinity
+        if (traits.body && typeof traits.body === 'object' && traits.body.affinity) {
+            affinities[id].body = traits.body.affinity;
+        }
+        
+        // Extract hand affinity
+        if (traits.hand && typeof traits.hand === 'object' && traits.hand.affinity) {
+            affinities[id].hand = traits.hand.affinity;
+        }
+    });
+    
+    return affinities;
+}
+
 // Get sorted NFT IDs based on current sort order (with stats support)
+// ALWAYS keeps clone groups together
 function getSortedNFTIds(idsToSort) {
     const ids = idsToSort || Object.keys(traitsData);
     
-    switch(currentSortOrder) {
-        case 'latest':
-            return ids.sort((a, b) => Number(b) - Number(a));
-        case 'oldest':
-            return ids.sort((a, b) => Number(a) - Number(b));
-        case 'rarity':
-            return ids.sort((a, b) => {
-                return nftRarityScores[a].rank - nftRarityScores[b].rank;
+    // Helper function to get stat value
+    const getStatValue = (id, sortOrder) => {
+        switch(sortOrder) {
+            case 'rarity':
+                return nftRarityScores[id]?.rank || 9999;
+            case 'harmony':
+                return kamiStatsData[id]?.stats.harmony || 0;
+            case 'health':
+                return kamiStatsData[id]?.stats.health || 0;
+            case 'power':
+                return kamiStatsData[id]?.stats.power || 0;
+            case 'violence':
+                return kamiStatsData[id]?.stats.violence || 0;
+            default:
+                return 0;
+        }
+    };
+    
+    // 1. CHRONOLOGICAL SORTING (Latest/Oldest)
+    if (currentSortOrder === 'latest' || currentSortOrder === 'oldest') {
+        if (isShowingClonesOnly) {
+            // Group clones together based on a representative member
+            const signatureToRepId = {};
+            ids.forEach(id => {
+                const sig = traitSignatures.signatures[id];
+                const numId = Number(id);
+                if (!signatureToRepId[sig]) {
+                    signatureToRepId[sig] = numId;
+                } else {
+                    if (currentSortOrder === 'latest') {
+                        signatureToRepId[sig] = Math.max(signatureToRepId[sig], numId);
+                    } else {
+                        signatureToRepId[sig] = Math.min(signatureToRepId[sig], numId);
+                    }
+                }
             });
-        case 'harmony':
+            
             return ids.sort((a, b) => {
-                const statA = kamiStatsData[a]?.stats.harmony || 0;
-                const statB = kamiStatsData[b]?.stats.harmony || 0;
-                return statB - statA;
+                const sigA = traitSignatures.signatures[a];
+                const sigB = traitSignatures.signatures[b];
+                if (sigA !== sigB) {
+                    const repA = signatureToRepId[sigA];
+                    const repB = signatureToRepId[sigB];
+                    return currentSortOrder === 'latest' ? repB - repA : repA - repB;
+                }
+                // Within a clone group, always sort by ID
+                return currentSortOrder === 'latest' ? Number(b) - Number(a) : Number(a) - Number(b);
             });
-        case 'health':
+        } else {
+            // Standard individual sorting (No grouping)
             return ids.sort((a, b) => {
-                const statA = kamiStatsData[a]?.stats.health || 0;
-                const statB = kamiStatsData[b]?.stats.health || 0;
-                return statB - statA;
+                return currentSortOrder === 'latest' ? Number(b) - Number(a) : Number(a) - Number(b);
             });
-        case 'power':
-            return ids.sort((a, b) => {
-                const statA = kamiStatsData[a]?.stats.power || 0;
-                const statB = kamiStatsData[b]?.stats.power || 0;
-                return statB - statA;
-            });
-        case 'violence':
-            return ids.sort((a, b) => {
-                const statA = kamiStatsData[a]?.stats.violence || 0;
-                const statB = kamiStatsData[b]?.stats.violence || 0;
-                return statB - statA;
-            });
-        default:
-            return ids.sort((a, b) => Number(b) - Number(a));
+        }
     }
+    
+    // 2. STAT/RARITY SORTING (Always groups clones)
+    return ids.sort((a, b) => {
+        const sigA = traitSignatures.signatures[a];
+        const sigB = traitSignatures.signatures[b];
+        
+        // Step A: If they belong to different clone groups
+        if (sigA !== sigB) {
+            const statA = getStatValue(a, currentSortOrder);
+            const statB = getStatValue(b, currentSortOrder);
+            
+            // If the stats are different, sort by stat
+            if (statA !== statB) {
+                if (currentSortOrder === 'rarity') return statA - statB;
+                return statB - statA;
+            }
+            
+            // IF STATS ARE EQUAL: Tiebreaker is the LATEST ID in each group
+            // This ensures groups with the same Harmony/Health etc. are listed newest first
+            const repA = Math.max(...traitSignatures.groups[sigA].map(Number));
+            const repB = Math.max(...traitSignatures.groups[sigB].map(Number));
+            return repB - repA; 
+        }
+        
+        // Step B: If they are in the same clone group
+        // Always list the newest ID of that specific group first
+        return Number(b) - Number(a);
+    });
 }
 
 // Setup sort button event listeners
@@ -322,17 +531,171 @@ function setupSortButtons() {
                 sortButtons.forEach(b => b.classList.remove('active'));
                 e.target.classList.add('active');
                 
-                updateURL(); // <<< URL Update
-                
-                if (isFiltering) {
-                    filterByTraits();
+                // FIXED: Re-apply the active filter state after sort change
+                if (isShowingClonesOnly) {
+                    filterClones(); // Re-sort and display clones
+                } else if (isFiltering) {
+                    filterByTraits(); // Re-apply trait filters with new sort
                 } else {
+                    // Just re-sort all NFTs
                     allNFTIds = getSortedNFTIds();
                     loadInitialNFTs();
                 }
+                
+                // Update selected cards display to match new sort order
+                if (selectedIDs.size > 0) {
+                    updateSelectedIDsDisplay();
+                }
+                
+                updateURL(); // Update URL after all changes
             }
         });
     });
+}
+
+// Setup clone filter button
+function setupCloneFilterButton() {
+    const cloneBtn = document.getElementById('cloneFilterBtn');
+    if (!cloneBtn) return;
+    
+    cloneBtn.addEventListener('click', () => {
+        isShowingClonesOnly = !isShowingClonesOnly;
+        
+        if (isShowingClonesOnly) {
+            cloneBtn.classList.add('active');
+            filterClones();
+        } else {
+            cloneBtn.classList.remove('active');
+            // Return to normal view
+            if (isFiltering) {
+                filterByTraits();
+            } else {
+                const hasAffinityFilters = selectedBodyAffinities.size > 0 || selectedHandAffinities.size > 0; // NEW
+                if (hasAffinityFilters) { // NEW
+                    filterByTraits(); // NEW
+                } else { // NEW
+                    allNFTIds = getSortedNFTIds();
+                    loadInitialNFTs();
+                } // NEW
+            }
+        }
+        
+        updateURL();
+    });
+}
+
+function filterClones() {
+    const resultsDiv = document.getElementById('results');
+    resultsDiv.textContent = '';
+    
+    // 1. Identify which IDs to display
+    const checkboxes = document.querySelectorAll('.trait-checkbox:checked');
+    const hasTraitFilters = checkboxes.length > 0;
+    const hasAffinityFilters = selectedBodyAffinities.size > 0 || selectedHandAffinities.size > 0;
+    
+    let cloneIds;
+    if (hasTraitFilters && isFiltering) {
+        // Intersection of current trait filters and clone IDs
+        cloneIds = filteredNFTIds.filter(id => traitSignatures.cloneIds.has(id));
+    } else {
+        // All known clones
+        cloneIds = Array.from(traitSignatures.cloneIds);
+    }
+    
+    // Apply affinity filters to clone IDs
+    if (hasAffinityFilters) {
+        cloneIds = cloneIds.filter(id => {
+            const nftAffinity = affinityData[id];
+            if (!nftAffinity) return false;
+            
+            const bodyMatch = selectedBodyAffinities.size === 0 || selectedBodyAffinities.has(nftAffinity.body);
+            const handMatch = selectedHandAffinities.size === 0 || selectedHandAffinities.has(nftAffinity.hand);
+            
+            return bodyMatch && handMatch;
+        });
+    }
+    
+    // 2. Use the centralized sorting logic
+    filteredNFTIds = getSortedNFTIds(cloneIds);
+    isFiltering = true; 
+    
+    // --- NEW: AFFINITY NOTATION LOGIC ---
+    let affinityNotation = "";
+    if (hasAffinityFilters) {
+        const affinityMap = {
+            'NORMAL': 'N',
+            'INSECT': 'I',
+            'SCRAP': 'S',
+            'EERIE': 'E'
+        };
+
+        // UI logic typically handles single affinity selection via Sets
+        const bValue = Array.from(selectedBodyAffinities)[0];
+        const hValue = Array.from(selectedHandAffinities)[0];
+
+        const bChar = bValue ? (affinityMap[bValue] || "?") : "";
+        const hChar = hValue ? (affinityMap[hValue] || "?") : "";
+            
+        affinityNotation = ` (${bChar}/${hChar})`;
+    }
+    // ------------------------------------
+
+    // 3. UI Construction
+    const countDiv = document.createElement('div');
+    countDiv.className = 'count-header';
+    
+    const uniqueSignatures = new Set();
+    cloneIds.forEach(id => {
+        uniqueSignatures.add(traitSignatures.signatures[id]);
+    });
+    
+    // Build filter summary buttons if trait filters are active
+    let filterSummaryHTML = '';
+    if (hasTraitFilters) {
+        const selectedTraits = {};
+        checkboxes.forEach(checkbox => {
+            const traitType = checkbox.dataset.traitType;
+            const traitValue = checkbox.dataset.traitValue;
+            if (!selectedTraits[traitType]) selectedTraits[traitType] = [];
+            selectedTraits[traitType].push(traitValue);
+        });
+        
+        let summaryButtonsHTML = Object.entries(selectedTraits).map(([type, values]) => 
+            values.map(value => `
+                <button class="count-header-trait-btn" data-trait-type="${type}" data-trait-value="${value}">
+                    ${type}: ${value} ×
+                </button>`).join('')
+        ).join('');
+        
+        filterSummaryHTML = `<div class="filter-summary-buttons-container" style="display: flex; flex-wrap: wrap; gap: 5px; margin: 10px;">${summaryButtonsHTML}</div>`;
+    }
+    
+    countDiv.innerHTML = `
+        <div id="count-summary" style="font-size: 14px;">
+            Found ${cloneIds.length} clones in ${uniqueSignatures.size} groups${affinityNotation}
+        </div>
+        <div class="note">** dear mobile user, click card to show og stats **</div>
+        ${filterSummaryHTML}
+    `;
+    
+    resultsDiv.appendChild(countDiv);
+    
+    // Re-attach listeners to the new summary buttons
+    countDiv.querySelectorAll('.count-header-trait-btn').forEach(btn => {
+        btn.addEventListener('click', removeSelectedTrait);
+    });
+    
+    if (filteredNFTIds.length === 0) {
+        const noResultsDiv = document.createElement('div');
+        noResultsDiv.className = 'no-results';
+        noResultsDiv.textContent = 'No clones found with current filters';
+        resultsDiv.appendChild(noResultsDiv);
+        return;
+    }
+    
+    currentLoadIndex = 0;
+    loadMoreNFTs();
+    setupInfiniteScroll();
 }
 
 // Enhanced fetch function with cache-busting and proper headers
@@ -406,6 +769,14 @@ async function loadData() {
         console.log(`✅ Loaded ${Object.keys(imagesData).length} images`);
         console.log(`✅ Loaded ${Object.keys(traitsData).length} trait sets`);
         
+        // NEW: Extract affinity data
+        affinityData = extractAffinityData();
+        console.log(`✅ Extracted affinity data for ${Object.keys(affinityData).length} Kamigotchi`);
+        
+        // Build trait signatures for clone detection
+        traitSignatures = buildTraitSignatures();
+        console.log(`🔍 Found ${traitSignatures.cloneIds.size} clones in ${Object.values(traitSignatures.groups).filter(g => g.length > 1).length} groups`);
+
         traitCounts = calculateTraitCounts();
         console.log('🔢 Calculating OpenRarity scores...');
         nftRarityScores = calculateRarityScores();
@@ -413,6 +784,9 @@ async function loadData() {
         
         // Setup controls
         setupSortButtons();
+        setupCloneFilterButton();
+        setupAffinityFilterToggle(); // NEW
+        setupAffinityFilters(); // NEW
         createFilterControls();
         
         // --- URL Integration START ---
@@ -423,14 +797,26 @@ async function loadData() {
         const sortButton = document.querySelector(`.sort-btn[data-sort="${currentSortOrder}"]`);
         if (sortButton) sortButton.classList.add('active');
 
+        // Update clone button visual state
+        const cloneBtn = document.getElementById('cloneFilterBtn');
+        if (cloneBtn && isShowingClonesOnly) {
+            cloneBtn.classList.add('active');
+        }
+
         updateSelectedIDsDisplay(); // Display IDs loaded from URL
         
         allNFTIds = getSortedNFTIds(); // Sort all IDs initially
 
+        // Handle filter state on page load
         if (initialFilterActive) {
-            filterByTraits(); // Apply filters if URL had them
+            // Trait filters are active (will handle clone filter if also active)
+            filterByTraits();
+        } else if (isShowingClonesOnly) {
+            // Only clone filter is active
+            filterClones();
         } else {
-            loadInitialNFTs(); // Normal load
+            // No filters active
+            loadInitialNFTs();
         }
         
         updateURL(true); // Replace initial URL with the canonical state
@@ -470,6 +856,7 @@ async function refreshData() {
         // Save current filters
         const currentFilters = getTraitStringFromState();
         const currentSort = currentSortOrder;
+        const wasShowingClones = isShowingClonesOnly;
         
         // Reload all data
         const imagesResponse = await fetchWithCacheBusting('api/data/kamiImage.json');
@@ -501,6 +888,14 @@ async function refreshData() {
             console.log('Metadata not updated');
         }
         
+        // NEW: Re-extract affinity data
+        affinityData = extractAffinityData();
+        console.log(`✅ Re-extracted affinity data for ${Object.keys(affinityData).length} Kamigotchi`);
+        
+        // Rebuild trait signatures
+        traitSignatures = buildTraitSignatures();
+        console.log(`🔍 Found ${traitSignatures.cloneIds.size} clones in ${Object.values(traitSignatures.groups).filter(g => g.length > 1).length} groups`);
+
         // Recalculate everything with OpenRarity
         traitCounts = calculateTraitCounts();
         console.log('🔢 Recalculating OpenRarity scores...');
@@ -509,6 +904,7 @@ async function refreshData() {
         
         // Restore sort and filters
         currentSortOrder = currentSort;
+        isShowingClonesOnly = wasShowingClones;
         allNFTIds = getSortedNFTIds();
         
         // Rebuild filter controls with updated data
@@ -526,9 +922,23 @@ async function refreshData() {
              history.replaceState(null, '', `?${params.toString()}`);
              loadStateFromURL();
              history.replaceState(null, '', originalSearch); // Restore original URL
-             
-             filterByTraits();
-             
+        }
+        
+        // Update clone button state
+        const cloneBtn = document.getElementById('cloneFilterBtn');
+        if (cloneBtn) {
+            if (isShowingClonesOnly) {
+                cloneBtn.classList.add('active');
+            } else {
+                cloneBtn.classList.remove('active');
+            }
+        }
+        
+        // Reload display based on active filters
+        if (isShowingClonesOnly) {
+            filterClones();
+        } else if (currentFilters) {
+            filterByTraits();
         } else {
             isFiltering = false;
             loadInitialNFTs();
@@ -568,7 +978,17 @@ function loadInitialNFTs() {
     
     const idsToDisplay = isFiltering ? filteredNFTIds : allNFTIds;
     
-    const title = isFiltering ? 'Found matching Kamigotchi' : 'Showing all Kamigotchi';
+    let title = 'Showing all Kamigotchi';
+    if (isShowingClonesOnly) {
+        const uniqueSignatures = new Set();
+        idsToDisplay.forEach(id => {
+            uniqueSignatures.add(traitSignatures.signatures[id]);
+        });
+        title = `Showing ${idsToDisplay.length} clones in ${uniqueSignatures.size} groups`;
+    } else if (isFiltering) {
+        title = 'Found matching Kamigotchi';
+    }
+    
     const countDiv = createCountHeader(idsToDisplay.length, title);
     resultsDiv.appendChild(countDiv);
     
@@ -681,26 +1101,105 @@ function removeSelectedTrait(event) {
     }
 }
 
+// MODIFIED: Added logic to stop affinity filter if traits are partially removed
 function updateSelectedTraitsDisplay(forceUpdate = false) {
     const selectedTraitsDiv = document.getElementById('selectedTraitsDisplay');
-    if (selectedTraitsDiv) {
-        selectedTraitsDiv.style.display = 'none';
-    }
+    if (selectedTraitsDiv) selectedTraitsDiv.style.display = 'none';
     
+    // 1. Sync Affinities: This now checks if any NEW traits were selected 
+    // that aren't part of the current affinity sets.
+    validateAffinitiesAgainstCheckboxes();
+
     const checkboxes = document.querySelectorAll('.trait-checkbox:checked');
     
     if (checkboxes.length === 0 && (isFiltering || forceUpdate)) {
         isFiltering = false;
         filteredNFTIds = [];
-        allNFTIds = getSortedNFTIds(Object.keys(traitsData));
-        loadInitialNFTs();
-        updateURL(); // <<< URL Update
+        selectedBodyAffinities.clear();
+        selectedHandAffinities.clear();
+        updateAffinityButtonStates();
+
+        if (isShowingClonesOnly) {
+            filterClones();
+        } else {
+            allNFTIds = getSortedNFTIds(Object.keys(traitsData));
+            loadInitialNFTs();
+        }
+        updateURL();
         return;
     }
     
-    updateURL(); // <<< URL Update on change
-    
+    updateURL(); 
     filterByTraits();
+}
+
+/**
+ * NEW LOGIC: Validates that ONLY traits belonging to the active affinities are selected.
+ * If a user selects a trait outside the affinity, the affinity filter is deactivated.
+ */
+function validateAffinitiesAgainstCheckboxes() {
+    let stateChanged = false;
+
+    ['body', 'hand'].forEach(type => {
+        const activeAffinities = type === 'body' ? selectedBodyAffinities : selectedHandAffinities;
+        
+        // 1. Get all currently checked traits for this category
+        const checkedBoxes = document.querySelectorAll(`.trait-checkbox[data-trait-type="${type}"]:checked`);
+        const checkedTraitNames = Array.from(checkedBoxes).map(cb => cb.dataset.traitValue);
+
+        // 2. Identify which affinities are represented by the current checkbox selection
+        const representedAffinities = new Set();
+        checkedTraitNames.forEach(name => {
+            const nft = Object.values(traitsData).find(n => n[type]?.name === name);
+            if (nft && nft[type]?.affinity) {
+                representedAffinities.add(nft[type].affinity);
+            }
+        });
+
+        // 3. Logic: An affinity should be "Active" IF AND ONLY IF:
+        //    a) All traits belonging to that affinity are checked.
+        //    b) No traits from OTHER affinities are checked in this category.
+        
+        // We only allow an affinity to be "active" if there is exactly ONE affinity type selected in this category
+        if (representedAffinities.size === 1) {
+            const currentAffinity = Array.from(representedAffinities)[0];
+            
+            // Get all traits that belong to this specific affinity
+            const requiredTraits = new Set();
+            Object.values(traitsData).forEach(nft => {
+                if (nft[type]?.affinity === currentAffinity) {
+                    requiredTraits.add(nft[type].name);
+                }
+            });
+
+            // Check if every required trait is checked
+            const isComplete = Array.from(requiredTraits).every(name => checkedTraitNames.includes(name));
+            
+            // If it's complete and wasn't active, or if it was active and is still complete
+            if (isComplete) {
+                if (!activeAffinities.has(currentAffinity)) {
+                    activeAffinities.add(currentAffinity);
+                    stateChanged = true;
+                }
+            } else {
+                // Traits are missing from this affinity
+                if (activeAffinities.size > 0) {
+                    activeAffinities.clear();
+                    stateChanged = true;
+                }
+            }
+        } else {
+            // Either 0 traits are selected, or traits from multiple affinities (e.g. NORMAL + INSECT)
+            if (activeAffinities.size > 0) {
+                activeAffinities.clear();
+                stateChanged = true;
+            }
+        }
+    });
+
+    if (stateChanged) {
+        updateAffinityButtonStates();
+    }
 }
 
 function createFilterControls() {
@@ -911,8 +1410,10 @@ function displayNFT(id, showCloseButton = false) {
     const rarityData = nftRarityScores[id];
     const rank = rarityData ? rarityData.rank : '?';
     const score = rarityData ? rarityData.score.toFixed(4) : '?';
+    const isTied = rarityData ? rarityData.isTied : false;
     
     const isNew = metadataInfo.newKamiIds && metadataInfo.newKamiIds.includes(Number(id));
+    const isClone = traitSignatures.cloneIds.has(id);
     
     const card = document.createElement('div');
     card.className = 'nft-card hover_wrapper';
@@ -980,50 +1481,60 @@ function displayNFT(id, showCloseButton = false) {
     
     const newBadgeHTML = isNew ? 
         `<div class="new-badge" title="Recently Added!">NEW</div>` : '';
+
+    const cloneBadgeHTML = isClone ? 
+        `<div class="clone-badge" title="This Kamigotchi has identical traits to others">CLONE</div>` : '';
     
     // Check if mobile view
-const isMobile = window.innerWidth <= 390;
+    const isMobile = window.innerWidth <= 390;
 
-// Build the card HTML based on screen size
-if (isMobile) {
-    card.innerHTML = `
-    ${closeButtonHTML}
-    ${newBadgeHTML}
-    <div class="rank-stat-container">
-        <div class="rank-badge ${rankClass}" title="Rarity Rank: #${rank} | Score: ${score}">
-            ${rank}
+    // Prepare tooltip text
+    const rankTooltip = isTied 
+        ? `OpenRarity Rank: #${rank} (Tied) | Score: ${score}` 
+        : `OpenRarity Rank: #${rank} | Score: ${score}`;
+
+    // Build the card HTML based on screen size
+    if (isMobile) {
+        card.innerHTML = `
+        ${closeButtonHTML}
+        ${newBadgeHTML}
+        ${cloneBadgeHTML}
+        <div class="rank-stat-container">
+            <div class="rank-badge ${rankClass}" title="Rarity Rank: #${rank} | Score: ${score}">
+                ${rank}
+            </div>
+            ${statColorHTML}
         </div>
-        ${statColorHTML}
-    </div>
-    <div class="nft-card-content">
-        <img src="${imageUrl}" alt="NFT #${id}" loading="lazy" onerror="this.src='https://via.placeholder.com/250?text=Image+Not+Found'">
-        <div class="nft-details hover_wrapper">
-            <div class="nft-id">Kamigotchi ${id}</div>
-            ${traitsHTML}
-            ${statsHTML}
+        <div class="nft-card-content">
+            <img src="${imageUrl}" alt="NFT #${id}" loading="lazy" onerror="this.src='https://via.placeholder.com/250?text=Image+Not+Found'">
+            <div class="nft-details hover_wrapper">
+                <div class="nft-id">Kamigotchi ${id}</div>
+                ${traitsHTML}
+                ${statsHTML}
+            </div>
         </div>
-    </div>
-    `;
-} else {
-    card.innerHTML = `
-    ${closeButtonHTML}
-    ${newBadgeHTML}
-    <div class="rank-stat-container">
-        <div class="rank-badge ${rankClass}" title="Rarity Rank: #${rank} | Score: ${score}">
-            ${rank}
+        `;
+    } else {
+        card.innerHTML = `
+        ${closeButtonHTML}
+        ${newBadgeHTML}
+        ${cloneBadgeHTML}
+        <div class="rank-stat-container">
+            <div class="rank-badge ${rankClass}" title="Rarity Rank: #${rank} | Score: ${score}">
+                ${rank}
+            </div>
+            ${statColorHTML}
         </div>
-        ${statColorHTML}
-    </div>
-    ${statsHTML}
-    <div class="nft-card-content">
-        <img src="${imageUrl}" alt="NFT #${id}" loading="lazy" onerror="this.src='https://via.placeholder.com/250?text=Image+Not+Found'">
-        <div class="nft-details hover_wrapper">
-            <div class="nft-id">Kamigotchi ${id}</div>
-            ${traitsHTML}
+        ${statsHTML}
+        <div class="nft-card-content">
+            <img src="${imageUrl}" alt="NFT #${id}" loading="lazy" onerror="this.src='https://via.placeholder.com/250?text=Image+Not+Found'">
+            <div class="nft-details hover_wrapper">
+                <div class="nft-id">Kamigotchi ${id}</div>
+                ${traitsHTML}
+            </div>
         </div>
-    </div>
-    `;
-}
+        `;
+    }
     
     card.addEventListener('click', (event) => {
         event.stopPropagation();
@@ -1058,8 +1569,9 @@ function updateSelectedIDsDisplay() {
         const cardsContainer = document.createElement('div');
         cardsContainer.className = 'selected-cards-grid';
 
-        // Sort selected IDs numerically for consistent display and URL generation
-        const sortedIDs = Array.from(selectedIDs).sort((a, b) => Number(a) - Number(b));
+        // Sort selected IDs using the current sort order
+        const selectedIDsArray = Array.from(selectedIDs);
+        const sortedIDs = getSortedNFTIds(selectedIDsArray);
         
         sortedIDs.forEach(id => {
             const card = displayNFT(id, true);
@@ -1132,11 +1644,18 @@ function filterByTraits() {
     resultsDiv.textContent = '';
 
     const checkboxes = document.querySelectorAll('.trait-checkbox:checked');
+    const hasTraitFilters = checkboxes.length > 0;
+    const hasAffinityFilters = selectedBodyAffinities.size > 0 || selectedHandAffinities.size > 0;
     
-    if (checkboxes.length === 0) {
+    if (!hasTraitFilters && !hasAffinityFilters) {
         isFiltering = false;
-        allNFTIds = getSortedNFTIds(Object.keys(traitsData));
-        loadInitialNFTs();
+        
+        if (isShowingClonesOnly) {
+            filterClones();
+        } else {
+            allNFTIds = getSortedNFTIds(Object.keys(traitsData));
+            loadInitialNFTs();
+        }
         return;
     }
     
@@ -1156,22 +1675,60 @@ function filterByTraits() {
         selectedTraits[traitType].push(traitValue);
     });
     
-    let matchingNFTs = Object.keys(traitsData)
-        .filter(id => {
-            const nftTraits = traitsData[id];
-            return Object.entries(selectedTraits).every(([traitType, selectedValues]) => {
-                const nftTraitName = getTraitName(nftTraits[traitType]);
-                return selectedValues.includes(nftTraitName);
-            });
+    let baseIDs = isShowingClonesOnly ? Array.from(traitSignatures.cloneIds) : Object.keys(traitsData);
+
+    let matchingNFTs = baseIDs.filter(id => {
+        const nftTraits = traitsData[id];
+        return Object.entries(selectedTraits).every(([traitType, selectedValues]) => {
+            const nftTraitName = getTraitName(nftTraits[traitType]);
+            return selectedValues.includes(nftTraitName);
         });
+    });
+    
+    if (hasAffinityFilters) {
+        matchingNFTs = matchingNFTs.filter(id => {
+            const nftAffinity = affinityData[id];
+            if (!nftAffinity) return false;
+            
+            const bodyMatch = selectedBodyAffinities.size === 0 || selectedBodyAffinities.has(nftAffinity.body);
+            const handMatch = selectedHandAffinities.size === 0 || selectedHandAffinities.has(nftAffinity.hand);
+            
+            return bodyMatch && handMatch;
+        });
+    }
     
     filteredNFTIds = getSortedNFTIds(matchingNFTs);
     isFiltering = true;
     
+    if (isShowingClonesOnly) {
+        filterClones();
+        return;
+    }
+    
     resultsDiv.textContent = '';
     
+    // --- NEW: AFFINITY NOTATION LOGIC ---
+    let affinityNotation = "";
+    if (hasAffinityFilters) {
+        const affinityMap = {
+            'NORMAL': 'N',
+            'INSECT': 'I',
+            'SCRAP': 'S',
+            'EERIE': 'E'
+        };
+
+        // Get the first item from the Sets (since UI logic handles single affinity selection)
+        const bValue = Array.from(selectedBodyAffinities)[0];
+        const hValue = Array.from(selectedHandAffinities)[0];
+
+        const bChar = bValue ? (affinityMap[bValue] || "?") : "";
+        const hChar = hValue ? (affinityMap[hValue] || "?") : "";
+            
+        affinityNotation = ` (${bChar}/${hChar})`;
+    }
+    // ------------------------------------
+
     let summaryButtonsHTML = '';
-    
     Object.entries(selectedTraits).forEach(([type, values]) => {
         values.forEach(value => {
             summaryButtonsHTML += `
@@ -1188,9 +1745,11 @@ function filterByTraits() {
     const countDiv = document.createElement('div');
     countDiv.className = 'count-header';
     countDiv.innerHTML = `
-        <div id="count-summary" style="font-size: 14px;">Found matching Kamigotchi: ${filteredNFTIds.length}</div>
-        <div class="note">** dear mobile user, click card to show og stats **<div>
-        <div id="filter-summary-buttons" class="filter-summary-buttons-container" style="display: flex; flex-wrap: wrap; gap: 5px; margin: 10px;">
+        <div id="count-summary" style="font-size: 14px;">
+            Found matching Kamigotchi: ${filteredNFTIds.length}${affinityNotation}
+        </div>
+        <div class="note">** dear mobile user, click card to show og stats **</div>
+        <div class="filter-summary-buttons-container" style="display: flex; flex-wrap: wrap; gap: 5px; margin: 10px;">
             ${summaryButtonsHTML}
         </div>
     `;
@@ -1215,6 +1774,107 @@ function filterByTraits() {
     setupInfiniteScroll();
 }
 
+// NEW: Setup affinity filter toggle button
+function setupAffinityFilterToggle() {
+    const toggleBtn = document.getElementById('affinityFilterToggle');
+    const affinitySection = document.querySelector('.affinity-filter-section');
+    
+    if (toggleBtn && affinitySection) {
+        toggleBtn.addEventListener('click', () => {
+            const isVisible = affinitySection.style.display !== 'none';
+            affinitySection.style.display = isVisible ? 'none' : 'block';
+            toggleBtn.classList.toggle('active', !isVisible);
+        });
+    }
+}
+
+// MODIFIED: Clicking affinity now toggles all matching individual trait checkboxes
+function setupAffinityFilters() {
+    const affinityButtons = document.querySelectorAll('.affinity-btn');
+    
+    affinityButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            const affinityValue = button.textContent.trim();
+            const isBody = button.closest('#bodyAffinity') !== null;
+            const traitType = isBody ? 'body' : 'hand';
+            const affinitySet = isBody ? selectedBodyAffinities : selectedHandAffinities;
+
+            if (affinitySet.has(affinityValue)) {
+                affinitySet.delete(affinityValue);
+                button.classList.remove('active');
+                toggleTraitCheckboxesByAffinity(traitType, affinityValue, false);
+            } else {
+                // --- FIX: CLEAR PREVIOUS SELECTIONS ---
+                // 1. Clear the set for this category
+                affinitySet.clear(); 
+                
+                // 2. Uncheck EVERY checkbox in the filterGroupsContainer for this type
+                const allCheckboxesInType = document.querySelectorAll(`.trait-checkbox[data-trait-type="${traitType}"]`);
+                allCheckboxesInType.forEach(cb => cb.checked = false);
+
+                // 3. Set this affinity as active
+                affinitySet.add(affinityValue);
+                updateAffinityButtonStates(); 
+                toggleTraitCheckboxesByAffinity(traitType, affinityValue, true);
+            }
+            
+            // Re-run display logic to clear summary buttons and refresh results
+            updateSelectedTraitsDisplay(true);
+        });
+    });
+}
+
+// NEW: Helper to sync checkboxes with the clicked affinity
+function toggleTraitCheckboxesByAffinity(type, affinity, shouldCheck) {
+    // Collect all traits that belong to this affinity from our data
+    const affinityTraitNames = new Set();
+    Object.values(traitsData).forEach(nft => {
+        const trait = nft[type];
+        if (trait && typeof trait === 'object' && trait.affinity === affinity) {
+            affinityTraitNames.add(trait.name);
+        }
+    });
+
+    // Toggle only the checkboxes for those specific traits
+    affinityTraitNames.forEach(traitName => {
+        const cb = document.querySelector(`.trait-checkbox[data-trait-type="${type}"][data-trait-value="${traitName}"]`);
+        if (cb) cb.checked = shouldCheck;
+    });
+}
+
+// NEW: Update affinity button visual states
+function updateAffinityButtonStates() {
+    const affinityButtons = document.querySelectorAll('.affinity-btn');
+    
+    affinityButtons.forEach(button => {
+        const affinity = button.textContent.trim();
+        const isBodyButton = button.closest('#bodyAffinity') !== null;
+        
+        if (isBodyButton) {
+            button.classList.toggle('active', selectedBodyAffinities.has(affinity));
+        } else {
+            button.classList.toggle('active', selectedHandAffinities.has(affinity));
+        }
+    });
+}
+
+// NEW: Remove affinity filter when clicking on summary button
+function removeSelectedAffinity(event) {
+    const button = event.currentTarget;
+    const affinityType = button.dataset.affinityType;
+    const affinityValue = button.dataset.affinityValue;
+    
+    if (affinityType === 'body') {
+        selectedBodyAffinities.delete(affinityValue);
+    } else if (affinityType === 'hand') {
+        selectedHandAffinities.delete(affinityValue);
+    }
+    
+    updateAffinityButtonStates();
+    filterByTraits();
+    updateURL();
+}
+
 function clearFilters() {
     const checkboxes = document.querySelectorAll('.trait-checkbox');
     checkboxes.forEach(checkbox => checkbox.checked = false);
@@ -1231,13 +1891,23 @@ function clearFilters() {
     
     const allFilterGroups = document.querySelectorAll('.filter-group');
     allFilterGroups.forEach(group => group.style.display = 'none');
+
+    // --- ADDED: RESET AFFINITY STATE ---
+    selectedBodyAffinities.clear();
+    selectedHandAffinities.clear();
+    updateAffinityButtonStates(); // Resets the glowing/active state of buttons
     
     isFiltering = false;
     filteredNFTIds = [];
-    allNFTIds = getSortedNFTIds(Object.keys(traitsData));
-    loadInitialNFTs();
     
-    updateURL(); // <<< URL Update
+    if (isShowingClonesOnly) {
+        filterClones();
+    } else {
+        allNFTIds = getSortedNFTIds(Object.keys(traitsData));
+        loadInitialNFTs();
+    }
+    
+    updateURL();
 }
 
 // Setup refresh button
@@ -1292,87 +1962,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Inject enhanced styles for stats display
 const enhancedStyles = `
-.trait-name-row {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-bottom: 4px;
-}
-
-.trait-info-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-}
-
-.trait-affinity {
-    display: inline-block;
-    padding: 2px 6px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border-radius: 3px;
-    font-size: 10px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.trait-stats {
-    display: flex;
-    gap: 4px;
-    flex-wrap: wrap;
-}
-
-.trait-stat {
-    display: inline-block;
-    padding: 2px 5px;
-    border-radius: 3px;
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 0.3px;
-}
-
-.checkbox-label .trait-label-text {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-
-.checkbox-label {
-    padding: 8px 10px !important;
-    min-height: 50px;
-    align-items: flex-start !important;
-}
-
-.rank-stat-container {
-    display: flex;
-    align-items: center;
-    gap: 1px;
-    margin-bottom: 1px;
-}
-
-.stat-color-box {
-    border-radius: 2px;
-    border: 1px solid rgba(147, 125, 26, 0.3);
-    flex-shrink: 0;
-}
-
-.stat-color-box.harmony {
-    background: #9cbcd2;
-}
-
-.stat-color-box.health {
-    background: #d7bce8;
-}
-
-.stat-color-box.power {
-    background: #f9db6d;
-}
-
-.stat-color-box.violence {
-    background: #df829b;
-}
 
 /* Custom Message Box Style (For replacing alert()) */
 #messageBox {

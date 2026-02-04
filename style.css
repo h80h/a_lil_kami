@@ -43,7 +43,10 @@ h2 {
     font-size: 14px;
 }
 
-.search-section, .filter-section {
+.search-section,
+.trait-filter-section,
+.sort-section,
+.affinity-filter-section {
     margin-bottom: 30px;
     border-radius: 10px;
 }
@@ -52,6 +55,12 @@ h2 {
   display: flex;
   align-content: center;
   gap: 5px;
+}
+
+#affinityFilterContainer {
+  display: flex;
+  flex: 1;
+  gap: 8px;
 }
 
 /* Selected IDs Section */
@@ -110,7 +119,10 @@ button {
 }
 
 #clearBtn,
-.sort-btn {
+.sort-btn,
+.affinity-btn,
+#cloneFilterBtn,
+#affinityFilterToggle {
   width: 60px;
   height: 37px;
   color: white;
@@ -160,7 +172,7 @@ button {
 }
 
 #clearBtn {
-  font-size: 11px;
+  font-size: 9px;
   background: #95a5a6;
   box-shadow: 1px 5px 0 0 rgba(25, 58, 43, 0.7);
 }
@@ -175,45 +187,74 @@ button {
   fill: #55a9b0;
 }
 
-.sort-label {
+.sort-label,
+#affinityFilterLabel {
   margin-bottom: 10px;
   font-size: 14px;
 }
 
-.sort-btn {
+#bodyAffinityLabel,
+#handAffinityLabel {
+  margin-bottom: 10px;
+  font-size: 12px;
+}
+
+.sort-btn,
+.affinity-btn,
+#cloneFilterBtn,
+#affinityFilterToggle {
   background: #93bbbf;
   box-shadow: 1px 5px 0 0 #516668;
   font-size: 9px;
 }
 
-.sort-btn:hover {
+.sort-btn:hover,
+.affinity-btn:hover,
+#cloneFilterBtn:hover,
+#affinityFilterToggle:hover {
   box-shadow: 1px 3px 0 0 #516668;
 }
 
-.sort-btn.active {
+.sort-btn.active,
+.affinity-btn.active,
+#cloneFilterBtn.active,
+#affinityFilterToggle.active {
   background: #55a9b0;
   box-shadow: 1px 3px 0 0 #34656a;
   text-shadow: #eeeeee 0 -1px 4px, rgb(42, 135, 166) 0 1px 1px;
 }
 
-.sort-buttons {
+.sort-buttons,
+.affinity-filter-buttons {
   cursor: default;
 }
 
-.sort-btn {
+.sort-btn,
+.affinity-btn,
+#cloneFilterBtn {
   flex: 1;
   margin-bottom: 10px;
 }
 
 #clearBtn,
-.sort-btn {
+.sort-btn,
+.affinity-btn,
+#cloneFilterBtn {
   transition: all 0.1s ease;
 }
 
 #clearBtn:hover,
 .sort-btn:hover,
 .sort-btn.active,
-.sort-btn.active:hover {
+.sort-btn.active:hover,
+.affinity-btn:hover,
+.affinity-btn.active,
+.affinity-btn.active:hover,
+#cloneFilterBtn:hover,
+#cloneFilterBtn.active,
+#cloneFilterBtn.active:hover,
+#affinityFilterToggle:hover,
+#affinityFilterToggle.active:hover {
   transform: translateY(2px);
 }
 
@@ -606,7 +647,8 @@ button {
 }
 
 /* NEW Badge Styling */
-.new-badge {
+.new-badge,
+.clone-badge {
     position: absolute;
     top: 1px;
     right: 3px;
@@ -631,7 +673,8 @@ button {
   }
 }
 
-.new-badge {
+.new-badge,
+.clone-badge {
     animation: newBadgeSparkle 1.5s ease-in-out infinite;
 }
 
@@ -801,7 +844,7 @@ button {
   }
 
   .trait-name {
-    font-size: 18px;
+    font-size: 15px;
   }
 
   .trait-count {
@@ -867,8 +910,13 @@ button {
     margin-bottom: 3px;
   }
 
-  .new-badge {
+  .new-badge,
+  .clone-badge {
     top: 2px;
+  }
+
+  .trait-name {
+    font-size: 13px;
   }
 }
 
@@ -948,7 +996,8 @@ button {
    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
   }
 
-  .new-badge {
+  .new-badge,
+  .clone-badge {
     font-size: 10px;
     top: 3px;
     right: 3px;
@@ -994,7 +1043,8 @@ button {
     gap: 8px;
   }
 
-  .new-badge {
+  .new-badge,
+  .clone-badge {
     font-size: 8px;
     top: 2px;
   }
@@ -1050,7 +1100,8 @@ button {
     right: 5px;
   }
 
-  .new-badge {
+  .new-badge,
+  .clone-badge {
     font-size: 6px;
     top: 2px;
     right: 3px;
