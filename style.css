@@ -254,6 +254,7 @@ button {
 #cloneFilterBtn.active,
 #cloneFilterBtn.active:hover,
 #affinityFilterToggle:hover,
+#affinityFilterToggle.active,
 #affinityFilterToggle.active:hover {
   transform: translateY(2px);
 }

@@ -1542,6 +1542,7 @@ function displayNFT(id, showCloseButton = false) {
             <div class="nft-details hover_wrapper">
                 <div class="nft-id">Kamigotchi ${id}</div>
                 ${traitsHTML}
+                ${statsHTML}
             </div>
         </div>
         `;
