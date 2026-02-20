@@ -1,9 +1,11 @@
 // api/data/[filename].js
 // Vercel API route to serve JSON data from Cloudflare R2 bundle
 
-// Map of allowed filenames to their key inside the bundle
+// Map of allowed filenames to their key inside the bundle.
+// Use null as the key for the bundle itself — served as a full passthrough.
 const ALLOWED_FILES = {
-  'kamiImage.json':    'kamiImage',
+  'kamiBundle.json':   null,          // full bundle passthrough (used by the browser)
+  'kamiImage.json':    'kamiImage',   // individual sections (kept for backward compat)
   'kamiTraits.json':   'kamiTraits',
   'kamiStats.json':    'kamiStats',
   'kamiRankings.json': 'kamiRankings',
@@ -81,6 +83,14 @@ export default async function handler(req, res) {
     const bundle = await getBundle(r2PublicUrl);
 
     const bundleKey = ALLOWED_FILES[filename];
+
+    // null key = full bundle passthrough (kamiBundle.json)
+    if (bundleKey === null) {
+      res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=3600');
+      res.setHeader('Content-Type', 'application/json');
+      return res.status(200).json(bundle);
+    }
+
     const sectionData = bundle[bundleKey];
 
     if (sectionData === undefined || sectionData === null) {

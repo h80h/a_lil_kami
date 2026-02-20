@@ -735,60 +735,59 @@ async function loadSacrificeData() {
     }
 }
 
-// Load JSON files with cache-busting
+/**
+ * Fetch the full bundle once and split it into the 5 data sections.
+ * Returns the parsed bundle object, or throws on failure.
+ */
+async function fetchBundle() {
+    const response = await fetchWithCacheBusting('api/data/kamiBundle.json');
+    if (!response.ok) {
+        throw new Error(`Failed to load kamiBundle.json: ${response.status}`);
+    }
+    return response.json();
+}
+
+// Load all data via a single bundle fetch
 async function loadData() {
     try {
-        console.log('📄 Loading data with cache-busting...');
-        
-        const imagesResponse = await fetchWithCacheBusting('api/data/kamiImage.json');
-        if (!imagesResponse.ok) {
-            throw new Error(`Failed to load kamiImage.json: ${imagesResponse.status}`);
-        }
-        
-        const traitsResponse = await fetchWithCacheBusting('api/data/kamiTraits.json');
-        if (!traitsResponse.ok) {
-            throw new Error(`Failed to load kamiTraits.json: ${traitsResponse.status}`);
-        }
-        
-        // NEW: Load sacrifice data
-        await loadSacrificeData();
+        console.log('📄 Loading bundle with cache-busting...');
 
-        try {
-            const statsResponse = await fetchWithCacheBusting('api/data/kamiStats.json');
-            if (statsResponse.ok) {
-                kamiStatsData = await statsResponse.json();
-                console.log(`✅ Loaded stats data for ${Object.keys(kamiStatsData).length} Kamigotchi`);
-            } else {
-                console.log('ℹ️  Stats file not found - stat sorting disabled');
-                kamiStatsData = {};
-            }
-        } catch (statsError) {
-            console.log('ℹ️  Could not load stats:', statsError.message);
-            kamiStatsData = {};
+        // Single network request — fetch the merged bundle
+        const [bundle] = await Promise.all([
+            fetchBundle(),
+            loadSacrificeData(), // runs in parallel; doesn't block the bundle
+        ]);
+
+        // Split bundle sections (required)
+        if (!bundle.kamiImage || !bundle.kamiTraits) {
+            throw new Error('Bundle is missing required sections (kamiImage / kamiTraits)');
         }
-        
-        try {
-            const metadataResponse = await fetchWithCacheBusting('api/data/kamiMetadata.json');
-            if (metadataResponse.ok) {
-                metadataInfo = await metadataResponse.json();
-                console.log(`✨ Found ${metadataInfo.newKamiIds?.length || 0} new Kamigotchi!`);
-                if (metadataInfo.newKamiIds?.length > 0) {
-                    console.log(`   New IDs: ${metadataInfo.newKamiIds.join(', ')}`);
-                }
-            } else {
-                console.log('ℹ️  No metadata file found, NEW badges disabled');
-                metadataInfo = { newKamiIds: [] };
-            }
-        } catch (metaError) {
-            console.log('ℹ️  Could not load metadata:', metaError.message);
-            metadataInfo = { newKamiIds: [] };
-        }
-        
-        imagesData = await imagesResponse.json();
-        traitsData = await traitsResponse.json();
-        
+
+        imagesData = bundle.kamiImage;
+        traitsData  = bundle.kamiTraits;
+
         console.log(`✅ Loaded ${Object.keys(imagesData).length} images`);
         console.log(`✅ Loaded ${Object.keys(traitsData).length} trait sets`);
+
+        // Split bundle sections (optional — degrade gracefully if absent)
+        if (bundle.kamiStats) {
+            kamiStatsData = bundle.kamiStats;
+            console.log(`✅ Loaded stats data for ${Object.keys(kamiStatsData).length} Kamigotchi`);
+        } else {
+            console.log('ℹ️  No kamiStats in bundle - stat sorting disabled');
+            kamiStatsData = {};
+        }
+
+        if (bundle.kamiMetadata) {
+            metadataInfo = bundle.kamiMetadata;
+            console.log(`✨ Found ${metadataInfo.newKamiIds?.length || 0} new Kamigotchi!`);
+            if (metadataInfo.newKamiIds?.length > 0) {
+                console.log(`   New IDs: ${metadataInfo.newKamiIds.join(', ')}`);
+            }
+        } else {
+            console.log('ℹ️  No kamiMetadata in bundle - NEW badges disabled');
+            metadataInfo = { newKamiIds: [] };
+        }
         
         // NEW: Extract affinity data
         affinityData = extractAffinityData();
@@ -879,38 +878,21 @@ async function refreshData() {
         const currentSort = currentSortOrder;
         const wasShowingClones = isShowingClonesOnly;
         
-        // Reload all data
-        const imagesResponse = await fetchWithCacheBusting('api/data/kamiImage.json');
-        const traitsResponse = await fetchWithCacheBusting('api/data/kamiTraits.json');
-        
-        if (!imagesResponse.ok || !traitsResponse.ok) {
-            throw new Error('Failed to fetch updated data');
+        // Single bundle fetch + sacrifice data in parallel
+        const [bundle] = await Promise.all([
+            fetchBundle(),
+            loadSacrificeData(),
+        ]);
+
+        if (!bundle.kamiImage || !bundle.kamiTraits) {
+            throw new Error('Bundle is missing required sections (kamiImage / kamiTraits)');
         }
 
-        // Refresh sacrifice data
-        await loadSacrificeData();
-        
-        imagesData = await imagesResponse.json();
-        traitsData = await traitsResponse.json();
-        
-        // Reload optional files
-        try {
-            const statsResponse = await fetchWithCacheBusting('api/data/kamiStats.json');
-            if (statsResponse.ok) {
-                kamiStatsData = await statsResponse.json();
-            }
-        } catch (e) {
-            console.log('Stats not updated');
-        }
-        
-        try {
-            const metadataResponse = await fetchWithCacheBusting('api/data/kamiMetadata.json');
-            if (metadataResponse.ok) {
-                metadataInfo = await metadataResponse.json();
-            }
-        } catch (e) {
-            console.log('Metadata not updated');
-        }
+        imagesData = bundle.kamiImage;
+        traitsData  = bundle.kamiTraits;
+
+        if (bundle.kamiStats)    kamiStatsData = bundle.kamiStats;
+        if (bundle.kamiMetadata) metadataInfo  = bundle.kamiMetadata;
         
         // NEW: Re-extract affinity data
         affinityData = extractAffinityData();
