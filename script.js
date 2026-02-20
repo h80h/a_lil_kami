@@ -8,6 +8,7 @@ let filteredNFTIds = [];
 let currentLoadIndex = 0;
 let traitCounts = {};
 let nftRarityScores = {};
+let sacrificedNFTs = new Set(); // NEW: Store IDs of sacrificed Kamigotchi
 
 let traitSignatures = {}; // Store trait signatures for clone detection
 
@@ -717,6 +718,23 @@ async function fetchWithCacheBusting(url, options = {}) {
     return fetch(urlWithCacheBuster, fetchOptions);
 }
 
+async function loadSacrificeData() {
+    // Point to your new Vercel Serverless Function
+    const targetUrl = "/api/sacrifices"; 
+
+    try {
+        const response = await fetch('/api/sacrifices');
+        
+        if (response.ok) {
+            const data = await response.json();
+            sacrificedNFTs = new Set(data.map(item => String(item.kami_index)));
+            console.log(`🕳️ Loaded ${sacrificedNFTs.size} sacrifice records via Vercel Proxy`);
+        }
+    } catch (err) {
+        console.error('Failed to load sacrifice data:', err);
+    }
+}
+
 // Load JSON files with cache-busting
 async function loadData() {
     try {
@@ -732,6 +750,9 @@ async function loadData() {
             throw new Error(`Failed to load kamiTraits.json: ${traitsResponse.status}`);
         }
         
+        // NEW: Load sacrifice data
+        await loadSacrificeData();
+
         try {
             const statsResponse = await fetchWithCacheBusting('api/data/kamiStats.json');
             if (statsResponse.ok) {
@@ -865,6 +886,9 @@ async function refreshData() {
         if (!imagesResponse.ok || !traitsResponse.ok) {
             throw new Error('Failed to fetch updated data');
         }
+
+        // Refresh sacrifice data
+        await loadSacrificeData();
         
         imagesData = await imagesResponse.json();
         traitsData = await traitsResponse.json();
@@ -1396,7 +1420,7 @@ function getStatColorClass() {
     return statSorts.includes(currentSortOrder) ? currentSortOrder : '';
 }
 
-// Display NFT with stats and OpenRarity rank
+// MODIFIED: Added check for sacrifice data and emoji badge
 function displayNFT(id, showCloseButton = false) {
     const imageUrl = imagesData[id];
     const traits = traitsData[id];
@@ -1414,6 +1438,7 @@ function displayNFT(id, showCloseButton = false) {
     
     const isNew = metadataInfo.newKamiIds && metadataInfo.newKamiIds.includes(Number(id));
     const isClone = traitSignatures.cloneIds.has(id);
+    const isSacrificed = sacrificedNFTs.has(String(id)); // NEW: Check sacrifice set
     
     const card = document.createElement('div');
     card.className = 'nft-card hover_wrapper';
@@ -1484,6 +1509,10 @@ function displayNFT(id, showCloseButton = false) {
 
     const cloneBadgeHTML = isClone ? 
         `<div class="clone-badge" title="This Kamigotchi has identical traits to others">CLONE</div>` : '';
+
+    // NEW: Sacrifice Badge HTML
+    const sacrificeBadgeHTML = isSacrificed ?
+        `<div class="sacrifice-badge" title="This Kamigotchi has been sacrificed">🕳️</div>` : '';
     
     // Check if mobile view
     const isMobile = window.innerWidth <= 390;
@@ -1506,11 +1535,13 @@ function displayNFT(id, showCloseButton = false) {
             ${statColorHTML}
         </div>
         <div class="nft-card-content">
-            <img src="${imageUrl}" alt="NFT #${id}" loading="lazy" onerror="this.src='https://via.placeholder.com/250?text=Image+Not+Found'">
+            <div class="image-container">
+                <img src="${imageUrl}" alt="NFT #${id}" loading="lazy" onerror="this.src='https://via.placeholder.com/250?text=Not+Found'">
+                ${sacrificeBadgeHTML}
+            </div>
             <div class="nft-details hover_wrapper">
                 <div class="nft-id">Kamigotchi ${id}</div>
                 ${traitsHTML}
-                ${statsHTML}
             </div>
         </div>
         `;
@@ -1527,7 +1558,10 @@ function displayNFT(id, showCloseButton = false) {
         </div>
         ${statsHTML}
         <div class="nft-card-content">
-            <img src="${imageUrl}" alt="NFT #${id}" loading="lazy" onerror="this.src='https://via.placeholder.com/250?text=Image+Not+Found'">
+            <div class="image-container">
+                <img src="${imageUrl}" alt="NFT #${id}" loading="lazy" onerror="this.src='https://via.placeholder.com/250?text=Image+Not+Found'">
+                ${sacrificeBadgeHTML}
+            </div>
             <div class="nft-details hover_wrapper">
                 <div class="nft-id">Kamigotchi ${id}</div>
                 ${traitsHTML}
@@ -1960,7 +1994,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('popstate', handlePopState);
 });
 
-// Inject enhanced styles for stats display
+// Inject enhanced styles for stats and badges
 const enhancedStyles = `
 
 /* Custom Message Box Style (For replacing alert()) */

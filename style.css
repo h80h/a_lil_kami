@@ -837,6 +837,21 @@ button {
     text-align: center;
 }
 
+.image-container {
+    position: relative;
+}
+
+.sacrifice-badge {
+    position: absolute;
+    bottom: 10px;    /* Gap from bottom of image */
+    left: 3px;      /* Gap from left of image */
+    color: white;
+    padding: 2px 2px;
+    font-size: 20px;
+    line-height: 1;
+    z-index: 5;
+}
+
 @media (max-width: 820px){
   .checkbox-label input[type="checkbox"] {
     width: 24px;
