@@ -95,15 +95,16 @@ async function calculateKamiStats(traitsData) {
 }
 
 /**
- * Upload file to Cloudflare R2
+ * Upload the merged bundle file to Cloudflare R2
  */
-async function uploadToR2(filename, data) {
+async function uploadBundleToR2(bundleData) {
+  const filename = 'kamiBundle.json';
   console.log(`📤 Uploading ${filename} to Cloudflare R2...`);
   
   const command = new PutObjectCommand({
     Bucket: process.env.R2_BUCKET_NAME,
     Key: filename,
-    Body: JSON.stringify(data),
+    Body: JSON.stringify(bundleData),
     ContentType: 'application/json',
     CacheControl: 'public, max-age=300', // 5 minutes cache
   });
@@ -117,28 +118,34 @@ async function uploadToR2(filename, data) {
 }
 
 /**
- * Fetch previous metadata from Cloudflare R2
+ * Fetch previous metadata from Cloudflare R2 (from the bundle)
  */
 async function fetchPreviousMetadata() {
   try {
-    console.log('📋 Fetching previous metadata from R2...');
+    console.log('📋 Fetching previous metadata from R2 bundle...');
     
     const command = new GetObjectCommand({
       Bucket: process.env.R2_BUCKET_NAME,
-      Key: 'kamiMetadata.json',
+      Key: 'kamiBundle.json',
     });
     
     const response = await r2Client.send(command);
     const body = await response.Body.transformToString();
-    const metadata = JSON.parse(body);
+    const bundle = JSON.parse(body);
+    const metadata = bundle.kamiMetadata;
+    
+    if (!metadata) {
+      console.log('   ℹ️  Bundle found but no metadata section (first run)');
+      return { previousMaxId: null, isFirstRun: true };
+    }
     
     console.log(`   ✅ Found previous metadata (max ID: ${metadata.previousMaxId})`);
     return metadata;
   } catch (error) {
     if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
-      console.log('   ℹ️  No previous metadata found (first run)');
+      console.log('   ℹ️  No previous bundle found (first run)');
     } else {
-      console.log(`   ⚠️  Error fetching metadata: ${error.message}`);
+      console.log(`   ⚠️  Error fetching bundle: ${error.message}`);
     }
     
     return {
@@ -161,7 +168,7 @@ async function runExtraction() {
     console.log('='.repeat(60));
     console.log(`Started at: ${new Date().toISOString()}`);
     console.log(`Repository: https://github.com/h80h/a_lil_kami`);
-    console.log(`Storage: Cloudflare R2`);
+    console.log(`Storage: Cloudflare R2 (single bundle file)`);
     console.log('='.repeat(60));
     
     // Launch Playwright browser
@@ -375,14 +382,18 @@ async function runExtraction() {
       storageProvider: 'Cloudflare R2'
     };
     
-    // Upload all files to Cloudflare R2
-    console.log('\n📤 Uploading to Cloudflare R2...');
+    // Merge all 5 data objects into a single bundle
+    const bundle = {
+      kamiImage: imageMap,
+      kamiTraits: traitsMap,
+      kamiStats: kamiStats,
+      kamiRankings: statRankings,
+      kamiMetadata: metadata
+    };
     
-    await uploadToR2('kamiImage.json', imageMap);
-    await uploadToR2('kamiTraits.json', traitsMap);
-    await uploadToR2('kamiStats.json', kamiStats);
-    await uploadToR2('kamiRankings.json', statRankings);
-    await uploadToR2('kamiMetadata.json', metadata);
+    // Upload single bundle file to Cloudflare R2
+    console.log('\n📤 Uploading merged bundle to Cloudflare R2...');
+    await uploadBundleToR2(bundle);
     
     const duration = Math.round((Date.now() - startTime) / 1000);
     
@@ -392,7 +403,7 @@ Kamigotchi Data Extraction Log
 ${'='.repeat(60)}
 Timestamp: ${new Date().toISOString()}
 Duration: ${duration} seconds
-Storage: Cloudflare R2
+Storage: Cloudflare R2 (single bundle)
 ${'='.repeat(60)}
 
 RESULTS:
@@ -403,11 +414,12 @@ RESULTS:
 - New IDs: ${newKamiIds.join(', ') || 'none'}
 
 FILES UPLOADED TO R2:
-✅ kamiImage.json (${imageCount} entries)
-✅ kamiTraits.json (${traitsCount} entries with stats)
-✅ kamiStats.json (${Object.keys(kamiStats).length} calculated stats)
-✅ kamiRankings.json (4 stat rankings)
-✅ kamiMetadata.json (tracking metadata)
+✅ kamiBundle.json (contains all 5 sections)
+   - kamiImage    (${imageCount} entries)
+   - kamiTraits   (${traitsCount} entries with stats)
+   - kamiStats    (${Object.keys(kamiStats).length} calculated stats)
+   - kamiRankings (4 stat rankings)
+   - kamiMetadata (tracking metadata)
 
 ${'='.repeat(60)}
 Extraction completed successfully! 🎉
@@ -421,7 +433,7 @@ Extraction completed successfully! 🎉
     console.log(`Duration: ${duration} seconds`);
     console.log(`Total Kamigotchi: ${allIds.length}`);
     console.log(`New Kamigotchi: ${newKamiIds.length}`);
-    console.log(`Storage: Cloudflare R2`);
+    console.log(`Storage: Cloudflare R2 (single bundle: kamiBundle.json)`);
     console.log('='.repeat(60));
     
   } catch (error) {
