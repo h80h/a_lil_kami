@@ -736,15 +736,49 @@ async function loadSacrificeData() {
 }
 
 /**
- * Fetch the full bundle once and split it into the 5 data sections.
- * Returns the parsed bundle object, or throws on failure.
+ * Fetch the full bundle once, split it into the 5 data sections,
+ * and immediately release the bundle reference so the GC can free it.
+ * Populates the global variables directly; returns nothing.
  */
-async function fetchBundle() {
+async function fetchAndSplitBundle() {
     const response = await fetchWithCacheBusting('api/data/kamiBundle.json');
     if (!response.ok) {
         throw new Error(`Failed to load kamiBundle.json: ${response.status}`);
     }
-    return response.json();
+
+    // Parse once into a local variable — NOT stored in any outer scope
+    let bundle = await response.json();
+
+    // --- Required sections ---
+    if (!bundle.kamiImage || !bundle.kamiTraits) {
+        bundle = null; // release before throwing
+        throw new Error('Bundle is missing required sections (kamiImage / kamiTraits)');
+    }
+
+    // Move each section into its global; then immediately delete from bundle
+    // so the large intermediate object can be GC'd as soon as possible.
+    imagesData = bundle.kamiImage;   bundle.kamiImage   = null;
+    traitsData  = bundle.kamiTraits; bundle.kamiTraits  = null;
+
+    // --- Optional sections ---
+    if (bundle.kamiStats) {
+        kamiStatsData = bundle.kamiStats;
+    } else {
+        kamiStatsData = {};
+    }
+    bundle.kamiStats = null;
+
+    if (bundle.kamiRankings) bundle.kamiRankings = null; // not used client-side
+
+    if (bundle.kamiMetadata) {
+        metadataInfo = bundle.kamiMetadata;
+    } else {
+        metadataInfo = { newKamiIds: [] };
+    }
+    bundle.kamiMetadata = null;
+
+    // Drop the bundle reference entirely — GC can now free it
+    bundle = null;
 }
 
 // Load all data via a single bundle fetch
@@ -752,41 +786,22 @@ async function loadData() {
     try {
         console.log('📄 Loading bundle with cache-busting...');
 
-        // Single network request — fetch the merged bundle
-        const [bundle] = await Promise.all([
-            fetchBundle(),
-            loadSacrificeData(), // runs in parallel; doesn't block the bundle
+        // Single network request + sacrifice fetch run in parallel
+        await Promise.all([
+            fetchAndSplitBundle(),
+            loadSacrificeData(),
         ]);
-
-        // Split bundle sections (required)
-        if (!bundle.kamiImage || !bundle.kamiTraits) {
-            throw new Error('Bundle is missing required sections (kamiImage / kamiTraits)');
-        }
-
-        imagesData = bundle.kamiImage;
-        traitsData  = bundle.kamiTraits;
 
         console.log(`✅ Loaded ${Object.keys(imagesData).length} images`);
         console.log(`✅ Loaded ${Object.keys(traitsData).length} trait sets`);
-
-        // Split bundle sections (optional — degrade gracefully if absent)
-        if (bundle.kamiStats) {
-            kamiStatsData = bundle.kamiStats;
+        if (Object.keys(kamiStatsData).length > 0) {
             console.log(`✅ Loaded stats data for ${Object.keys(kamiStatsData).length} Kamigotchi`);
         } else {
             console.log('ℹ️  No kamiStats in bundle - stat sorting disabled');
-            kamiStatsData = {};
         }
-
-        if (bundle.kamiMetadata) {
-            metadataInfo = bundle.kamiMetadata;
-            console.log(`✨ Found ${metadataInfo.newKamiIds?.length || 0} new Kamigotchi!`);
-            if (metadataInfo.newKamiIds?.length > 0) {
-                console.log(`   New IDs: ${metadataInfo.newKamiIds.join(', ')}`);
-            }
-        } else {
-            console.log('ℹ️  No kamiMetadata in bundle - NEW badges disabled');
-            metadataInfo = { newKamiIds: [] };
+        if (metadataInfo.newKamiIds?.length > 0) {
+            console.log(`✨ Found ${metadataInfo.newKamiIds.length} new Kamigotchi!`);
+            console.log(`   New IDs: ${metadataInfo.newKamiIds.join(', ')}`);
         }
         
         // NEW: Extract affinity data
@@ -879,20 +894,10 @@ async function refreshData() {
         const wasShowingClones = isShowingClonesOnly;
         
         // Single bundle fetch + sacrifice data in parallel
-        const [bundle] = await Promise.all([
-            fetchBundle(),
+        await Promise.all([
+            fetchAndSplitBundle(),
             loadSacrificeData(),
         ]);
-
-        if (!bundle.kamiImage || !bundle.kamiTraits) {
-            throw new Error('Bundle is missing required sections (kamiImage / kamiTraits)');
-        }
-
-        imagesData = bundle.kamiImage;
-        traitsData  = bundle.kamiTraits;
-
-        if (bundle.kamiStats)    kamiStatsData = bundle.kamiStats;
-        if (bundle.kamiMetadata) metadataInfo  = bundle.kamiMetadata;
         
         // NEW: Re-extract affinity data
         affinityData = extractAffinityData();
