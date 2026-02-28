@@ -10,7 +10,8 @@ const BASE_STATS = {
   harmony: 10,
   health: 50,
   power: 10,
-  violence: 10
+  violence: 10,
+  slots: 0
 };
 
 // Initialize Cloudflare R2 client
@@ -34,7 +35,8 @@ async function calculateKamiStats(traitsData) {
     harmony: [],
     health: [],
     power: [],
-    violence: []
+    violence: [],
+    slots: []
   };
   
   Object.entries(traitsData).forEach(([kamiId, traits]) => {
@@ -42,14 +44,16 @@ async function calculateKamiStats(traitsData) {
       harmony: BASE_STATS.harmony,
       health: BASE_STATS.health,
       power: BASE_STATS.power,
-      violence: BASE_STATS.violence
+      violence: BASE_STATS.violence,
+      slots: BASE_STATS.slots
     };
     
     const traitBonuses = {
       harmony: [],
       health: [],
       power: [],
-      violence: []
+      violence: [],
+      slots: []
     };
     
     Object.entries(traits).forEach(([traitType, traitData]) => {
@@ -77,6 +81,7 @@ async function calculateKamiStats(traitsData) {
     statRankings.health.push({ id: kamiId, value: stats.health });
     statRankings.power.push({ id: kamiId, value: stats.power });
     statRankings.violence.push({ id: kamiId, value: stats.violence });
+    statRankings.slots.push({ id: kamiId, value: stats.slots });
   });
   
   Object.keys(statRankings).forEach(statType => {
@@ -310,7 +315,7 @@ async function runExtraction() {
                 
                 if (trait.stats) {
                   const stats = {};
-                  const statsToTrack = ['harmony', 'health', 'power', 'violence'];
+                  const statsToTrack = ['harmony', 'health', 'power', 'violence', 'slots'];
                   
                   statsToTrack.forEach(statName => {
                     if (trait.stats[statName] && trait.stats[statName].base !== 0) {

@@ -12,6 +12,16 @@ let sacrificedNFTs = new Set(); // NEW: Store IDs of sacrificed Kamigotchi
 
 let traitSignatures = {}; // Store trait signatures for clone detection
 
+// Stat min/max filter state: { statName: { value, isMax } }
+// isMax=false means ">= value" (min mode), isMax=true means "<= value" (MAX mode)
+let statMinMaxFilters = {
+    health:   { value: 50,  isMax: false },
+    power:    { value: 10,  isMax: false },
+    violence: { value: 10,  isMax: false },
+    harmony:  { value: 10,  isMax: false },
+    slots:    { value: 0,   isMax: false }
+};
+
 let currentSortOrder = 'latest'; // Default sort
 let isFiltering = false;
 
@@ -69,6 +79,16 @@ function getAffinityStringFromState() {
     return parts.join(';');
 }
 
+function getMinMaxStringFromState() {
+    const parts = [];
+    Object.entries(statMinMaxFilters).forEach(([statName, filter]) => {
+        if (!isStatFilterDefault(statName)) {
+            parts.push(`${statName}:${filter.value}:${filter.isMax ? 'max' : 'min'}`);
+        }
+    });
+    return parts.join(';');
+}
+
 // Updates the browser URL based on the current app state
 function updateURL(replace = false) {
     const params = new URLSearchParams();
@@ -99,6 +119,12 @@ function updateURL(replace = false) {
     const affinityString = getAffinityStringFromState();
     if (affinityString) {
         params.set('affinity', affinityString);
+    }
+
+    // 6. Min/Max Stat Filters
+    const minMaxString = getMinMaxStringFromState();
+    if (minMaxString) {
+        params.set('minmax', minMaxString);
     }
 
     const queryString = params.toString();
@@ -194,6 +220,36 @@ function loadStateFromURL() {
         updateAffinityButtonStates();
     }
     
+    // 6. Load Min/Max Stat Filters
+    const urlMinMax = params.get('minmax');
+    if (urlMinMax) {
+        urlMinMax.split(';').forEach(part => {
+            const [statName, value, mode] = part.split(':');
+            if (statName && value && statMinMaxFilters[statName] !== undefined) {
+                const isMax = mode === 'max';
+                statMinMaxFilters[statName].value = Number(value);
+                statMinMaxFilters[statName].isMax = isMax;
+
+                // Sync slider
+                const slider = document.querySelector(`.stat-control.${statName} .stat-control-input`);
+                const valueDisplay = document.querySelector(`.stat-control.${statName} .stat-control-input-value`);
+                const toggleInput = document.querySelector(`.stat-control.${statName} .toggle-input`);
+                if (slider) slider.value = value;
+                if (valueDisplay) valueDisplay.textContent = value;
+                if (toggleInput) toggleInput.checked = isMax;
+            }
+        });
+
+        // Show the section and activate the toggle button
+        const minmaxSection = document.querySelector('.minmax-filter-section');
+        const toggleBtn = document.getElementById('minmaxFilterToggle');
+        if (minmaxSection && toggleBtn) {
+            minmaxSection.style.display = 'block';
+            toggleBtn.classList.add('active');
+        }
+        hasFilters = true;
+    }
+
     return hasFilters;
 }
 
@@ -615,6 +671,11 @@ function filterClones() {
             return bodyMatch && handMatch;
         });
     }
+
+    // Apply stat min/max filters to clone IDs
+    if (hasActiveStatFilters()) {
+        cloneIds = cloneIds.filter(id => passesStatMinMaxFilters(id));
+    }
     
     // 2. Use the centralized sorting logic
     filteredNFTIds = getSortedNFTIds(cloneIds);
@@ -677,15 +738,16 @@ function filterClones() {
         </div>
         <div class="note">** dear mobile user, click card to show og stats **</div>
         ${filterSummaryHTML}
+        ${buildStatFilterSummaryHTML()}
     `;
     
     resultsDiv.appendChild(countDiv);
+    attachStatFilterSummaryListeners(countDiv);
     
     // Re-attach listeners to the new summary buttons
-    countDiv.querySelectorAll('.count-header-trait-btn').forEach(btn => {
+    countDiv.querySelectorAll('.count-header-trait-btn:not(.stat-filter-summary-btn)').forEach(btn => {
         btn.addEventListener('click', removeSelectedTrait);
     });
-    
     if (filteredNFTIds.length === 0) {
         const noResultsDiv = document.createElement('div');
         noResultsDiv.className = 'no-results';
@@ -820,8 +882,9 @@ async function loadData() {
         // Setup controls
         setupSortButtons();
         setupCloneFilterButton();
-        setupAffinityFilterToggle(); // NEW
-        setupAffinityFilters(); // NEW
+        setupAffinityFilterToggle(); 
+        setupMinMaxFilterToggle(); 
+        setupAffinityFilters();
         createFilterControls();
         
         // --- URL Integration START ---
@@ -1124,21 +1187,23 @@ function updateSelectedTraitsDisplay(forceUpdate = false) {
     const checkboxes = document.querySelectorAll('.trait-checkbox:checked');
     
     if (checkboxes.length === 0 && (isFiltering || forceUpdate)) {
-        isFiltering = false;
-        filteredNFTIds = [];
-        selectedBodyAffinities.clear();
-        selectedHandAffinities.clear();
-        updateAffinityButtonStates();
+    isFiltering = false;
+    filteredNFTIds = [];
+    selectedBodyAffinities.clear();
+    selectedHandAffinities.clear();
+    updateAffinityButtonStates();
 
-        if (isShowingClonesOnly) {
-            filterClones();
-        } else {
-            allNFTIds = getSortedNFTIds(Object.keys(traitsData));
-            loadInitialNFTs();
-        }
-        updateURL();
-        return;
+    if (isShowingClonesOnly) {
+        filterClones();
+    } else if (hasActiveStatFilters()) {
+        filterByTraits();
+    } else {
+        allNFTIds = getSortedNFTIds(Object.keys(traitsData));
+        loadInitialNFTs();
     }
+    updateURL();
+    return;
+}
     
     updateURL(); 
     filterByTraits();
@@ -1669,7 +1734,9 @@ function filterByTraits() {
     const hasTraitFilters = checkboxes.length > 0;
     const hasAffinityFilters = selectedBodyAffinities.size > 0 || selectedHandAffinities.size > 0;
     
-    if (!hasTraitFilters && !hasAffinityFilters) {
+    const hasStatFilters = hasActiveStatFilters();
+
+    if (!hasTraitFilters && !hasAffinityFilters && !hasStatFilters) {
         isFiltering = false;
         
         if (isShowingClonesOnly) {
@@ -1717,6 +1784,11 @@ function filterByTraits() {
             
             return bodyMatch && handMatch;
         });
+    }
+
+    // Apply stat min/max filters
+    if (hasStatFilters) {
+        matchingNFTs = matchingNFTs.filter(id => passesStatMinMaxFilters(id));
     }
     
     filteredNFTIds = getSortedNFTIds(matchingNFTs);
@@ -1774,13 +1846,15 @@ function filterByTraits() {
         <div class="filter-summary-buttons-container" style="display: flex; flex-wrap: wrap; gap: 5px; margin: 10px;">
             ${summaryButtonsHTML}
         </div>
+        ${buildStatFilterSummaryHTML()}
     `;
 
     resultsDiv.appendChild(countDiv);
     
-    countDiv.querySelectorAll('.count-header-trait-btn').forEach(btn => {
+    countDiv.querySelectorAll('.count-header-trait-btn:not(.stat-filter-summary-btn)').forEach(btn => {
         btn.addEventListener('click', removeSelectedTrait);
     });
+    attachStatFilterSummaryListeners(countDiv);
 
     if (filteredNFTIds.length === 0) {
         const noResultsDiv = document.createElement('div');
@@ -1897,6 +1971,148 @@ function removeSelectedAffinity(event) {
     updateURL();
 }
 
+function setupMinMaxFilterToggle() {
+    const toggleBtn = document.getElementById('minmaxFilterToggle');
+    const minmaxSection = document.querySelector('.minmax-filter-section');
+    
+    if (toggleBtn && minmaxSection) {
+        toggleBtn.addEventListener('click', () => {
+            const isVisible = minmaxSection.style.display !== 'none';
+            minmaxSection.style.display = isVisible ? 'none' : 'block';
+            toggleBtn.classList.toggle('active', !isVisible);
+        });
+    }
+}
+
+// Helper: returns true if the stat min/max filters are at their default (no actual filtering)
+function isStatFilterDefault(statName) {
+    const f = statMinMaxFilters[statName];
+    const slider = document.querySelector(`.stat-control.${statName} .stat-control-input`);
+    if (!slider) return true;
+    const defaultVal = Number(slider.min);
+    // In min mode: at minimum value means "show all" (>= min = all pass)
+    // In max mode: at maximum value means "show all" (<= max = all pass)
+    if (f.isMax) {
+        return f.value >= Number(slider.max);
+    } else {
+        return f.value <= defaultVal;
+    }
+}
+
+// Helper: returns true if a kamigotchi passes all active stat min/max filters
+function passesStatMinMaxFilters(id) {
+    const kamiData = kamiStatsData[id];
+    for (const [statName, filter] of Object.entries(statMinMaxFilters)) {
+        if (isStatFilterDefault(statName)) continue;
+        let statVal = 0;
+        if (kamiData) {
+            if (statName === 'slots') {
+                statVal = kamiData.stats?.slots ?? 0;
+            } else {
+                statVal = kamiData.stats?.[statName] ?? 0;
+            }
+        }
+        if (filter.isMax) {
+            if (statVal > filter.value) return false;
+        } else {
+            if (statVal < filter.value) return false;
+        }
+    }
+    return true;
+}
+
+// Helper: returns true if any stat filter is meaningfully active
+function hasActiveStatFilters() {
+    return Object.keys(statMinMaxFilters).some(s => !isStatFilterDefault(s));
+}
+
+const controls = document.querySelectorAll('.stat-control');
+
+controls.forEach(control => {
+  // Determine which stat this control is for
+  const statName = ['health', 'power', 'violence', 'harmony', 'slots'].find(s => control.classList.contains(s));
+  
+  const slider = control.querySelector('input[type="range"]');
+  const valueDisplay = control.querySelector('.stat-control-input-value');
+  const toggleInput = control.querySelector('.toggle-input');
+
+  // Initialize state from slider default
+  if (statName && slider) {
+    statMinMaxFilters[statName].value = Number(slider.value);
+    statMinMaxFilters[statName].isMax = toggleInput ? toggleInput.checked : false;
+  }
+
+  // Update the text and state whenever the slider moves
+  slider.addEventListener('input', (event) => {
+    valueDisplay.textContent = event.target.value;
+    if (statName) {
+      statMinMaxFilters[statName].value = Number(event.target.value);
+      triggerStatFilter();
+    }
+  });
+
+  // Update state and re-filter when min/MAX toggle changes
+  if (toggleInput && statName) {
+    toggleInput.addEventListener('change', () => {
+      statMinMaxFilters[statName].isMax = toggleInput.checked;
+      // Update display (the value stays the same)
+      triggerStatFilter();
+    });
+  }
+});
+
+function buildStatFilterSummaryHTML() {
+    let html = '';
+    Object.entries(statMinMaxFilters).forEach(([statName, filter]) => {
+        if (isStatFilterDefault(statName)) return;
+        const op = filter.isMax ? '&lt;=' : '&gt;=';
+        html += `<button class="count-header-trait-btn stat-filter-summary-btn" 
+                    data-stat-name="${statName}">
+                    ${statName} ${op} ${filter.value} ×
+                </button>`;
+    });
+    return html ? `<div class="filter-summary-buttons-container" style="display:flex;flex-wrap:wrap;gap:5px;margin:10px;">${html}</div>` : '';
+}
+
+function attachStatFilterSummaryListeners(container) {
+    container.querySelectorAll('.stat-filter-summary-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const statName = btn.dataset.statName;
+            const slider = document.querySelector(`.stat-control.${statName} .stat-control-input`);
+            const valueDisplay = document.querySelector(`.stat-control.${statName} .stat-control-input-value`);
+            const toggleInput = document.querySelector(`.stat-control.${statName} .toggle-input`);
+            if (slider) {
+                slider.value = slider.min;
+                if (valueDisplay) valueDisplay.textContent = slider.min;
+            }
+            // Reset toggle back to min mode
+            if (toggleInput) toggleInput.checked = false;
+            // Reset internal state fully
+            statMinMaxFilters[statName].value = slider ? Number(slider.min) : 0;
+            statMinMaxFilters[statName].isMax = false;
+            triggerStatFilter();
+        });
+    });
+}
+
+// Trigger re-filter from stat sliders, integrating with existing filter logic
+let _statFilterTimer = null;
+function triggerStatFilter() {
+    clearTimeout(_statFilterTimer);
+    _statFilterTimer = setTimeout(() => {
+        if (isShowingClonesOnly) {
+            filterClones();
+        } else if (isFiltering || hasActiveStatFilters()) {
+            filterByTraits();
+        } else {
+            allNFTIds = getSortedNFTIds(Object.keys(traitsData));
+            loadInitialNFTs();
+        };
+        updateURL();
+    }, 200);
+}
+
+
 function clearFilters() {
     const checkboxes = document.querySelectorAll('.trait-checkbox');
     checkboxes.forEach(checkbox => checkbox.checked = false);
@@ -1918,6 +2134,24 @@ function clearFilters() {
     selectedBodyAffinities.clear();
     selectedHandAffinities.clear();
     updateAffinityButtonStates(); // Resets the glowing/active state of buttons
+
+    // --- ADDED: RESET STAT MIN/MAX FILTERS ---
+    document.querySelectorAll('.stat-control').forEach(control => {
+        const slider = control.querySelector('input[type="range"]');
+        const valueDisplay = control.querySelector('.stat-control-input-value');
+        const toggleInput = control.querySelector('.toggle-input');
+        if (slider) {
+            slider.value = slider.min;
+            if (valueDisplay) valueDisplay.textContent = slider.min;
+        }
+        if (toggleInput) toggleInput.checked = false;
+    });
+    // Reset internal state
+    Object.keys(statMinMaxFilters).forEach(statName => {
+        const slider = document.querySelector(`.stat-control.${statName} .stat-control-input`);
+        statMinMaxFilters[statName].value = slider ? Number(slider.min) : 0;
+        statMinMaxFilters[statName].isMax = false;
+    });
     
     isFiltering = false;
     filteredNFTIds = [];
@@ -1980,6 +2214,17 @@ document.addEventListener('DOMContentLoaded', () => {
     setupRefreshButton();
     // Add event listener for browser history changes
     window.addEventListener('popstate', handlePopState);
+
+    document.addEventListener('click', (e) => {
+        const filterControls = document.getElementById('filterControls');
+        if (filterControls && !filterControls.contains(e.target)) {
+            document.querySelectorAll('.filter-group').forEach(group => {
+                group.style.display = 'none';
+            });
+            const dropdown = document.getElementById('traitCategoryDropdown');
+            if (dropdown) dropdown.value = '';
+        }
+    });
 });
 
 // Inject enhanced styles for stats and badges
