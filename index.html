@@ -55,6 +55,7 @@
       <div id="selectedTraitsDisplay" class="selected-traits-display" style="display: none;"></div>
       <button id="clearBtn">CLEAR</button>
       <button id="affinityFilterToggle">Affinity</button>
+      <button id="minmaxFilterToggle">min-MAX</button>
     </div>
 
     <div class="sort-section">
@@ -71,7 +72,7 @@
       </div>
     </div>
 
-    <div class="affinity-filter-section" style="display: none;"">
+    <div class="affinity-filter-section" style="display: none;">
       <div id="affinityFilterLabel">Affinity:</div>
       <div id="affinityFilterContainer">
         <div id="bodyAffinity">
@@ -90,6 +91,92 @@
               <button class="affinity-btn">SCRAP</button>
               <button class="affinity-btn">INSECT</button>
               <button class="affinity-btn">NORMAL</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="minmax-filter-section" style="display: none;">
+      <div id="minmaxFilterLabel">min-Max:</div>
+      <div id="minmaxFilterContainer">
+        <div class="stat-control health">
+          <img class="stat-icon" src="https://app.kamigotchi.io/assets/health-ZqO6d5Ak.png" title="health">
+          <input min="50" max="310" step="10" class="stat-control-input" type="range" value="50">
+          <div class="display">
+            <div class="display-item">
+              <span class="stat-control-input-value">50</span>
+            </div>
+          </div>
+          <div class="minmax-toggle">
+            <input type="checkbox" id="health-toggle" class="toggle-input">
+            <label for="health-toggle" class="toggle-label">
+              <span class="label-min">min</span>
+              <span class="label-max">MAX</span>
+            </label>
+          </div>
+        </div>
+        <div class="stat-control power">
+          <img class="stat-icon" src="https://app.kamigotchi.io/assets/power-DgpSIKjO.png" title="power">
+          <input min="10" max="32" step="1" class="stat-control-input" type="range" value="10">
+          <div class="display">
+            <div class="display-item">
+              <span class="stat-control-input-value">10</span>
+            </div>
+          </div>
+          <div class="minmax-toggle">
+            <input type="checkbox" id="power-toggle" class="toggle-input">
+            <label for="power-toggle" class="toggle-label">
+              <span class="label-min">min</span>
+              <span class="label-max">MAX</span>
+            </label>
+          </div>
+        </div>
+        <div class="stat-control violence">
+            <img class="stat-icon" src="https://app.kamigotchi.io/assets/violence-2QoeI4RM.png" title="violence">
+            <input min="10" max="33" step="1" class="stat-control-input" type="range" value="10">
+            <div class="display">
+            <div class="display-item">
+              <span class="stat-control-input-value">10</span>
+            </div>
+            </div>
+            <div class="minmax-toggle">
+            <input type="checkbox" id="violence-toggle" class="toggle-input">
+            <label for="violence-toggle" class="toggle-label">
+              <span class="label-min">min</span>
+              <span class="label-max">MAX</span>
+            </label>
+          </div>
+        </div>
+        <div class="stat-control harmony">
+          <img class="stat-icon" src="https://app.kamigotchi.io/assets/harmony-BmwPIlDW.png" title="harmony">
+          <input min="10" max="29" step="1" class="stat-control-input" type="range" value="10">
+          <div class="display">
+            <div class="display-item">
+              <span class="stat-control-input-value">10</span>
+            </div>
+          </div>
+          <div class="minmax-toggle">
+            <input type="checkbox" id="harmony-toggle" class="toggle-input">
+            <label for="harmony-toggle" class="toggle-label">
+              <span class="label-min">min</span>
+              <span class="label-max">MAX</span>
+            </label>
+          </div>
+        </div>
+        <div class="stat-control slots">
+          <img class="stat-icon" src="https://app.kamigotchi.io/assets/slots-D5Uktt4Y.png" title="slots">
+          <input min="0" max="3" step="1" class="stat-control-input" type="range" value="0">
+          <div class="display">
+            <div class="display-item">
+              <span class="stat-control-input-value">0</span>
+            </div>
+          </div>
+          <div class="minmax-toggle">
+            <input type="checkbox" id="slots-toggle" class="toggle-input">
+            <label for="slots-toggle" class="toggle-label">
+              <span class="label-min">min</span>
+              <span class="label-max">MAX</span>
+            </label>
           </div>
         </div>
       </div>
