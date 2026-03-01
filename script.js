@@ -1,3 +1,44 @@
+// ANALYTICS & ENGAGEMENT (Umami)
+(function() {
+  // 1. SAFETY CHECK: Don't track on localhost or development IP
+  const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  if (isLocal) {
+    console.log("Umami: Development mode. Tracking script and engagement timer disabled.");
+    return; 
+  }
+
+  // 2. INJECT UMAMI SCRIPT
+  const el = document.createElement('script');
+  el.setAttribute('src', 'https://umami.h80h.xyz/script.js');
+  el.setAttribute('data-website-id', '018528f0-40ae-4d41-b0f8-23de03a97547');
+  el.setAttribute('data-domains', 'kami.h80h.xyz');
+  el.setAttribute('data-do-not-track', 'true');
+  el.setAttribute('defer', 'true');
+  document.head.appendChild(el);
+
+  // 3. START ACTIVE ENGAGEMENT TIMER (1 MINUTE)
+  let totalActiveTime = 0;
+  let hasTracked = false;
+
+  const engagementInterval = setInterval(() => {
+    // Only count time if the tab is visible and Umami is loaded
+    if (document.visibilityState === 'visible' && !hasTracked) {
+      totalActiveTime += 1000; // Add 1 second
+      
+      if (totalActiveTime >= 60000) { // 60 seconds reached
+        if (window.umami) {
+          umami.track('long-engagement', { type: 'active-visitor' });
+          hasTracked = true;
+          clearInterval(engagementInterval); // Stop the timer once tracked
+          console.log("Umami: 1-minute active engagement recorded!");
+        }
+      }
+    }
+  }, 1000);
+})();
+
+// Main Project
+
 let imagesData = {};
 let traitsData = {};
 let kamiStatsData = {};
