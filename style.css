@@ -978,6 +978,7 @@ button {
 /* Logic: Highlight active text */
 .toggle-input:not(:checked) + .toggle-label .label-min { color: #000; }
 .toggle-input:checked + .toggle-label .label-max { color: #000; }
+
 @media (max-width: 820px){
   .checkbox-label input[type="checkbox"] {
     width: 24px;
