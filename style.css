@@ -912,7 +912,7 @@ button {
 
 /* Container for the toggle */
 .minmax-toggle {
-  display: flex;
+  display: inline-flex; /* Changed to inline-flex to hug the button size */
   align-items: center;
   margin-bottom: 1px;
 }
@@ -922,46 +922,62 @@ button {
   display: none;
 }
 
-/* The visual "track" */
+/* The visual "track" (Scaled Down) */
 .toggle-label {
   cursor: pointer;
   display: flex;
-  background: #333; /* Dark theme background */
-  border-radius: 4px;
-  padding: 2px;
-  font-size: 9px;
-  font-weight: bold;
-  color: #888;
+  align-items: center;
   position: relative;
   user-select: none;
+  
+  /* Reduced padding and border-radius for a tighter look */
+  padding: 1px; 
+  background: linear-gradient(to bottom, #949494, #cccccc);
+  border-radius: 3px; 
+  border: 1px solid #777;
+  
+  /* Subtle shadows for the smaller scale */
+  box-shadow: 
+    inset 0 1px 2px rgba(0,0,0,0.4),
+    0 1px 0 rgba(255,255,255,0.4); 
 }
 
+/* Text Labels (Shrunk to 8px) */
 .toggle-label span {
-  padding: 2px 6px;
-  z-index: 1;
+  padding: 1.5px 4px 1px 4px; /* Tighter internal spacing */
+  font-size: 8px;   /* Smaller font */
+  line-height: 1;
+  font-weight: 800;
+  z-index: 5;
+  transition: color 0.2s;
+  color: #666;
 }
 
-/* The sliding highlight/background */
+/* The Sliding Button (The tactile thumb) */
 .toggle-label::after {
   content: "";
   position: absolute;
-  top: 2px;
-  left: 2px;
-  width: calc(50% - 2px);
-  height: calc(100% - 4px);
-  background: #555; /* Highlight color */
+  top: 1px;
+  left: 1px;
+  width: calc(50% - 1px); 
+  height: calc(100% - 2px);
+  
+  background: linear-gradient(to bottom, #ffffff 0%, #bbbbbb 100%);
   border-radius: 2px;
-  transition: transform 0.2s ease;
+  transition: transform 0.15s ease-out; /* Faster snap for smaller size */
+  
+  box-shadow: 0 1px 2px rgba(0,0,0,0.5);
+  z-index: 2;
 }
 
-/* Move the highlight and change text color when checked */
+/* Logic: Move the slider */
 .toggle-input:checked + .toggle-label::after {
   transform: translateX(100%);
 }
 
-.toggle-input:not(:checked) + .toggle-label .label-min { color: #fff; }
-.toggle-input:checked + .toggle-label .label-max { color: #fff; }
-
+/* Logic: Highlight active text */
+.toggle-input:not(:checked) + .toggle-label .label-min { color: #000; }
+.toggle-input:checked + .toggle-label .label-max { color: #000; }
 @media (max-width: 820px){
   .checkbox-label input[type="checkbox"] {
     width: 24px;
