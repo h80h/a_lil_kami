@@ -1,41 +1,74 @@
 // ANALYTICS & ENGAGEMENT (Umami)
 (function() {
-  // 1. SAFETY CHECK: Don't track on localhost or development IP
+  // 1. SAFETY CHECK: Don't track on localhost
   const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-  if (isLocal) {
-    console.log("Umami: Development mode. Tracking script and engagement timer disabled.");
-    return; 
-  }
+  if (isLocal) return; 
 
-  // 2. INJECT UMAMI SCRIPT
+  // 2. INJECT UMAMI SCRIPT (STEALTH MODE)
   const el = document.createElement('script');
-  el.setAttribute('src', 'https://umami.h80h.xyz/script.js');
+  el.setAttribute('src', '/stats/script.js'); 
   el.setAttribute('data-website-id', '018528f0-40ae-4d41-b0f8-23de03a97547');
   el.setAttribute('data-domains', 'kami.h80h.xyz');
+  el.setAttribute('data-host-url', 'https://kami.h80h.xyz/stats');
   el.setAttribute('data-do-not-track', 'true');
   el.setAttribute('defer', 'true');
   document.head.appendChild(el);
 
-  // 3. START ACTIVE ENGAGEMENT TIMER (1 MINUTE)
-  let totalActiveTime = 0;
-  let hasTracked = false;
+  // 3. DAILY STREAK TRACKER (Runs immediately)
+  const todayStr = new Date().toISOString().split('T')[0];
+  const lastVisit = localStorage.getItem('kami_last_visit');
+  let streak = parseInt(localStorage.getItem('kami_streak') || '0');
 
-  const engagementInterval = setInterval(() => {
-    // Only count time if the tab is visible and Umami is loaded
-    if (document.visibilityState === 'visible' && !hasTracked) {
-      totalActiveTime += 1000; // Add 1 second
-      
-      if (totalActiveTime >= 60000) { // 60 seconds reached
-        if (window.umami) {
-          umami.track('long-engagement', { type: 'active-visitor' });
-          hasTracked = true;
-          clearInterval(engagementInterval); // Stop the timer once tracked
-          console.log("Umami: 1-minute active engagement recorded!");
+  if (lastVisit !== todayStr) {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+    streak = (lastVisit === yesterdayStr) ? streak + 1 : 1;
+    localStorage.setItem('kami_last_visit', todayStr);
+    localStorage.setItem('kami_streak', streak);
+
+    setTimeout(() => {
+      if (window.umami) umami.track('daily-streak', { count: streak });
+    }, 3000);
+  }
+})();
+
+// 4. THE HONEST TIMER LOGIC
+let engagementInterval;
+const tiers = { 
+  'just-checking': 2000,      // 2s: Quick check
+  'quick-peek': 5000,         // 5s: Eyeballing the top
+  'engaged': 20000,           // 20s: Reading the list
+  'deep-dive': 60000,         // 1m: Digging into stats
+  'dedicated': 300000,        // 5m: Serious study
+  'long-engagement': 600000   // 10m: THE "GOLD STANDARD"
+};
+
+function startHonestTracking() {
+  if (engagementInterval) return; 
+  let totalActiveTime = 0;
+
+  engagementInterval = setInterval(() => {
+    // Only count if the tab is visible (The "Honest" Check)
+    if (document.visibilityState === 'visible') {
+      totalActiveTime += 1000;
+
+      for (let [name, ms] of Object.entries(tiers)) {
+        if (typeof tiers[name] === 'number' && totalActiveTime >= ms) {
+          if (window.umami && typeof window.umami.track === 'function') {
+            // Consistent with your previous event style
+            umami.track(name, { seconds: ms / 1000 });
+            tiers[name] = true; // Mark as sent
+          }
         }
       }
+
+      // Stop once we hit the 10-minute historical peak
+      if (tiers['long-engagement'] === true) clearInterval(engagementInterval);
     }
   }, 1000);
-})();
+}
 
 // Main Project
 
@@ -340,6 +373,7 @@ function showLoader() {
 function hideLoader() {
     const loader = document.querySelector('.loader');
     loader.style.opacity = '0';
+    startHonestTracking();
     setTimeout(() => {
         loader.style.display = 'none';
     }, 300);

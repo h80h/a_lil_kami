@@ -1,5 +1,11 @@
 {
   "buildCommand": null,
   "outputDirectory": ".",
-  "devCommand": null
+  "devCommand": null,
+  "rewrites": [
+    {
+      "source": "/stats/:match*",
+      "destination": "https://umami.h80h.xyz/:match*"
+    }
+  ]
 }
