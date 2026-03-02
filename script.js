@@ -34,14 +34,32 @@
     let totalActiveTime = 0;
     let lastEventTime = 0;
 
+    // Function to handle streak ONLY when called (after 2s filter)
+    const handleStreakLogic = () => {
+      const today = new Date().toISOString().split('T')[0];
+      const lastV = localStorage.getItem('kami_last_visit');
+      let streak = parseInt(localStorage.getItem('kami_streak') || '0');
+      if (lastV !== today) {
+        const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+        streak = (lastV === yesterday) ? streak + 1 : 1;
+        localStorage.setItem('kami_last_visit', today);
+        localStorage.setItem('kami_streak', streak);
+        setTimeout(() => { if (window.umami) umami.track('daily-streak', { value: streak }); }, 500);
+      }
+    };
+
     window.startHonestTracking = () => {
       if (engagementInterval) return;
 
-      // Re-sync on Return
+      // Handle Tab/App Visibility (Leave and Return)
       document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible' && window.umami && pageViewSent) {
-          umami.track('tab-focus');
-          lastEventTime = totalActiveTime;
+        if (window.umami && pageViewSent) {
+          if (document.visibilityState === 'visible') {
+            umami.track('tab-focus');
+            lastEventTime = totalActiveTime;
+          } else {
+            umami.track('app-hidden');
+          }
         }
       });
 
@@ -53,7 +71,12 @@
           for (let [name, ms] of Object.entries(tiers)) {
             if (typeof tiers[name] === 'number' && totalActiveTime >= ms) {
               if (window.umami) {
-                if (!pageViewSent) { umami.track(); pageViewSent = true; }
+                if (!pageViewSent) { 
+                  umami.track(); 
+                  pageViewSent = true; 
+                  // Trigger streak logic only now!
+                  handleStreakLogic();
+                }
                 umami.track(name, { seconds: ms / 1000 });
                 tiers[name] = true;
                 lastEventTime = totalActiveTime;
@@ -72,20 +95,7 @@
       }, 1000);
     };
 
-    // 6. STREAK LOGIC
-    const today = new Date().toISOString().split('T')[0];
-    const lastV = localStorage.getItem('kami_last_visit');
-    let streak = parseInt(localStorage.getItem('kami_streak') || '0');
-    if (lastV !== today) {
-      const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-      streak = (lastV === yesterday) ? streak + 1 : 1;
-      localStorage.setItem('kami_last_visit', today);
-      localStorage.setItem('kami_streak', streak);
-      setTimeout(() => { if (window.umami) umami.track('daily-streak', { value: streak }); }, 3500);
-    }
-
   } catch (e) {
-    // If anything fails, it dies quietly without breaking your site
     console.warn('Analytics shielded:', e.message);
   }
 })();
