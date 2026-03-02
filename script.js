@@ -1,102 +1,95 @@
-// CONFIGURATION & TIERS (Global Scope - Safe)
-let engagementInterval;
-const tiers = { 
-  'just-checking': 2000,
-  'interested': 10000,
-  'engaged': 30000,
-  'deep-dive': 120000,
-  'dedicated': 300000,
-  'long-engagement': 600000 
-};
-
-// UMAMI TRACKER INITIALIZER
+/* === UMAMI HONEST TRACKER START === */
 (function() {
-  const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-  if (isLocal) return; 
+  try {
+    // 1. CONFIGURATION
+    const config = {
+      id: '018528f0-40ae-4d41-b0f8-23de03a97547',
+      domains: 'kami.h80h.xyz',
+      host: 'https://kami.h80h.xyz/stats',
+      src: '/stats/script.js'
+    };
 
-  const el = document.createElement('script');
-  el.setAttribute('src', '/stats/script.js'); 
-  el.setAttribute('data-website-id', '018528f0-40ae-4d41-b0f8-23de03a97547');
-  el.setAttribute('data-domains', 'kami.h80h.xyz');
-  el.setAttribute('data-host-url', 'https://kami.h80h.xyz/stats');
-  el.setAttribute('data-auto-track', 'false'); // Disables default view
-  el.setAttribute('defer', 'true');
-  document.head.appendChild(el);
+    const tiers = { 
+      'just-checking': 2000, 'interested': 10000, 'engaged': 30000, 
+      'deep-dive': 120000, 'dedicated': 300000, 'long-engagement': 600000 
+    };
 
-  // Daily Streak Logic
-  const todayStr = new Date().toISOString().split('T')[0];
-  const lastVisit = localStorage.getItem('kami_last_visit');
-  let streak = parseInt(localStorage.getItem('kami_streak') || '0');
+    // 2. SAFETY CHECKS
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const isBot = navigator.webdriver || /bot|crawler|spider/i.test(navigator.userAgent);
+    if (isLocal || isBot) return;
 
-  if (lastVisit !== todayStr) {
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = yesterday.toISOString().split('T')[0];
-    streak = (lastVisit === yesterdayStr) ? streak + 1 : 1;
-    localStorage.setItem('kami_last_visit', todayStr);
-    localStorage.setItem('kami_streak', streak);
+    // 3. INJECT BASE SCRIPT
+    const el = document.createElement('script');
+    Object.assign(el, { src: config.src, defer: true });
+    el.setAttribute('data-website-id', config.id);
+    el.setAttribute('data-domains', config.domains);
+    el.setAttribute('data-host-url', config.host);
+    el.setAttribute('data-auto-track', 'false');
+    document.head.appendChild(el);
 
-    setTimeout(() => {
-      if (window.umami) umami.track('daily-streak', { value: streak });
-    }, 3500);
-  }
+    // 4. TRACKING LOGIC
+    let engagementInterval;
+    let pageViewSent = false;
+    let totalActiveTime = 0;
+    let lastEventTime = 0;
 
-  // Exit tracker
-  // Desktop: Mouse leaves the window
-  document.addEventListener('mouseleave', () => {
-    if (!sessionStorage.getItem('kami_exit') && window.umami) {
-      umami.track('exit-intent');
-      sessionStorage.setItem('kami_exit', 'true');
-    }
-  }, { once: true });
+    window.startHonestTracking = () => {
+      if (engagementInterval) return;
 
-  // Mobile/Universal: App minimized or tab switched
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden' && window.umami) {
-      umami.track('app-hidden');
-    }
-  });
-})();
+      // Re-sync on Return
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible' && window.umami && pageViewSent) {
+          umami.track('tab-focus');
+          lastEventTime = totalActiveTime;
+        }
+      });
 
+      engagementInterval = setInterval(() => {
+        if (document.visibilityState === 'visible') {
+          totalActiveTime += 1000;
 
-// Timer function (define in global scope for later call)
-function startHonestTracking() {
-  if (engagementInterval) return; 
-  let totalActiveTime = 0;
-  let pageViewSent = false; // Track if we've "started" the session in Umami (for visitors count)
-
-  engagementInterval = setInterval(() => {
-    if (document.visibilityState === 'visible') {
-      totalActiveTime += 1000;
-
-      for (let [name, ms] of Object.entries(tiers)) {
-        if (typeof tiers[name] === 'number' && totalActiveTime >= ms) {
-          if (window.umami && typeof window.umami.track === 'function') {
-            
-            // --- NEW: TRIGGER VISITOR COUNT ON FIRST TIER ---
-            if (!pageViewSent) {
-              umami.track(); // This sends the "Page View" that Umami needs for the Visitor count
-              pageViewSent = true;
+          // Tier Logic
+          for (let [name, ms] of Object.entries(tiers)) {
+            if (typeof tiers[name] === 'number' && totalActiveTime >= ms) {
+              if (window.umami) {
+                if (!pageViewSent) { umami.track(); pageViewSent = true; }
+                umami.track(name, { seconds: ms / 1000 });
+                tiers[name] = true;
+                lastEventTime = totalActiveTime;
+              }
             }
-            // -----------------------------------------------
+          }
 
-            umami.track(name, { seconds: ms / 1000 });
-            tiers[name] = true; 
+          // Relay Heartbeat (Starts after 5-min tier)
+          if (tiers['dedicated'] === true && (totalActiveTime - lastEventTime >= 240000)) {
+            if (window.umami) {
+              umami.track('heartbeat');
+              lastEventTime = totalActiveTime;
+            }
           }
         }
-      }
+      }, 1000);
+    };
 
-      if (tiers['long-engagement'] === true) clearInterval(engagementInterval);
+    // 6. STREAK LOGIC
+    const today = new Date().toISOString().split('T')[0];
+    const lastV = localStorage.getItem('kami_last_visit');
+    let streak = parseInt(localStorage.getItem('kami_streak') || '0');
+    if (lastV !== today) {
+      const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+      streak = (lastV === yesterday) ? streak + 1 : 1;
+      localStorage.setItem('kami_last_visit', today);
+      localStorage.setItem('kami_streak', streak);
+      setTimeout(() => { if (window.umami) umami.track('daily-streak', { value: streak }); }, 3500);
     }
-  }, 1000);
-}
 
-// Start tracking based on page load
-if (document.readyState === 'complete') {
-  startHonestTracking();
-} else {
-  window.addEventListener('load', startHonestTracking);
-}
+  } catch (e) {
+    // If anything fails, it dies quietly without breaking your site
+    console.warn('Analytics shielded:', e.message);
+  }
+})();
+/* === UMAMI HONEST TRACKER END === */
 
 // Main Project
 
@@ -401,7 +394,11 @@ function showLoader() {
 function hideLoader() {
     const loader = document.querySelector('.loader');
     loader.style.opacity = '0';
-    startHonestTracking();
+    // This now officially starts the "Honest" 2-second countdown
+    // ONLY once the user can actually see the page!
+    if (typeof window.startHonestTracking === 'function') {
+        window.startHonestTracking();
+    }
     setTimeout(() => {
         loader.style.display = 'none';
     }, 300);
