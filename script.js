@@ -1,20 +1,29 @@
-// ANALYTICS & ENGAGEMENT (Umami)
+// CONFIGURATION & TIERS (Global Scope - Safe)
+let engagementInterval;
+const tiers = { 
+  'just-checking': 2000,
+  'interested': 10000,
+  'engaged': 30000,
+  'deep-dive': 120000,
+  'dedicated': 300000,
+  'long-engagement': 600000 
+};
+
+// UMAMI TRACKER INITIALIZER
 (function() {
-  // 1. SAFETY CHECK: Don't track on localhost
   const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
   if (isLocal) return; 
 
-  // 2. INJECT UMAMI SCRIPT (STEALTH MODE)
   const el = document.createElement('script');
   el.setAttribute('src', '/stats/script.js'); 
   el.setAttribute('data-website-id', '018528f0-40ae-4d41-b0f8-23de03a97547');
   el.setAttribute('data-domains', 'kami.h80h.xyz');
   el.setAttribute('data-host-url', 'https://kami.h80h.xyz/stats');
-  el.setAttribute('data-do-not-track', 'true');
+  el.setAttribute('data-auto-track', 'false'); // Disables default view
   el.setAttribute('defer', 'true');
   document.head.appendChild(el);
 
-  // 3. DAILY STREAK TRACKER (Runs immediately)
+  // Daily Streak Logic
   const todayStr = new Date().toISOString().split('T')[0];
   const lastVisit = localStorage.getItem('kami_last_visit');
   let streak = parseInt(localStorage.getItem('kami_streak') || '0');
@@ -23,51 +32,59 @@
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     const yesterdayStr = yesterday.toISOString().split('T')[0];
-
     streak = (lastVisit === yesterdayStr) ? streak + 1 : 1;
     localStorage.setItem('kami_last_visit', todayStr);
     localStorage.setItem('kami_streak', streak);
 
     setTimeout(() => {
       if (window.umami) umami.track('daily-streak', { value: streak });
-    }, 3000);
+    }, 3500);
   }
+
+  // Exit tracker
+  // Desktop: Mouse leaves the window
+  document.addEventListener('mouseleave', () => {
+    if (!sessionStorage.getItem('kami_exit') && window.umami) {
+      umami.track('exit-intent');
+      sessionStorage.setItem('kami_exit', 'true');
+    }
+  }, { once: true });
+
+  // Mobile/Universal: App minimized or tab switched
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden' && window.umami) {
+      umami.track('app-hidden');
+    }
+  });
 })();
 
-// 4. THE HONEST TIMER LOGIC
-let engagementInterval;
-const tiers = { 
-  'just-checking': 2000,      // 2s: Not a bot
-  'interested': 10000,        // 10s: Passed the "vibe check"
-  'engaged': 30000,           // 30s: Actually reading
-  'deep-dive': 120000,        // 2m: Digging in
-  'dedicated': 300000,        // 5m: Significant time investment
-  'long-engagement': 600000   // 10m: Your top 1% fans
-};
 
+// Timer function (define in global scope for later call)
 function startHonestTracking() {
   if (engagementInterval) return; 
   let totalActiveTime = 0;
 
   engagementInterval = setInterval(() => {
-    // Only count if the tab is visible (The "Honest" Check)
     if (document.visibilityState === 'visible') {
       totalActiveTime += 1000;
-
       for (let [name, ms] of Object.entries(tiers)) {
         if (typeof tiers[name] === 'number' && totalActiveTime >= ms) {
-          if (window.umami && typeof window.umami.track === 'function') {
-            // Consistent with your previous event style
-            umami.track(name, { seconds: ms / 1000 });
-            tiers[name] = true; // Mark as sent
+          if (window.umami) {
+            umami.track(name, { value: ms / 1000 });
+            tiers[name] = true; 
           }
         }
       }
-
-      // Stop once we hit the 10-minute historical peak
       if (tiers['long-engagement'] === true) clearInterval(engagementInterval);
     }
   }, 1000);
+}
+
+// Start tracking based on page load
+if (document.readyState === 'complete') {
+  startHonestTracking();
+} else {
+  window.addEventListener('load', startHonestTracking);
 }
 
 // Main Project
