@@ -29,7 +29,7 @@
     localStorage.setItem('kami_streak', streak);
 
     setTimeout(() => {
-      if (window.umami) umami.track('daily-streak', { count: streak });
+      if (window.umami) umami.track('daily-streak', { value: streak });
     }, 3000);
   }
 })();
@@ -37,12 +37,12 @@
 // 4. THE HONEST TIMER LOGIC
 let engagementInterval;
 const tiers = { 
-  'just-checking': 2000,      // 2s: Quick check
-  'quick-peek': 5000,         // 5s: Eyeballing the top
-  'engaged': 20000,           // 20s: Reading the list
-  'deep-dive': 60000,         // 1m: Digging into stats
-  'dedicated': 300000,        // 5m: Serious study
-  'long-engagement': 600000   // 10m: THE "GOLD STANDARD"
+  'just-checking': 2000,      // 2s: Not a bot
+  'interested': 10000,        // 10s: Passed the "vibe check"
+  'engaged': 30000,           // 30s: Actually reading
+  'deep-dive': 120000,        // 2m: Digging in
+  'dedicated': 300000,        // 5m: Significant time investment
+  'long-engagement': 600000   // 10m: Your top 1% fans
 };
 
 function startHonestTracking() {
