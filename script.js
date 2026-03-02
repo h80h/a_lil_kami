@@ -63,18 +63,29 @@ const tiers = {
 function startHonestTracking() {
   if (engagementInterval) return; 
   let totalActiveTime = 0;
+  let pageViewSent = false; // Track if we've "started" the session in Umami (for visitors count)
 
   engagementInterval = setInterval(() => {
     if (document.visibilityState === 'visible') {
       totalActiveTime += 1000;
+
       for (let [name, ms] of Object.entries(tiers)) {
         if (typeof tiers[name] === 'number' && totalActiveTime >= ms) {
-          if (window.umami) {
-            umami.track(name, { value: ms / 1000 });
+          if (window.umami && typeof window.umami.track === 'function') {
+            
+            // --- NEW: TRIGGER VISITOR COUNT ON FIRST TIER ---
+            if (!pageViewSent) {
+              umami.track(); // This sends the "Page View" that Umami needs for the Visitor count
+              pageViewSent = true;
+            }
+            // -----------------------------------------------
+
+            umami.track(name, { seconds: ms / 1000 });
             tiers[name] = true; 
           }
         }
       }
+
       if (tiers['long-engagement'] === true) clearInterval(engagementInterval);
     }
   }, 1000);
