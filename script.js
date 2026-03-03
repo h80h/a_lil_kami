@@ -1,7 +1,6 @@
 /* === UMAMI HONEST TRACKER START === */
 (function() {
   try {
-    // 1. CONFIGURATION
     const config = {
       id: '018528f0-40ae-4d41-b0f8-23de03a97547',
       domains: 'kami.h80h.xyz',
@@ -14,12 +13,10 @@
       'deep-dive': 120000, 'dedicated': 300000, 'long-engagement': 600000 
     };
 
-    // 2. SAFETY CHECKS
     const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
     const isBot = navigator.webdriver || /bot|crawler|spider/i.test(navigator.userAgent);
     if (isLocal || isBot) return;
 
-    // 3. INJECT BASE SCRIPT
     const el = document.createElement('script');
     Object.assign(el, { src: config.src, defer: true });
     el.setAttribute('data-website-id', config.id);
@@ -28,13 +25,9 @@
     el.setAttribute('data-auto-track', 'false');
     document.head.appendChild(el);
 
-    // 4. TRACKING LOGIC
-    let engagementInterval;
-    let pageViewSent = false;
-    let totalActiveTime = 0;
-    let lastEventTime = 0;
+    let engagementInterval, pageViewSent = false, totalActiveTime = 0, lastEventTime = 0;
+    let lastActivityTimestamp = Date.now(); 
 
-    // Function to handle streak ONLY when called (after 2s filter)
     const handleStreakLogic = () => {
       const today = new Date().toISOString().split('T')[0];
       const lastV = localStorage.getItem('kami_last_visit');
@@ -51,31 +44,70 @@
     window.startHonestTracking = () => {
       if (engagementInterval) return;
 
-      // Handle Tab/App Visibility (Leave and Return)
+      // 1. Activity Monitor
+      const updateActivity = () => { lastActivityTimestamp = Date.now(); };
+      ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'].forEach(name => {
+        document.addEventListener(name, updateActivity, { passive: true });
+      });
+
+      // 2. Filter Watcher
+      let lastUrl = window.location.href;
+      const watchFilters = (force = false) => {
+        // Trigger if URL changed OR if we are forcing it (for direct landing)
+        if ((window.location.href !== lastUrl || force) && window.umami && pageViewSent) {
+          lastUrl = window.location.href;
+          const params = new URLSearchParams(window.location.search);
+          const filterData = {};
+          params.forEach((value, key) => { filterData[key] = value; });
+          
+          // Only track if there are actually parameters to record
+          if (Object.keys(filterData).length > 0) {
+            umami.track('filter-applied', filterData);
+          }
+          updateActivity(); 
+        }
+      };
+      
+      window.addEventListener('popstate', () => watchFilters());
+      const originalPush = history.pushState;
+      history.pushState = function() {
+        originalPush.apply(this, arguments);
+        watchFilters();
+      };
+
+      // 3. Visibility Watcher
       document.addEventListener('visibilitychange', () => {
         if (window.umami && pageViewSent) {
           if (document.visibilityState === 'visible') {
             umami.track('tab-focus');
             lastEventTime = totalActiveTime;
+            updateActivity();
           } else {
             umami.track('app-hidden');
           }
         }
       });
 
+      // 4. Main Interval
       engagementInterval = setInterval(() => {
-        if (document.visibilityState === 'visible') {
+        const timeSinceLastActivity = Date.now() - lastActivityTimestamp;
+        
+        // Only count time if tab is visible and user has been active in last 5 mins
+        if (document.visibilityState === 'visible' && timeSinceLastActivity < 300000) {
           totalActiveTime += 1000;
 
-          // Tier Logic
           for (let [name, ms] of Object.entries(tiers)) {
             if (typeof tiers[name] === 'number' && totalActiveTime >= ms) {
               if (window.umami) {
                 if (!pageViewSent) { 
-                  umami.track(); 
+                  umami.track(); // Records initial Page View
                   pageViewSent = true; 
-                  // Trigger streak logic only now!
                   handleStreakLogic();
+
+                  // SYNC: Capture filters from a direct landing URL
+                  if (window.location.search) {
+                    watchFilters(true); 
+                  }
                 }
                 umami.track(name, { seconds: ms / 1000 });
                 tiers[name] = true;
@@ -84,7 +116,7 @@
             }
           }
 
-          // Relay Heartbeat (Starts after 5-min tier)
+          // Heartbeat logic
           if (tiers['dedicated'] === true && (totalActiveTime - lastEventTime >= 240000)) {
             if (window.umami) {
               umami.track('heartbeat');
