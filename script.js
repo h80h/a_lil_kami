@@ -2,7 +2,7 @@
 (function() {
   try {
     const config = {
-      id: '018528f0-40ae-4d41-b0f8-23de03a97547',
+      id: 'd7d7ed00-7944-425f-8a8c-552bf9916cc0',
       domains: 'kami.h80h.xyz',
       host: 'https://kami.h80h.xyz/stats',
       src: '/stats/script.js'
@@ -12,9 +12,9 @@
       'just-checking': 2000, 
       'interested': 10000, 
       'engaged': 30000, 
-      'deep-dive': 120000,    // 2 min
-      'dedicated': 300000,    // 5 min
-      'long-engagement': 600000 // 10 min
+      'deep-dive': 120000,
+      'dedicated': 300000,
+      'long-engagement': 600000 
     };
 
     if (window.location.hostname === 'localhost' || navigator.webdriver) return;
@@ -27,29 +27,18 @@
     el.setAttribute('data-auto-track', 'false');
     document.head.appendChild(el);
 
-    let engagementInterval, pageViewSent = false, totalActiveTime = 0, lastEventTime = 0;
-    let lastActivityTimestamp = Date.now(); 
+    // --- REFRESH-PROOF MEMORY ---
+    const getSessionVal = (key) => parseInt(sessionStorage.getItem(key) || '0');
+    const setSessionVal = (key, val) => sessionStorage.setItem(key, val.toString());
 
-    const handleStreakLogic = () => {
-      const today = new Date().toISOString().split('T')[0];
-      const lastV = localStorage.getItem('kami_last_visit');
-      let streak = parseInt(localStorage.getItem('kami_streak') || '0');
-      if (lastV !== today) {
-        const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-        streak = (lastV === yesterday) ? streak + 1 : 1;
-        localStorage.setItem('kami_last_visit', today);
-        localStorage.setItem('kami_streak', streak);
-        setTimeout(() => { if (window.umami) umami.track('daily-streak', { value: streak }); }, 500);
-      }
-    };
+    let engagementInterval, pageViewSent = false, lastEventTime = 0;
+    let totalActiveTime = getSessionVal('kami_active_ms');
+    let heartbeatCount = getSessionVal('kami_hb_count');
+    let lastInteractionTimestamp = 0; 
+    const MAX_HEARTBEATS = 5;
 
     window.startHonestTracking = () => {
       if (engagementInterval) return;
-
-      const updateActivity = () => { lastActivityTimestamp = Date.now(); };
-      ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'].forEach(name => {
-        document.addEventListener(name, updateActivity, { passive: true });
-      });
 
       let lastUrl = window.location.href;
       const watchFilters = (force = false) => {
@@ -57,10 +46,11 @@
           lastUrl = window.location.href;
           const params = new URLSearchParams(window.location.search);
           const filterData = Object.fromEntries(params.entries());
+          
           if (Object.keys(filterData).length > 0) {
             umami.track('filter-applied', filterData);
+            lastInteractionTimestamp = Date.now(); 
           }
-          updateActivity(); 
         }
       };
       
@@ -75,8 +65,6 @@
         if (window.umami && pageViewSent) {
           if (document.visibilityState === 'visible') {
             umami.track('tab-focus');
-            lastEventTime = totalActiveTime;
-            updateActivity();
           } else {
             umami.track('app-hidden');
           }
@@ -84,32 +72,38 @@
       });
 
       engagementInterval = setInterval(() => {
-        const timeSinceActivity = Date.now() - lastActivityTimestamp;
-        
-        // 5-MINUTE IDLE CUTOFF
-        if (document.visibilityState === 'visible' && timeSinceActivity < 300000) {
+        const now = Date.now();
+        const isGracePeriod = totalActiveTime < 600000;
+        const hasRecentInteraction = (now - lastInteractionTimestamp) < 300000;
+
+        if (document.visibilityState === 'visible' && (isGracePeriod || hasRecentInteraction)) {
           totalActiveTime += 1000;
+          setSessionVal('kami_active_ms', totalActiveTime); // SAVE TO SESSION
 
           for (let [name, ms] of Object.entries(tiers)) {
-            if (typeof tiers[name] === 'number' && totalActiveTime >= ms) {
+            // Check if tier was already sent in this session via sessionStorage
+            const tierKey = 'kami_tier_' + name;
+            const alreadySent = sessionStorage.getItem(tierKey) === 'true';
+
+            if (totalActiveTime >= ms && !alreadySent) {
               if (window.umami) {
                 if (!pageViewSent) { 
                   umami.track(); 
                   pageViewSent = true; 
-                  handleStreakLogic();
                   if (window.location.search) watchFilters(true); 
                 }
                 umami.track(name, { seconds: ms / 1000 });
-                tiers[name] = true;
+                sessionStorage.setItem(tierKey, 'true'); // MARK AS SENT
                 lastEventTime = totalActiveTime;
               }
             }
           }
 
-          // Heartbeat fires every 4 mins of ACTIVE time
-          if (tiers['dedicated'] === true && (totalActiveTime - lastEventTime >= 240000)) {
-            if (window.umami) {
+          if (totalActiveTime >= 600000 && (totalActiveTime - lastEventTime >= 240000)) {
+            if (window.umami && heartbeatCount < MAX_HEARTBEATS && hasRecentInteraction) {
               umami.track('heartbeat');
+              heartbeatCount++;
+              setSessionVal('kami_hb_count', heartbeatCount); // SAVE TO SESSION
               lastEventTime = totalActiveTime;
             }
           }
