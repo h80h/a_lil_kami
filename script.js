@@ -9,13 +9,15 @@
     };
 
     const tiers = { 
-      'just-checking': 2000, 'interested': 10000, 'engaged': 30000, 
-      'deep-dive': 120000, 'dedicated': 300000, 'long-engagement': 600000 
+      'just-checking': 2000, 
+      'interested': 10000, 
+      'engaged': 30000, 
+      'deep-dive': 120000,    // 2 min
+      'dedicated': 300000,    // 5 min
+      'long-engagement': 600000 // 10 min
     };
 
-    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    const isBot = navigator.webdriver || /bot|crawler|spider/i.test(navigator.userAgent);
-    if (isLocal || isBot) return;
+    if (window.location.hostname === 'localhost' || navigator.webdriver) return;
 
     const el = document.createElement('script');
     Object.assign(el, { src: config.src, defer: true });
@@ -44,23 +46,17 @@
     window.startHonestTracking = () => {
       if (engagementInterval) return;
 
-      // 1. Activity Monitor
       const updateActivity = () => { lastActivityTimestamp = Date.now(); };
       ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'].forEach(name => {
         document.addEventListener(name, updateActivity, { passive: true });
       });
 
-      // 2. Filter Watcher
       let lastUrl = window.location.href;
       const watchFilters = (force = false) => {
-        // Trigger if URL changed OR if we are forcing it (for direct landing)
         if ((window.location.href !== lastUrl || force) && window.umami && pageViewSent) {
           lastUrl = window.location.href;
           const params = new URLSearchParams(window.location.search);
-          const filterData = {};
-          params.forEach((value, key) => { filterData[key] = value; });
-          
-          // Only track if there are actually parameters to record
+          const filterData = Object.fromEntries(params.entries());
           if (Object.keys(filterData).length > 0) {
             umami.track('filter-applied', filterData);
           }
@@ -75,7 +71,6 @@
         watchFilters();
       };
 
-      // 3. Visibility Watcher
       document.addEventListener('visibilitychange', () => {
         if (window.umami && pageViewSent) {
           if (document.visibilityState === 'visible') {
@@ -88,26 +83,21 @@
         }
       });
 
-      // 4. Main Interval
       engagementInterval = setInterval(() => {
-        const timeSinceLastActivity = Date.now() - lastActivityTimestamp;
+        const timeSinceActivity = Date.now() - lastActivityTimestamp;
         
-        // Only count time if tab is visible and user has been active in last 5 mins
-        if (document.visibilityState === 'visible' && timeSinceLastActivity < 300000) {
+        // 5-MINUTE IDLE CUTOFF
+        if (document.visibilityState === 'visible' && timeSinceActivity < 300000) {
           totalActiveTime += 1000;
 
           for (let [name, ms] of Object.entries(tiers)) {
             if (typeof tiers[name] === 'number' && totalActiveTime >= ms) {
               if (window.umami) {
                 if (!pageViewSent) { 
-                  umami.track(); // Records initial Page View
+                  umami.track(); 
                   pageViewSent = true; 
                   handleStreakLogic();
-
-                  // SYNC: Capture filters from a direct landing URL
-                  if (window.location.search) {
-                    watchFilters(true); 
-                  }
+                  if (window.location.search) watchFilters(true); 
                 }
                 umami.track(name, { seconds: ms / 1000 });
                 tiers[name] = true;
@@ -116,7 +106,7 @@
             }
           }
 
-          // Heartbeat logic
+          // Heartbeat fires every 4 mins of ACTIVE time
           if (tiers['dedicated'] === true && (totalActiveTime - lastEventTime >= 240000)) {
             if (window.umami) {
               umami.track('heartbeat');
@@ -126,10 +116,7 @@
         }
       }, 1000);
     };
-
-  } catch (e) {
-    console.warn('Analytics shielded:', e.message);
-  }
+  } catch (e) {}
 })();
 /* === UMAMI HONEST TRACKER END === */
 
