@@ -959,10 +959,10 @@ async function fetchWithCacheBusting(url, options = {}) {
     return fetch(urlWithCacheBuster, fetchOptions);
 }
 
-async function loadSacrificeData() {
+async function loadSacrificeData(v) {
     try {
-        // No headers, no tokens, no leaks!
-        const response = await fetch('/api/sacrifices');
+    // Uses the timestamp to ensure the API doesn't return a cached 403 or old data
+    const response = await fetch(`/api/sacrifices?v=${v}`);
         
         if (response.ok) {
             const data = await response.json();
@@ -979,35 +979,39 @@ async function loadSacrificeData() {
  * and immediately release the bundle reference so the GC can free it.
  * Populates the global variables directly; returns nothing.
  */
-async function fetchAndSplitBundle() {
-    const response = await fetchWithCacheBusting('https://data.kami.h80h.xyz/kamiBundle.json');
+async function fetchAndSplitBundle(v) {
+    // 1. Figure out WHERE to look
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname.startsWith('192.168.');
+    
+    // If local, go directly to Cloudflare. If live, use the "middleman" path.
+    const finalUrl = isLocal 
+        ? `https://data.kami.h80h.xyz/kamiBundle.json?v=${v}` 
+        : `/api/data/kamiBundle.json?v=${v}`;
+
+    const response = await fetch(finalUrl);
     if (!response.ok) {
         throw new Error(`Failed to load kamiBundle.json: ${response.status}`);
     }
 
-    // Parse once into a local variable — NOT stored in any outer scope
+    // Parse into a local variable
     let bundle = await response.json();
 
-    // --- Required sections ---
+    // 2. Validate the bundle
     if (!bundle.kamiImage || !bundle.kamiTraits) {
-        bundle = null; // release before throwing
+        bundle = null; 
         throw new Error('Bundle is missing required sections (kamiImage / kamiTraits)');
     }
 
-    // Move each section into its global; then immediately delete from bundle
-    // so the large intermediate object can be GC'd as soon as possible.
+    // 3. Move data to global variables and clean up memory (Good for mobile!)
     imagesData = bundle.kamiImage;   bundle.kamiImage   = null;
     traitsData  = bundle.kamiTraits; bundle.kamiTraits  = null;
 
-    // --- Optional sections ---
     if (bundle.kamiStats) {
         kamiStatsData = bundle.kamiStats;
     } else {
         kamiStatsData = {};
     }
     bundle.kamiStats = null;
-
-    if (bundle.kamiRankings) bundle.kamiRankings = null; // not used client-side
 
     if (bundle.kamiMetadata) {
         metadataInfo = bundle.kamiMetadata;
@@ -1016,7 +1020,7 @@ async function fetchAndSplitBundle() {
     }
     bundle.kamiMetadata = null;
 
-    // Drop the bundle reference entirely — GC can now free it
+    // 4. Fully release the bundle for Garbage Collection
     bundle = null;
 }
 
@@ -1025,10 +1029,16 @@ async function loadData() {
     try {
         console.log('📄 Loading bundle with cache-busting...');
 
+        // --- CACHE BUSTING STRATEGY ---
+        // We create a version string based on the current time.
+        // This forces Cloudflare and Vercel to bypass their 5-minute cache.
+        const v = Date.now(); 
+        
         // Single network request + sacrifice fetch run in parallel
+        // We pass the timestamp to our fetching functions
         await Promise.all([
-            fetchAndSplitBundle(),
-            loadSacrificeData(),
+            fetchAndSplitBundle(v), // Pass 'v' here
+            loadSacrificeData(v),   // Pass 'v' here
         ]);
 
         if (Object.keys(kamiStatsData).length > 0) {

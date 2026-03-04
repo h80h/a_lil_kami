@@ -8,13 +8,3 @@ test-full-with-upload.js
 
 # Logs
 extraction.log
-
-# Old jsons
-kamiImage.json
-kamiMetadata.json
-kamiRankings.json
-kamiStats.json
-kamiTraits.json
-
-# Website self-serve api
-api/data/
