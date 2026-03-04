@@ -9,10 +9,10 @@ export default async function handler(req, res) {
   const allowedOriginsStr = process.env.ALLOWED_ORIGINS || "https://kami.h80h.xyz";
   const allowedOrigins = allowedOriginsStr.split(',').map(o => o.trim());
 
-  const isAllowed = allowedOrigins.includes(origin);
+  const isAllowed = !origin || allowedOrigins.includes(origin);
 
   // Set Dynamic CORS
-  if (isAllowed) {
+  if (origin && allowedOrigins.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
   } else {
     res.setHeader('Access-Control-Allow-Origin', 'https://kami.h80h.xyz');
