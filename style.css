@@ -51,7 +51,7 @@ h2 {
     border-radius: 10px;
 }
 
-.search-section {
+#search-section-container {
   display: flex;
   align-content: center;
   gap: 5px;
@@ -115,7 +115,6 @@ input[type="text"] {
   font-size: 12px;
   width: 180px;
   height: 37px;
-  color: #333;
   margin-right: 10px;
 }
 
@@ -978,6 +977,46 @@ button {
 /* Logic: Highlight active text */
 .toggle-input:not(:checked) + .toggle-label .label-min { color: #000; }
 .toggle-input:checked + .toggle-label .label-max { color: #000; }
+
+.online-indicator-container #pulse-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #dbbfe2;
+  animation: pulse 1s infinite;
+  flex-shrink: 0;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  20% { opacity: 0.5; }
+}
+
+.online-text {
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  font-size: 9px;
+  color: #93bbbf;
+}
+
+.online-indicator-container {
+  margin-left: 2px;
+  margin-top: 2px;
+}
+
+/* Start the count at 0 opacity */
+#online-count {
+  opacity: 0;
+  transition: opacity 0.8s ease-in-out;
+}
+
+/* A class we will add via JavaScript to fade it in */
+#online-count.visible {
+  opacity: 1;
+}
+
+
 
 @media (max-width: 820px){
   .checkbox-label input[type="checkbox"] {

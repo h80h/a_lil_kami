@@ -1,3 +1,6 @@
+// "Bot Armor" state - tracks the last time we talked to the database
+let lastRequestTime = 0;
+
 /* === UMAMI HONEST TRACKER START === */
 (function() {
   try {
@@ -113,6 +116,50 @@
   } catch (e) {}
 })();
 /* === UMAMI HONEST TRACKER END === */
+
+/* --- UI FUNCTIONS --- */
+async function updateLiveStatus() {
+  const now = Date.now();
+  if (now - lastRequestTime < 10000) return; 
+  lastRequestTime = now;
+
+  try {
+    const response = await fetch('/api/heartbeat'); 
+    if (!response.ok) throw new Error('Network error');
+    
+    const data = await response.json();
+    
+    // The Raw Truth for the console
+    const rawCount = data.count || 0; 
+
+    const countElement = document.getElementById('online-count');
+    if (countElement) {
+      // 1. UI FALLBACK: Show 1 if count is 0
+      const displayCount = rawCount > 0 ? rawCount : 1;
+      countElement.innerText = displayCount; 
+      countElement.classList.add('visible');
+
+      // 2. CONSOLE TRUTH: Show the actual 0 if no one is online
+      const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      
+      // We'll use a gray dot for 0 and a green dot for > 0
+      const statusColor = rawCount > 0 ? "#22c55e" : "#666";
+      
+      console.log(
+        `%c● %cLive Status %c[%s]%c %c${rawCount} Online %c(UI: ${displayCount})`,
+        `color: ${statusColor}; font-size: 14px;`, 
+        "color: #bbb; font-weight: bold;", 
+        "color: #666; font-family: monospace;", 
+        time,
+        "color: #bbb;", 
+        `color: ${statusColor}; font-weight: bold;`,
+        "color: #555; font-size: 10px; font-style: italic;" // Small note about the UI fallback
+      );
+    }
+  } catch (err) {
+    console.error('%c[!] Live Sync Interrupted.', "color: #ef4444;");
+  }
+}
 
 // Main Project
 
@@ -417,14 +464,23 @@ function showLoader() {
 function hideLoader() {
     const loader = document.querySelector('.loader');
     loader.style.opacity = '0';
-    // This now officially starts the "Honest" 2-second countdown
-    // ONLY once the user can actually see the page!
+    
+    // Start tracking
     if (typeof window.startHonestTracking === 'function') {
         window.startHonestTracking();
     }
+
+    // NEW: Trigger the Live Counter exactly when the loader fades!
+    // We use a tiny 300ms delay to match the loader's fade-out time
     setTimeout(() => {
+        updateLiveStatus();
         loader.style.display = 'none';
     }, 300);
+
+    // Keep the interval separate so it keeps running every minute
+    if (!window.liveStatusInterval) {
+        window.liveStatusInterval = setInterval(updateLiveStatus, 60000);
+    }
 }
 
 function showContainer() {
@@ -904,19 +960,17 @@ async function fetchWithCacheBusting(url, options = {}) {
 }
 
 async function loadSacrificeData() {
-    // Point to your new Vercel Serverless Function
-    const targetUrl = "/api/sacrifices"; 
-
     try {
+        // No headers, no tokens, no leaks!
         const response = await fetch('/api/sacrifices');
         
         if (response.ok) {
             const data = await response.json();
             sacrificedNFTs = new Set(data.map(item => String(item.kami_index)));
-            console.log(`🕳️ Loaded ${sacrificedNFTs.size} sacrifice records via Vercel Proxy`);
+            console.log(`🕳️ Loaded ${sacrificedNFTs.size} sacrifice records`);
         }
     } catch (err) {
-        console.error('Failed to load sacrifice data:', err);
+        // Silent fail
     }
 }
 
@@ -926,7 +980,7 @@ async function loadSacrificeData() {
  * Populates the global variables directly; returns nothing.
  */
 async function fetchAndSplitBundle() {
-    const response = await fetchWithCacheBusting('api/data/kamiBundle.json');
+    const response = await fetchWithCacheBusting('https://data.kami.h80h.xyz/kamiBundle.json');
     if (!response.ok) {
         throw new Error(`Failed to load kamiBundle.json: ${response.status}`);
     }
@@ -977,8 +1031,6 @@ async function loadData() {
             loadSacrificeData(),
         ]);
 
-        console.log(`✅ Loaded ${Object.keys(imagesData).length} images`);
-        console.log(`✅ Loaded ${Object.keys(traitsData).length} trait sets`);
         if (Object.keys(kamiStatsData).length > 0) {
             console.log(`✅ Loaded stats data for ${Object.keys(kamiStatsData).length} Kamigotchi`);
         } else {
@@ -991,14 +1043,11 @@ async function loadData() {
         
         // NEW: Extract affinity data
         affinityData = extractAffinityData();
-        console.log(`✅ Extracted affinity data for ${Object.keys(affinityData).length} Kamigotchi`);
         
         // Build trait signatures for clone detection
         traitSignatures = buildTraitSignatures();
-        console.log(`🔍 Found ${traitSignatures.cloneIds.size} clones in ${Object.values(traitSignatures.groups).filter(g => g.length > 1).length} groups`);
 
         traitCounts = calculateTraitCounts();
-        console.log('🔢 Calculating OpenRarity scores...');
         nftRarityScores = calculateRarityScores();
         console.log('✅ OpenRarity calculation complete!');
         

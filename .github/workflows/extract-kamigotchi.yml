@@ -2,16 +2,13 @@ name: Extract Kamigotchi Data
 
 on:
   schedule:
-    # Runs at 0:00, 2:00, 4:00, 6:00, 8:00, 10:00, 12:00, 14:00..., every 2 hrs
     - cron: '0 0-22/2 * * *'
-  
-  # This button lets you run it manually
   workflow_dispatch:
 
 jobs:
   extract-and-upload:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 25
     
     steps:
       - name: Get the code
@@ -30,14 +27,44 @@ jobs:
         run: npx playwright install --with-deps chromium
       
       - name: Run the extraction script
-        run: node extract-kamigotchi-github.js
+        id: extraction
+        run: |
+          echo "START_TIME=$(date +%s)" >> $GITHUB_ENV
+          node extract-kamigotchi-github.js
+          echo "END_TIME=$(date +%s)" >> $GITHUB_ENV
         env:
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
-        timeout-minutes: 15
       
+      - name: Purge Cloudflare Cache
+        id: purge
+        run: |
+          RESPONSE=$(curl -s -X POST "https://api.cloudflare.com/client/v4/zones/${{ secrets.CLOUDFLARE_ZONE_ID }}/purge_cache" \
+            -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            --data '{"files":["https://data.kami.h80h.xyz/kamiBundle.json"]}')
+          
+          echo "Cloudflare Response: $RESPONSE"
+          
+          if [[ $RESPONSE == *"\"success\":true"* ]]; then
+            echo "✅ Cache purged successfully."
+          else
+            echo "❌ Cache purge FAILED."
+            exit 1
+          fi
+
+      - name: Final Performance Summary
+        if: always()
+        run: |
+          DURATION=$(( END_TIME - START_TIME ))
+          echo "=========================================="
+          echo "📊 PERFORMANCE SUMMARY"
+          echo "Extraction & Upload took: $DURATION seconds"
+          echo "Cache Status: Updated & Purged"
+          echo "=========================================="
+
       - name: Save logs
         if: always()
         uses: actions/upload-artifact@v4

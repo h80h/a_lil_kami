@@ -1,8 +1,6 @@
 .vercel
 node_modules/
-extract-kamigotchi.js
 test-full-with-upload.js
-test-api-route.js
 
 # Environment variables
 .env
@@ -10,3 +8,13 @@ test-api-route.js
 
 # Logs
 extraction.log
+
+# Old jsons
+kamiImage.json
+kamiMetadata.json
+kamiRankings.json
+kamiStats.json
+kamiTraits.json
+
+# Website self-serve api
+api/data/

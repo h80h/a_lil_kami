@@ -7,17 +7,17 @@ const ALLOWED_FILES = new Set([
   'kamiBundle.json', // full bundle — the only file the browser now requests
   // Individual section filenames kept here so old/debug URLs get a clear error
   // rather than a generic 400. Remove if you never need them.
-  'kamiImage.json',
-  'kamiTraits.json',
-  'kamiStats.json',
-  'kamiRankings.json',
-  'kamiMetadata.json',
+  // 'kamiImage.json',
+  // 'kamiTraits.json',
+  // 'kamiStats.json',
+  // 'kamiRankings.json',
+  // 'kamiMetadata.json',
 ]);
 
 // Only the bundle is served — individual section requests get a clear message.
-const BUNDLE_ONLY_MESSAGE =
-  'Individual section files are no longer served separately. ' +
-  'Request kamiBundle.json instead.';
+// const BUNDLE_ONLY_MESSAGE =
+//   'Individual section files are no longer served separately. ' +
+//   'Request kamiBundle.json instead.';
 
 export default async function handler(req, res) {
   // CORS
@@ -41,12 +41,12 @@ export default async function handler(req, res) {
 
   // Only the bundle is proxied — section filenames are allowed in the set
   // so they return a helpful error rather than the generic 400 above.
-  if (filename !== 'kamiBundle.json') {
-    return res.status(410).json({
-      error: 'Gone',
-      message: BUNDLE_ONLY_MESSAGE,
-    });
-  }
+  // if (filename !== 'kamiBundle.json') {
+  //   return res.status(410).json({
+  //     error: 'Gone',
+  //     message: BUNDLE_ONLY_MESSAGE,
+  //   });
+  // }
 
   const r2PublicUrl = process.env.R2_PUBLIC_URL;
   if (!r2PublicUrl) {
@@ -64,7 +64,7 @@ export default async function handler(req, res) {
       if (r2Response.status === 404) {
         return res.status(404).json({
           error: 'Bundle not found',
-          message: 'kamiBundle.json has not been extracted yet. Check GitHub Actions or try again shortly.',
+          message: 'kamiBundle.json has not been extracted yet.',
         });
       }
       throw new Error(`R2 responded with ${r2Response.status} ${r2Response.statusText}`);
