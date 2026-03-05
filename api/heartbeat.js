@@ -11,21 +11,15 @@ export default async function handler(req, res) {
   const allowedOriginsStr = process.env.ALLOWED_ORIGINS || "https://kami.h80h.xyz";
   const allowedOrigins = allowedOriginsStr.split(',').map(o => o.trim());
 
-  // Set Dynamic CORS
-  if (allowedOrigins.includes(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-  } else {
-    res.setHeader('Access-Control-Allow-Origin', 'https://kami.h80h.xyz');
-  }
+  // Determine the safe origin to return
+  // If the requester is in our list, use their origin. Otherwise, use our main domain.
+  const safeOrigin = (origin && allowedOrigins.includes(origin)) ? origin : "https://kami.h80h.xyz";
 
+  res.setHeader('Access-Control-Allow-Origin', safeOrigin);
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Content-Type', 'application/json');
   res.setHeader('Vary', 'Origin');
-
-  // --- CACHING LAYER ---
-  // Cache for 60 seconds on the user's browser, 
-  // and 5 minutes on Vercel's Edge network.
-  res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=60');
+  res.setHeader('Cache-Control', 'public, s-maxage=1, stale-while-revalidate=9');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
 

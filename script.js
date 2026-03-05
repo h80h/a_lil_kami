@@ -124,7 +124,8 @@ async function updateLiveStatus() {
   lastRequestTime = now;
 
   try {
-    const response = await fetch('/api/heartbeat'); 
+    // ADDED: ?t= timestamp to kill the 304 cache freeze
+    const response = await fetch(`/api/heartbeat?t=${now}`); 
     if (!response.ok) throw new Error('Network error');
     
     const data = await response.json();
@@ -139,21 +140,19 @@ async function updateLiveStatus() {
       countElement.innerText = displayCount; 
       countElement.classList.add('visible');
 
-      // 2. CONSOLE TRUTH: Show the actual 0 if no one is online
-      const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      
-      // We'll use a gray dot for 0 and a green dot for > 0
-      const statusColor = rawCount > 0 ? "#22c55e" : "#666";
+      // 2. CONSOLE TRUTH
+      const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+      const statusColor = rawCount > 0 ? "#22c55e" : "#999"; // Green for active, Red/Gray for 0
       
       console.log(
         `%c● %cLive Status %c[%s]%c %c${rawCount} Online %c(UI: ${displayCount})`,
         `color: ${statusColor}; font-size: 14px;`, 
-        "color: #bbb; font-weight: bold;", 
+        "color: #bbb; ", 
         "color: #666; font-family: monospace;", 
         time,
         "color: #bbb;", 
-        `color: ${statusColor}; font-weight: bold;`,
-        "color: #555; font-size: 10px; font-style: italic;" // Small note about the UI fallback
+        `color: ${statusColor};`,
+        "color: #555; font-size: 10px; font-style: italic;" 
       );
     }
   } catch (err) {
