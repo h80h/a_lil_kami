@@ -2,8 +2,14 @@ name: Extract Kamigotchi Data
 
 on:
   schedule:
-    - cron: '0 0-22/2 * * *'
+    # This triggers the workflow every 5 minutes, every day
+    - cron: '*/5 * * * *'
   workflow_dispatch:
+
+# Logic A: Prevents multiple runs from interfering with each other
+concurrency:
+  group: extract-kamigotchi
+  cancel-in-progress: false
 
 jobs:
   extract-and-upload:
@@ -22,9 +28,24 @@ jobs:
       
       - name: Install dependencies
         run: npm ci
-      
-      - name: Install Playwright browser
+
+      # Logic B: Cache Playwright browsers to speed up 5-minute intervals
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
+      - name: Install Playwright Chromium & dependencies
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: npx playwright install --with-deps chromium
+
+      - name: Install Playwright system dependencies (if cache hit)
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
       
       - name: Run the extraction script
         id: extraction
@@ -71,4 +92,5 @@ jobs:
         with:
           name: extraction-logs-${{ github.run_number }}
           path: extraction.log
-          retention-days: 7
+          # Reduced to 1 day to prevent UI clutter at 5-min intervals
+          retention-days: 1
