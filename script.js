@@ -1022,7 +1022,7 @@ async function fetchAndSplitBundle(v) {
 
     if (bundle.kamiListed) {
         listedNFTs = new Set(bundle.kamiListed.map(String));
-        console.log(`🏷️ Loaded ${listedNFTs.size} Kamigotchi which is listed on KamiSwap`);
+        console.log(`🛍️ Loaded ${listedNFTs.size} Kamigotchi which is listed on KamiSwap`);
     } else {
         listedNFTs = new Set();
     }
@@ -1051,9 +1051,8 @@ async function loadData() {
 
         if (Object.keys(kamiStatsData).length > 0) {
             console.log(`✅ Loaded stats data for ${Object.keys(kamiStatsData).length} Kamigotchi`);
-        } else {
-            console.log('ℹ️  No kamiStats in bundle - stat sorting disabled');
         }
+
         if (metadataInfo.newKamiIds?.length > 0) {
             console.log(`✨ Found ${metadataInfo.newKamiIds.length} new Kamigotchi!`);
             console.log(`   New IDs: ${metadataInfo.newKamiIds.join(', ')}`);
@@ -1146,23 +1145,32 @@ async function refreshData() {
         const currentSort = currentSortOrder;
         const wasShowingClones = isShowingClonesOnly;
         
-        // Single bundle fetch + sacrifice data in parallel
+        const v = Date.now(); 
+        
         await Promise.all([
-            fetchAndSplitBundle(),
-            loadSacrificeData(),
+            fetchAndSplitBundle(v),
+            loadSacrificeData(v),   
         ]);
         
+        if (Object.keys(kamiStatsData).length > 0) {
+            console.log(`✅ Re-loaded stats data for ${Object.keys(kamiStatsData).length} Kamigotchi`);
+        }
+
+        if (metadataInfo.newKamiIds?.length > 0) {
+            console.log(`✨ Found ${metadataInfo.newKamiIds.length} new Kamigotchi!`);
+            console.log(`   New IDs: ${metadataInfo.newKamiIds.join(', ')}`);
+        } else {
+            console.log("💤 No new Kamigotchi")
+        }
+
         // NEW: Re-extract affinity data
         affinityData = extractAffinityData();
-        console.log(`✅ Re-extracted affinity data for ${Object.keys(affinityData).length} Kamigotchi`);
         
         // Rebuild trait signatures
         traitSignatures = buildTraitSignatures();
-        console.log(`🔍 Found ${traitSignatures.cloneIds.size} clones in ${Object.values(traitSignatures.groups).filter(g => g.length > 1).length} groups`);
 
         // Recalculate everything with OpenRarity
         traitCounts = calculateTraitCounts();
-        console.log('🔢 Recalculating OpenRarity scores...');
         nftRarityScores = calculateRarityScores();
         console.log('✅ OpenRarity recalculation complete!');
         
@@ -1209,8 +1217,6 @@ async function refreshData() {
         }
         
         updateURL(true); // Ensure final URL reflects current state
-        
-        console.log('✅ Data refreshed successfully!');
         
         // Show success feedback
         refreshBtn.innerHTML = `<svg id="refreshComplete" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><mask id="SVGkzXYXbbR"><g fill="none" stroke="#fff" stroke-dasharray="24" stroke-dashoffset="24" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M2 13.5l4 4l10.75 -10.75"><animate fill="freeze" attributeName="stroke-dashoffset" dur="0.4s" values="24;0"/></path><path stroke="#000" stroke-width="6" d="M7.5 13.5l4 4l10.75 -10.75"><animate fill="freeze" attributeName="stroke-dashoffset" begin="0.4s" dur="0.4s" values="24;0"/></path><path d="M7.5 13.5l4 4l10.75 -10.75"><animate fill="freeze" attributeName="stroke-dashoffset" begin="0.4s" dur="0.4s" values="24;0"/></path></g></mask><rect width="24" height="24" fill="currentColor" mask="url(#SVGkzXYXbbR)"/></svg>`;

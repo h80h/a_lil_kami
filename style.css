@@ -1199,6 +1199,16 @@ button {
   #searchInput {
     width: 130px;
   }
+
+  .sacrifice-badge {
+    right: unset;
+    left: 3px;
+  }
+
+  .listed-badge {
+    right: unset;
+    left: 3px;
+  }
 }
 
 @media (max-width: 326px) {
