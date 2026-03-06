@@ -1022,7 +1022,7 @@ async function fetchAndSplitBundle(v) {
 
     if (bundle.kamiListed) {
         listedNFTs = new Set(bundle.kamiListed.map(String));
-        console.log(`🏷️  Loaded ${listedNFTs.size} listed (for sale) Kamigotchi`);
+        console.log(`🏷️ Loaded ${listedNFTs.size} Kamigotchi which is listed on KamiSwap`);
     } else {
         listedNFTs = new Set();
     }
@@ -1759,7 +1759,7 @@ function displayNFT(id, showCloseButton = false) {
 
     // listed Badge HTML
     const listedBadgeHTML = isListed ?
-        `<div class="listed-badge" title="This Kamigotchi is listed on KamiSwap"><img id="kamiswap_icon" src="https://whisperclient.kamibots.xyz/assets/marketplace-BqMKbOFC.png" style="border: none"></div>` : '';
+        `<div class="listed-badge" title="This Kamigotchi is listed on KamiSwap"><img id="kamiswap_icon" src="https://app.kamigotchi.io/assets/marketplace-BqMKbOFC.png" style="border: none"></div>` : '';
     
     // Check if mobile view
     const isMobile = window.innerWidth <= 390;

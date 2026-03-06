@@ -1,10 +1,9 @@
 name: Extract Kamigotchi Data
 
 on:
-  schedule:
-    # This triggers the workflow every 1 hour, every day
-    - cron: '0 0-23/1 * * *'
-  workflow_dispatch:
+  repository_dispatch:
+    types: [ping_from_cronjob]  # This "type" must match the JSON body later
+  workflow_dispatch:            # Allows you to also trigger it manually for testing
 
 # Logic A: Prevents multiple runs from interfering with each other
 concurrency:
