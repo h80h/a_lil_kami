@@ -102,9 +102,9 @@ async function fetchPreviousMetadata() {
     const response = await r2Client.send(command);
     const body = await response.Body.transformToString();
     const bundle = JSON.parse(body);
-    return bundle.kamiMetadata || { previousMaxId: null, isFirstRun: true };
+    return bundle.kamiMetadata || { previousMaxId: null, isFirstRun: true, kamiNewWindow: {} };
   } catch (error) {
-    return { previousMaxId: null, isFirstRun: true };
+    return { previousMaxId: null, isFirstRun: true, kamiNewWindow: {} };
   }
 }
 
@@ -142,7 +142,7 @@ async function runExtraction() {
       if (!dataLoaded) await page.waitForTimeout(30000); 
     }
 
-    const { imageMap, traitsMap } = await page.evaluate(() => {
+    const { imageMap, traitsMap, listedSet } = await page.evaluate(() => {
       function extractDetailedTraits(kamiData) {
         const traitsToKeep = ["background", "body", "color", "face", "hand"];
         const detailedData = {};
@@ -170,8 +170,13 @@ async function runExtraction() {
       const all = network.explorer.kamis.all({traits: true, stats: true});
       const img = {};
       const trtRaw = {};
-      all.forEach(k => { img[k.index] = k.image; trtRaw[k.index] = k.traits; });
-      return { imageMap: img, traitsMap: extractDetailedTraits(trtRaw) };
+      const listed = new Set();
+      all.forEach(k => {
+        img[k.index] = k.image;
+        trtRaw[k.index] = k.traits;
+        if (k.state === 'LISTED') listed.add(k.index);
+      });
+      return { imageMap: img, traitsMap: extractDetailedTraits(trtRaw), listedSet: Array.from(listed) };
     });
     
     await browser.close();
@@ -199,15 +204,40 @@ async function runExtraction() {
     }
     // --- RESTORED DETECTION LOGIC END ---
 
+    // --- NEW-WINDOW LOGIC START ---
+    // Each newly discovered ID enters kamiNewWindow with 13 runs remaining (including this run).
+    // Every run decrements all counters. IDs reaching 0 are removed (~1 hour at 5-min intervals).
+    const NEW_WINDOW_RUNS = 13;
+    const prevWindow = previousMetadata.kamiNewWindow || {};
+
+    // Decrement existing entries, drop any that have expired
+    const updatedWindow = {};
+    for (const [id, remaining] of Object.entries(prevWindow)) {
+      const next = remaining - 1;
+      if (next > 0) updatedWindow[id] = next;
+    }
+
+    // Add brand-new IDs (skip on first run — everything would be "new" otherwise)
+    if (!isFirstRun) {
+      for (const id of newKamiIds) {
+        updatedWindow[id] = NEW_WINDOW_RUNS;
+      }
+    }
+
+    console.log(`⏱️  IDs in new-window: ${Object.keys(updatedWindow).length > 0 ? Object.keys(updatedWindow).join(', ') : 'none'}`);
+    // --- NEW-WINDOW LOGIC END ---
+
     const bundle = {
       kamiImage: imageMap,
       kamiTraits: traitsMap,
       kamiStats: kamiStats,
       kamiRankings: statRankings,
+      kamiListed: listedSet,
       kamiMetadata: {
         lastUpdate: new Date().toISOString(),
         previousMaxId: currentMaxId,
-        newKamiIds: newKamiIds.sort((a, b) => a - b),
+        newKamiIds: newKamiIds.sort((a, b) => a - b),   // IDs first seen THIS run
+        kamiNewWindow: updatedWindow,                     // Persistent countdown map { id: remainingRuns }
         totalCount: allIds.length,
         extractionDuration: Math.round((Date.now() - startTime) / 1000)
       }
@@ -216,7 +246,7 @@ async function runExtraction() {
     await uploadBundleToR2(bundle);
     
     console.log('\n' + '='.repeat(60));
-    console.log(`✅ COMPLETE: ${bundle.kamiMetadata.totalCount} items in ${bundle.kamiMetadata.extractionDuration}s`);
+    console.log(`✅ COMPLETE: ${bundle.kamiMetadata.totalCount} items | ${listedSet.length} listed | ${bundle.kamiMetadata.extractionDuration}s`);
     console.log('='.repeat(60));
     
   } catch (error) {

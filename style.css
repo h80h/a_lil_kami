@@ -694,6 +694,7 @@ button {
 
 .nft-card {
     position: relative;
+    overflow: hidden;
 }
 
 .trait-name-row {
@@ -862,11 +863,21 @@ button {
 .sacrifice-badge {
     position: absolute;
     bottom: 10px;    /* Gap from bottom of image */
-    left: 3px;      /* Gap from left of image */
+    right: 5px;      /* Gap from left of image */
     color: white;
     padding: 2px 2px;
     font-size: 20px;
     line-height: 1;
+    z-index: 5;
+}
+
+.listed-badge {
+    position: absolute;
+    bottom: 5px;
+    right: 5px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: flex-end;
     z-index: 5;
 }
 
@@ -877,7 +888,8 @@ button {
   gap: 8px;
 }
 
-.stat-icon {
+.stat-icon,
+#kamiswap_icon {
   width: 28px;
   height: 28px;
 }

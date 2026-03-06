@@ -173,6 +173,7 @@ let currentLoadIndex = 0;
 let traitCounts = {};
 let nftRarityScores = {};
 let sacrificedNFTs = new Set(); // NEW: Store IDs of sacrificed Kamigotchi
+let listedNFTs = new Set(); // Store IDs of LISTED (for sale) Kamigotchi
 
 let traitSignatures = {}; // Store trait signatures for clone detection
 
@@ -1019,6 +1020,14 @@ async function fetchAndSplitBundle(v) {
     }
     bundle.kamiMetadata = null;
 
+    if (bundle.kamiListed) {
+        listedNFTs = new Set(bundle.kamiListed.map(String));
+        console.log(`🏷️  Loaded ${listedNFTs.size} listed (for sale) Kamigotchi`);
+    } else {
+        listedNFTs = new Set();
+    }
+    bundle.kamiListed = null;
+
     // 4. Fully release the bundle for Garbage Collection
     bundle = null;
 }
@@ -1672,6 +1681,7 @@ function displayNFT(id, showCloseButton = false) {
     const isNew = metadataInfo.newKamiIds && metadataInfo.newKamiIds.includes(Number(id));
     const isClone = traitSignatures.cloneIds.has(id);
     const isSacrificed = sacrificedNFTs.has(String(id)); // NEW: Check sacrifice set
+    const isListed = listedNFTs.has(String(id)); // Check if listed for sale
     
     const card = document.createElement('div');
     card.className = 'nft-card hover_wrapper';
@@ -1746,6 +1756,10 @@ function displayNFT(id, showCloseButton = false) {
     // NEW: Sacrifice Badge HTML
     const sacrificeBadgeHTML = isSacrificed ?
         `<div class="sacrifice-badge" title="This Kamigotchi has been sacrificed">🕳️</div>` : '';
+
+    // listed Badge HTML
+    const listedBadgeHTML = isListed ?
+        `<div class="listed-badge" title="This Kamigotchi is listed on KamiSwap"><img id="kamiswap_icon" src="https://whisperclient.kamibots.xyz/assets/marketplace-BqMKbOFC.png" style="border: none"></div>` : '';
     
     // Check if mobile view
     const isMobile = window.innerWidth <= 390;
@@ -1771,12 +1785,14 @@ function displayNFT(id, showCloseButton = false) {
             <div class="image-container">
                 <img src="${imageUrl}" alt="NFT #${id}" loading="lazy" onerror="this.src='https://via.placeholder.com/250?text=Not+Found'">
                 ${sacrificeBadgeHTML}
+                ${listedBadgeHTML}
             </div>
             <div class="nft-details hover_wrapper">
                 <div class="nft-id">Kamigotchi ${id}</div>
                 ${traitsHTML}
                 ${statsHTML}
             </div>
+            
         </div>
         `;
     } else {
@@ -1795,11 +1811,13 @@ function displayNFT(id, showCloseButton = false) {
             <div class="image-container">
                 <img src="${imageUrl}" alt="NFT #${id}" loading="lazy" onerror="this.src='https://via.placeholder.com/250?text=Image+Not+Found'">
                 ${sacrificeBadgeHTML}
+                ${listedBadgeHTML}
             </div>
             <div class="nft-details hover_wrapper">
                 <div class="nft-id">Kamigotchi ${id}</div>
                 ${traitsHTML}
             </div>
+            
         </div>
         `;
     }
