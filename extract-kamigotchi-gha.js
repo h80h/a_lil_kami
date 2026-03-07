@@ -1,4 +1,4 @@
-// extract-kamigotchi-github.js
+// extract-kamigotchi-gha.js
 // FINAL MERGED VERSION: Detailed Logging + RESTORED Detection Logic + 1.2GB Streaming Upload
 
 const { chromium } = require('playwright');

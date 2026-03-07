@@ -128,7 +128,8 @@ button {
 .affinity-btn,
 #cloneFilterBtn,
 #affinityFilterToggle,
-#minmaxFilterToggle {
+#minmaxFilterToggle,
+#listingFilterBtn {
   width: 60px;
   height: 37px;
   color: white;
@@ -210,7 +211,8 @@ button {
 .affinity-btn,
 #cloneFilterBtn,
 #affinityFilterToggle,
-#minmaxFilterToggle {
+#minmaxFilterToggle,
+#listingFilterBtn {
   background: #93bbbf;
   box-shadow: 1px 5px 0 0 #516668;
   font-size: 9px;
@@ -220,7 +222,8 @@ button {
 .affinity-btn:hover,
 #cloneFilterBtn:hover,
 #affinityFilterToggle:hover,
-#minmaxFilterToggle:hover {
+#minmaxFilterToggle:hover,
+#listingFilterBtn:hover {
   box-shadow: 1px 3px 0 0 #516668;
 }
 
@@ -228,7 +231,8 @@ button {
 .affinity-btn.active,
 #cloneFilterBtn.active,
 #affinityFilterToggle.active,
-#minmaxFilterToggle.active {
+#minmaxFilterToggle.active,
+#listingFilterBtn.active {
   background: #55a9b0;
   box-shadow: 1px 3px 0 0 #34656a;
   text-shadow: #eeeeee 0 -1px 4px, rgb(42, 135, 166) 0 1px 1px;
@@ -268,7 +272,10 @@ button {
 #affinityFilterToggle.active:hover,
 #minmaxFilterToggle:hover,
 #minmaxFilterToggle.active,
-#minmaxFilterToggle.active:hover {
+#minmaxFilterToggle.active:hover,
+#listingFilterBtn:hover,
+#listingFilterBtn.active,
+#listingFilterBtn.active:hover {
   transform: translateY(2px);
 }
 
@@ -871,7 +878,7 @@ button {
     z-index: 5;
 }
 
-.listed-badge {
+.listing-badge {
     position: absolute;
     bottom: 5px;
     right: 5px;
@@ -1205,7 +1212,7 @@ button {
     left: 3px;
   }
 
-  .listed-badge {
+  .listing-badge {
     right: unset;
     left: 3px;
   }

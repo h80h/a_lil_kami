@@ -1,6 +1,7 @@
 .vercel
 node_modules/
-test-full-with-upload.js
+test-extract-kamigotchi-gha.js
+test-fetch-listings-gha.js
 
 # Environment variables
 .env

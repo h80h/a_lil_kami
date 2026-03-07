@@ -1,215 +1,223 @@
-// "Bot Armor" state - tracks the last time we talked to the database
+// ============================================================
+// BOT ARMOR — throttle duplicate requests to the database
+// ============================================================
 let lastRequestTime = 0;
 
-/* === UMAMI HONEST TRACKER START === */
-(function() {
-  try {
-    const config = {
-      id: 'd7d7ed00-7944-425f-8a8c-552bf9916cc0',
-      domains: 'kami.h80h.xyz',
-      host: 'https://kami.h80h.xyz/stats',
-      src: '/stats/script.js'
-    };
 
-    const tiers = { 
-      'just-checking': 2000, 
-      'interested': 10000, 
-      'engaged': 30000, 
-      'deep-dive': 120000,
-      'dedicated': 300000,
-      'long-engagement': 600000 
-    };
+// ============================================================
+// UMAMI ENGAGEMENT TRACKER
+// ============================================================
+(function () {
+    try {
+        const config = {
+            id: 'd7d7ed00-7944-425f-8a8c-552bf9916cc0',
+            domains: 'kami.h80h.xyz',
+            host: 'https://kami.h80h.xyz/stats',
+            src: '/stats/script.js',
+        };
 
-    if (window.location.hostname === 'localhost' || navigator.webdriver) return;
+        const tiers = {
+            'just-checking':    2000,
+            'interested':       10000,
+            'engaged':          30000,
+            'deep-dive':        120000,
+            'dedicated':        300000,
+            'long-engagement':  600000,
+        };
 
-    const el = document.createElement('script');
-    Object.assign(el, { src: config.src, defer: true });
-    el.setAttribute('data-website-id', config.id);
-    el.setAttribute('data-domains', config.domains);
-    el.setAttribute('data-host-url', config.host);
-    el.setAttribute('data-auto-track', 'false');
-    document.head.appendChild(el);
+        if (window.location.hostname === 'localhost' || navigator.webdriver) return;
 
-    // --- REFRESH-PROOF MEMORY ---
-    const getSessionVal = (key) => parseInt(sessionStorage.getItem(key) || '0');
-    const setSessionVal = (key, val) => sessionStorage.setItem(key, val.toString());
+        const el = document.createElement('script');
+        Object.assign(el, { src: config.src, defer: true });
+        el.setAttribute('data-website-id', config.id);
+        el.setAttribute('data-domains', config.domains);
+        el.setAttribute('data-host-url', config.host);
+        el.setAttribute('data-auto-track', 'false');
+        document.head.appendChild(el);
 
-    let engagementInterval, pageViewSent = false, lastEventTime = 0;
-    let totalActiveTime = getSessionVal('kami_active_ms');
-    let heartbeatCount = getSessionVal('kami_hb_count');
-    let lastInteractionTimestamp = 0; 
-    const MAX_HEARTBEATS = 5;
+        const getSessionVal = (key) => parseInt(sessionStorage.getItem(key) || '0');
+        const setSessionVal = (key, val) => sessionStorage.setItem(key, val.toString());
 
-    window.startHonestTracking = () => {
-      if (engagementInterval) return;
+        let engagementInterval;
+        let pageViewSent = false;
+        let lastEventTime = 0;
+        let totalActiveTime = getSessionVal('kami_active_ms');
+        let heartbeatCount = getSessionVal('kami_hb_count');
+        let lastInteractionTimestamp = 0;
+        const MAX_HEARTBEATS = 5;
 
-      let lastUrl = window.location.href;
-      const watchFilters = (force = false) => {
-        if ((window.location.href !== lastUrl || force) && window.umami && pageViewSent) {
-          lastUrl = window.location.href;
-          const params = new URLSearchParams(window.location.search);
-          const filterData = Object.fromEntries(params.entries());
-          
-          if (Object.keys(filterData).length > 0) {
-            umami.track('filter-applied', filterData);
-            lastInteractionTimestamp = Date.now(); 
-          }
-        }
-      };
-      
-      window.addEventListener('popstate', () => watchFilters());
-      const originalPush = history.pushState;
-      history.pushState = function() {
-        originalPush.apply(this, arguments);
-        watchFilters();
-      };
+        window.startHonestTracking = () => {
+            if (engagementInterval) return;
 
-      document.addEventListener('visibilitychange', () => {
-        if (window.umami && pageViewSent) {
-          if (document.visibilityState === 'visible') {
-            umami.track('tab-focus');
-          } else {
-            umami.track('app-hidden');
-          }
-        }
-      });
+            let lastUrl = window.location.href;
 
-      engagementInterval = setInterval(() => {
-        const now = Date.now();
-        const isGracePeriod = totalActiveTime < 600000;
-        const hasRecentInteraction = (now - lastInteractionTimestamp) < 300000;
-
-        if (document.visibilityState === 'visible' && (isGracePeriod || hasRecentInteraction)) {
-          totalActiveTime += 1000;
-          setSessionVal('kami_active_ms', totalActiveTime); // SAVE TO SESSION
-
-          for (let [name, ms] of Object.entries(tiers)) {
-            // Check if tier was already sent in this session via sessionStorage
-            const tierKey = 'kami_tier_' + name;
-            const alreadySent = sessionStorage.getItem(tierKey) === 'true';
-
-            if (totalActiveTime >= ms && !alreadySent) {
-              if (window.umami) {
-                if (!pageViewSent) { 
-                  umami.track(); 
-                  pageViewSent = true; 
-                  if (window.location.search) watchFilters(true); 
+            const watchFilters = (force = false) => {
+                if ((window.location.href !== lastUrl || force) && window.umami && pageViewSent) {
+                    lastUrl = window.location.href;
+                    const params = new URLSearchParams(window.location.search);
+                    const filterData = Object.fromEntries(params.entries());
+                    if (Object.keys(filterData).length > 0) {
+                        umami.track('filter-applied', filterData);
+                        lastInteractionTimestamp = Date.now();
+                    }
                 }
-                umami.track(name, { seconds: ms / 1000 });
-                sessionStorage.setItem(tierKey, 'true'); // MARK AS SENT
-                lastEventTime = totalActiveTime;
-              }
-            }
-          }
+            };
 
-          if (totalActiveTime >= 600000 && (totalActiveTime - lastEventTime >= 240000)) {
-            if (window.umami && heartbeatCount < MAX_HEARTBEATS && hasRecentInteraction) {
-              umami.track('heartbeat');
-              heartbeatCount++;
-              setSessionVal('kami_hb_count', heartbeatCount); // SAVE TO SESSION
-              lastEventTime = totalActiveTime;
-            }
-          }
-        }
-      }, 1000);
-    };
-  } catch (e) {}
+            window.addEventListener('popstate', () => watchFilters());
+            const originalPush = history.pushState;
+            history.pushState = function () {
+                originalPush.apply(this, arguments);
+                watchFilters();
+            };
+
+            document.addEventListener('visibilitychange', () => {
+                if (window.umami && pageViewSent) {
+                    umami.track(document.visibilityState === 'visible' ? 'tab-focus' : 'app-hidden');
+                }
+            });
+
+            engagementInterval = setInterval(() => {
+                const now = Date.now();
+                const isGracePeriod = totalActiveTime < 600000;
+                const hasRecentInteraction = (now - lastInteractionTimestamp) < 300000;
+
+                if (document.visibilityState === 'visible' && (isGracePeriod || hasRecentInteraction)) {
+                    totalActiveTime += 1000;
+                    setSessionVal('kami_active_ms', totalActiveTime);
+
+                    for (const [name, ms] of Object.entries(tiers)) {
+                        const tierKey = 'kami_tier_' + name;
+                        if (totalActiveTime >= ms && sessionStorage.getItem(tierKey) !== 'true') {
+                            if (window.umami) {
+                                if (!pageViewSent) {
+                                    umami.track();
+                                    pageViewSent = true;
+                                    if (window.location.search) watchFilters(true);
+                                }
+                                umami.track(name, { seconds: ms / 1000 });
+                                sessionStorage.setItem(tierKey, 'true');
+                                lastEventTime = totalActiveTime;
+                            }
+                        }
+                    }
+
+                    if (totalActiveTime >= 600000 && (totalActiveTime - lastEventTime >= 240000)) {
+                        if (window.umami && heartbeatCount < MAX_HEARTBEATS && hasRecentInteraction) {
+                            umami.track('heartbeat');
+                            heartbeatCount++;
+                            setSessionVal('kami_hb_count', heartbeatCount);
+                            lastEventTime = totalActiveTime;
+                        }
+                    }
+                }
+            }, 1000);
+        };
+    } catch (e) {}
 })();
-/* === UMAMI HONEST TRACKER END === */
 
-/* --- UI FUNCTIONS --- */
+
+// ============================================================
+// LIVE STATUS (online user counter)
+// ============================================================
 async function updateLiveStatus() {
-  const now = Date.now();
-  if (now - lastRequestTime < 10000) return; 
-  lastRequestTime = now;
+    const now = Date.now();
+    if (now - lastRequestTime < 10000) return;
+    lastRequestTime = now;
 
-  try {
-    // ADDED: ?t= timestamp to kill the 304 cache freeze
-    const response = await fetch(`/api/heartbeat?t=${now}`); 
-    if (!response.ok) throw new Error('Network error');
-    
-    const data = await response.json();
-    
-    // The Raw Truth for the console
-    const rawCount = data.count || 0; 
+    try {
+        const response = await fetch(`/api/heartbeat?t=${now}`);
+        if (!response.ok) throw new Error('Network error');
 
-    const countElement = document.getElementById('online-count');
-    if (countElement) {
-      // 1. UI FALLBACK: Show 1 if count is 0
-      const displayCount = rawCount > 0 ? rawCount : 1;
-      countElement.innerText = displayCount; 
-      countElement.classList.add('visible');
+        const data = await response.json();
+        const rawCount = data.count || 0;
+        const countElement = document.getElementById('online-count');
 
-      // 2. CONSOLE TRUTH
-      const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
-      const statusColor = rawCount > 0 ? "#22c55e" : "#999"; // Green for active, Red/Gray for 0
-      
-      console.log(
-        `%c● %cLive Status %c[%s]%c %c${rawCount} Online %c(UI: ${displayCount})`,
-        `color: ${statusColor}; font-size: 14px;`, 
-        "color: #bbb; ", 
-        "color: #666; font-family: monospace;", 
-        time,
-        "color: #bbb;", 
-        `color: ${statusColor};`,
-        "color: #555; font-size: 10px; font-style: italic;" 
-      );
+        if (countElement) {
+            const displayCount = rawCount > 0 ? rawCount : 1;
+            countElement.innerText = displayCount;
+            countElement.classList.add('visible');
+
+            const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+            const statusColor = rawCount > 0 ? '#22c55e' : '#999';
+            console.log(
+                `%c● %cLive Status %c[%s]%c %c${rawCount} Online %c(UI: ${displayCount})`,
+                `color: ${statusColor}; font-size: 14px;`,
+                'color: #bbb;',
+                'color: #666; font-family: monospace;',
+                time,
+                'color: #bbb;',
+                `color: ${statusColor};`,
+                'color: #555; font-size: 10px; font-style: italic;'
+            );
+        }
+    } catch (err) {
+        console.error('%c[!] Live Sync Interrupted.', 'color: #ef4444;');
     }
-  } catch (err) {
-    console.error('%c[!] Live Sync Interrupted.', "color: #ef4444;");
-  }
 }
 
-// Main Project
 
+// ============================================================
+// GLOBAL STATE
+// ============================================================
+
+// Data stores
 let imagesData = {};
 let traitsData = {};
 let kamiStatsData = {};
-let affinityData = {}; // NEW: Store body and hand affinity for each NFT
-let selectedIDs = new Set();
-let allNFTIds = [];
-let filteredNFTIds = [];
-let currentLoadIndex = 0;
+let affinityData = {};
+let metadataInfo = {};
+let sacrificedNFTs = new Set();
+let listingNFTs = new Map();
+
+// Derived lookup structures
+let traitSignatures = {};
+let traitAffinityLookup = {}; // { body: { TraitName: affinity }, hand: { ... } } — O(1) affinity lookups
 let traitCounts = {};
 let nftRarityScores = {};
-let sacrificedNFTs = new Set(); // NEW: Store IDs of sacrificed Kamigotchi
-let listedNFTs = new Set(); // Store IDs of LISTED (for sale) Kamigotchi
 
-let traitSignatures = {}; // Store trait signatures for clone detection
-
-// Stat min/max filter state: { statName: { value, isMax } }
-// isMax=false means ">= value" (min mode), isMax=true means "<= value" (MAX mode)
-let statMinMaxFilters = {
-    health:   { value: 50,  isMax: false },
-    power:    { value: 10,  isMax: false },
-    violence: { value: 10,  isMax: false },
-    harmony:  { value: 10,  isMax: false },
-    slots:    { value: 0,   isMax: false }
-};
-
-let currentSortOrder = 'latest'; // Default sort
+// Display state
+let allNFTIds = [];
+let filteredNFTIds = [];
+let selectedIDs = new Set();
+let currentLoadIndex = 0;
+let currentSortOrder = 'latest';
 let isFiltering = false;
+let isLoading = false;
+let isRefreshing = false;
+let nftObserver = null;
 
-let isShowingClonesOnly = false; // New flag for clone filter
-
-// NEW: Track selected affinity filters
+// Filter state
+let isShowingClonesOnly = false;
+let isShowingListingOnly = false;
 let selectedBodyAffinities = new Set();
 let selectedHandAffinities = new Set();
 
-let nftObserver = null;
+// Stat min/max filter state — isMax=false means ">= value", isMax=true means "<= value"
+let statMinMaxFilters = {
+    health:   { value: 50, isMax: false },
+    power:    { value: 10, isMax: false },
+    violence: { value: 10, isMax: false },
+    harmony:  { value: 10, isMax: false },
+    slots:    { value: 0,  isMax: false },
+};
+
 const INITIAL_LOAD_COUNT = 50;
 const LAZY_LOAD_COUNT = 30;
-let isLoading = false;
-let metadataInfo = {};
-let isRefreshing = false;
 
-// --- URL SYNCHRONIZATION FUNCTIONS ---
+// Cache isMobile to avoid per-card layout reflow from window.innerWidth
+let isMobile = window.innerWidth <= 390;
+window.addEventListener('resize', () => { isMobile = window.innerWidth <= 390; }, { passive: true });
 
-// MODIFIED: Exclude traits from the URL if they are already represented by an active Affinity
+
+// ============================================================
+// URL SYNCHRONIZATION
+// ============================================================
+
+// Serialize trait checkboxes to URL string, skipping traits already covered by an active affinity
 function getTraitStringFromState() {
     const checkboxes = document.querySelectorAll('.trait-checkbox:checked');
     const selected = {};
-    
+
     checkboxes.forEach(checkbox => {
         const type = checkbox.dataset.traitType;
         const value = checkbox.dataset.traitValue;
@@ -232,15 +240,10 @@ function getTraitStringFromState() {
     return Object.entries(selected).map(([type, values]) => `${type}:${values.join(',')}`).join(';');
 }
 
-// NEW: Get affinity filter state as URL string
 function getAffinityStringFromState() {
     const parts = [];
-    if (selectedBodyAffinities.size > 0) {
-        parts.push(`body:${Array.from(selectedBodyAffinities).join(',')}`);
-    }
-    if (selectedHandAffinities.size > 0) {
-        parts.push(`hand:${Array.from(selectedHandAffinities).join(',')}`);
-    }
+    if (selectedBodyAffinities.size > 0) parts.push(`body:${Array.from(selectedBodyAffinities).join(',')}`);
+    if (selectedHandAffinities.size > 0) parts.push(`hand:${Array.from(selectedHandAffinities).join(',')}`);
     return parts.join(';');
 }
 
@@ -254,115 +257,80 @@ function getMinMaxStringFromState() {
     return parts.join(';');
 }
 
-// Updates the browser URL based on the current app state
 function updateURL(replace = false) {
     const params = new URLSearchParams();
 
-    // 1. Sort Order
-    if (currentSortOrder && currentSortOrder !== 'latest') {
-        params.set('sort', currentSortOrder);
-    }
+    if (currentSortOrder && currentSortOrder !== 'latest') params.set('sort', currentSortOrder);
 
-    // 2. Trait Filters
     const traitString = getTraitStringFromState();
-    if (traitString) {
-        params.set('traits', traitString);
-    }
+    if (traitString) params.set('traits', traitString);
 
-    // 3. Selected IDs (for comparison area)
     const idArray = Array.from(selectedIDs).sort((a, b) => Number(a) - Number(b));
-    if (idArray.length > 0) {
-        params.set('ids', idArray.join(','));
-    }
+    if (idArray.length > 0) params.set('ids', idArray.join(','));
 
-    // 4. Clone Filter
-    if (isShowingClonesOnly) {
-        params.set('clones', 'true');
-    }
+    if (isShowingClonesOnly) params.set('clones', 'true');
+    if (isShowingListingOnly) params.set('listing', 'true');
 
-    // 5. NEW: Affinity Filters
     const affinityString = getAffinityStringFromState();
-    if (affinityString) {
-        params.set('affinity', affinityString);
-    }
+    if (affinityString) params.set('affinity', affinityString);
 
-    // 6. Min/Max Stat Filters
     const minMaxString = getMinMaxStringFromState();
-    if (minMaxString) {
-        params.set('minmax', minMaxString);
-    }
+    if (minMaxString) params.set('minmax', minMaxString);
 
     const queryString = params.toString();
-    let newUrl;
+    const newUrl = queryString
+        ? `${window.location.pathname}?${queryString}${window.location.hash}`
+        : `${window.location.pathname}${window.location.hash}`;
 
-    // Check if the query string is empty to prevent trailing '?'
-    if (queryString) {
-        newUrl = `${window.location.pathname}?${queryString}${window.location.hash}`;
-    } else {
-        newUrl = `${window.location.pathname}${window.location.hash}`;
-    }
-    
     if (replace) {
-        history.replaceState(null, '', newUrl); // Use replaceState on initial load
+        history.replaceState(null, '', newUrl);
     } else {
-        history.pushState(null, '', newUrl); // Use pushState on user action
+        history.pushState(null, '', newUrl);
     }
 }
 
-// Loads state from the URL and applies it (checks checkboxes, sets sort, populates IDs)
 function loadStateFromURL() {
     const params = new URLSearchParams(window.location.search);
+    let hasFilters = false;
 
-    // 1. Load Sort Order
+    // Sort order
     const urlSort = params.get('sort');
-    if (urlSort) {
-        currentSortOrder = urlSort;
-    }
+    if (urlSort) currentSortOrder = urlSort;
 
-    // 2. Load Selected IDs
+    // Selected IDs
     const urlIDs = params.get('ids');
     if (urlIDs) {
-        const ids = urlIDs.split(',').map(id => id.trim()).filter(id => id);
-        selectedIDs = new Set(ids);
+        selectedIDs = new Set(urlIDs.split(',').map(id => id.trim()).filter(Boolean));
     }
-    
-    // 3. Load Clone Filter
-    const urlClones = params.get('clones');
-    isShowingClonesOnly = (urlClones === 'true');
 
-    // 4. Load Trait Filters
-    let hasFilters = false;
+    // Clone / listing flags
+    isShowingClonesOnly = params.get('clones') === 'true';
+    isShowingListingOnly = params.get('listing') === 'true';
+
+    // Trait filters
     const urlTraits = params.get('traits');
     if (urlTraits) {
-        const traitGroups = urlTraits.split(';');
-        traitGroups.forEach(group => {
+        urlTraits.split(';').forEach(group => {
             const [type, valuesString] = group.split(':');
             if (type && valuesString) {
-                const values = valuesString.split(',').map(v => decodeURIComponent(v));
-                values.forEach(value => {
+                valuesString.split(',').map(v => decodeURIComponent(v)).forEach(value => {
                     const checkbox = document.querySelector(`.trait-checkbox[data-trait-type="${type}"][data-trait-value="${value}"]`);
-                    if (checkbox) {
-                        checkbox.checked = true;
-                        hasFilters = true;
-                    }
+                    if (checkbox) { checkbox.checked = true; hasFilters = true; }
                 });
             }
         });
     }
-    
-    // 5. MODIFIED: Load Affinity and sync trait checkboxes
+
+    // Affinity filters
     const urlAffinity = params.get('affinity');
     if (urlAffinity) {
-        const affinityGroups = urlAffinity.split(';');
-        affinityGroups.forEach(group => {
+        urlAffinity.split(';').forEach(group => {
             const [type, valuesString] = group.split(':');
             if (type && valuesString) {
-                const values = valuesString.split(',');
-                values.forEach(affinityValue => {
+                valuesString.split(',').forEach(affinityValue => {
                     if (type === 'body') selectedBodyAffinities.add(affinityValue);
                     else if (type === 'hand') selectedHandAffinities.add(affinityValue);
 
-                    // Sync checkboxes: Check every trait belonging to this affinity
                     Object.values(traitsData).forEach(nft => {
                         const trait = nft[type];
                         if (trait && typeof trait === 'object' && trait.affinity === affinityValue) {
@@ -375,7 +343,6 @@ function loadStateFromURL() {
             }
         });
 
-        // Set Expected Mode: Show section and activate buttons
         const affinitySection = document.querySelector('.affinity-filter-section');
         const toggleBtn = document.getElementById('affinityFilterToggle');
         if (affinitySection && toggleBtn) {
@@ -384,8 +351,8 @@ function loadStateFromURL() {
         }
         updateAffinityButtonStates();
     }
-    
-    // 6. Load Min/Max Stat Filters
+
+    // Stat min/max filters
     const urlMinMax = params.get('minmax');
     if (urlMinMax) {
         urlMinMax.split(';').forEach(part => {
@@ -395,7 +362,6 @@ function loadStateFromURL() {
                 statMinMaxFilters[statName].value = Number(value);
                 statMinMaxFilters[statName].isMax = isMax;
 
-                // Sync slider
                 const slider = document.querySelector(`.stat-control.${statName} .stat-control-input`);
                 const valueDisplay = document.querySelector(`.stat-control.${statName} .stat-control-input-value`);
                 const toggleInput = document.querySelector(`.stat-control.${statName} .toggle-input`);
@@ -405,7 +371,6 @@ function loadStateFromURL() {
             }
         });
 
-        // Show the section and activate the toggle button
         const minmaxSection = document.querySelector('.minmax-filter-section');
         const toggleBtn = document.getElementById('minmaxFilterToggle');
         if (minmaxSection && toggleBtn) {
@@ -418,43 +383,31 @@ function loadStateFromURL() {
     return hasFilters;
 }
 
-// Handles browser back/forward button clicks
 function handlePopState() {
-    // 1. Sync state from URL
     const hasFilters = loadStateFromURL();
 
-    // 2. Sync UI Elements
-    updateSelectedIDsDisplay(); 
+    updateSelectedIDsDisplay();
     document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
     const sortButton = document.querySelector(`.sort-btn[data-sort="${currentSortOrder}"]`);
     if (sortButton) sortButton.classList.add('active');
 
     const cloneBtn = document.getElementById('cloneFilterBtn');
-    if (cloneBtn) {
-        isShowingClonesOnly ? cloneBtn.classList.add('active') : cloneBtn.classList.remove('active');
-    }
+    if (cloneBtn) cloneBtn.classList.toggle('active', isShowingClonesOnly);
 
-    // 3. Re-render
-    if (isShowingClonesOnly) {
-        filterClones(); // This now uses the centralized logic
-    } else if (hasFilters) {
-        filterByTraits(); // This now uses the centralized logic
-    } else {
-        isFiltering = false;
-        allNFTIds = getSortedNFTIds();
-        loadInitialNFTs();
-    }
+    const listingBtn = document.getElementById('listingFilterBtn');
+    if (listingBtn) listingBtn.classList.toggle('active', isShowingListingOnly);
+
+    if (isShowingClonesOnly) filterClones();
+    else if (isShowingListingOnly) filterListing();
+    else if (hasFilters) filterByTraits();
+    else { isFiltering = false; allNFTIds = getSortedNFTIds(); loadInitialNFTs(); }
 }
 
-// --- END URL SYNCHRONIZATION FUNCTIONS ---
 
+// ============================================================
+// LOADER / CONTAINER DISPLAY
+// ============================================================
 
-// Cache-busting timestamp generator
-function getCacheBuster() {
-    return new Date().getTime();
-}
-
-// Smooth loader display
 function showLoader() {
     const loader = document.querySelector('.loader');
     loader.style.display = 'block';
@@ -464,20 +417,17 @@ function showLoader() {
 function hideLoader() {
     const loader = document.querySelector('.loader');
     loader.style.opacity = '0';
-    
-    // Start tracking
+
     if (typeof window.startHonestTracking === 'function') {
         window.startHonestTracking();
     }
 
-    // NEW: Trigger the Live Counter exactly when the loader fades!
-    // We use a tiny 300ms delay to match the loader's fade-out time
+    // Delay matches the loader's CSS fade-out duration
     setTimeout(() => {
         updateLiveStatus();
         loader.style.display = 'none';
     }, 300);
 
-    // Keep the interval separate so it keeps running every minute
     if (!window.liveStatusInterval) {
         window.liveStatusInterval = setInterval(updateLiveStatus, 60000);
     }
@@ -486,450 +436,767 @@ function hideLoader() {
 function showContainer() {
     const container = document.querySelector('.container');
     container.style.display = 'block';
-    setTimeout(() => {
-        container.style.opacity = '1';
-    }, 50);
+    setTimeout(() => { container.style.opacity = '1'; }, 50);
 }
 
-// Helper function to get trait name from data (handles both old and new format)
+
+// ============================================================
+// DATA HELPERS
+// ============================================================
+
+// Handles both legacy string format and new object format for trait data
 function getTraitName(traitData) {
     return typeof traitData === 'string' ? traitData : traitData.name;
 }
 
-// Create a unique signature for an NFT based on its traits
+// Builds a deterministic signature string from an NFT's traits (used for clone detection)
 function createTraitSignature(traits) {
-    // Sort trait categories alphabetically for consistent signatures
-    const sortedCategories = Object.keys(traits).sort();
-    
-    // Create a string signature: "category1:value1|category2:value2|..."
-    const signature = sortedCategories
+    return Object.keys(traits).sort()
         .map(category => `${category}:${getTraitName(traits[category])}`)
         .join('|');
-    
-    return signature;
 }
 
-// Build trait signatures for all NFTs and identify clones
 function buildTraitSignatures() {
     const signatures = {};
-    const signatureGroups = {}; // Group IDs by signature
-    
+    const groups = {};
+
     Object.entries(traitsData).forEach(([id, traits]) => {
-        const signature = createTraitSignature(traits);
-        signatures[id] = signature;
-        
-        if (!signatureGroups[signature]) {
-            signatureGroups[signature] = [];
-        }
-        signatureGroups[signature].push(id);
+        const sig = createTraitSignature(traits);
+        signatures[id] = sig;
+        if (!groups[sig]) groups[sig] = [];
+        groups[sig].push(id);
     });
-    
-    // Store clone information
-    const cloneInfo = {
-        signatures: signatures,
-        groups: signatureGroups,
-        cloneIds: new Set() // IDs that are clones (have duplicates)
-    };
-    
-    // Identify which IDs are clones (signatures that appear more than once)
-    Object.entries(signatureGroups).forEach(([signature, ids]) => {
-        if (ids.length > 1) {
-            ids.forEach(id => cloneInfo.cloneIds.add(id));
-        }
+
+    const cloneIds = new Set();
+    Object.values(groups).forEach(ids => {
+        if (ids.length > 1) ids.forEach(id => cloneIds.add(id));
     });
-    
-    return cloneInfo;
+
+    return { signatures, groups, cloneIds };
 }
 
-// Calculate trait occurrence counts
 function calculateTraitCounts() {
     const counts = {};
-    
     Object.values(traitsData).forEach(nft => {
         Object.entries(nft).forEach(([category, traitData]) => {
             const traitName = getTraitName(traitData);
-            
-            if (!counts[category]) {
-                counts[category] = {};
-            }
-            if (!counts[category][traitName]) {
-                counts[category][traitName] = 0;
-            }
-            counts[category][traitName]++;
+            if (!counts[category]) counts[category] = {};
+            counts[category][traitName] = (counts[category][traitName] || 0) + 1;
         });
     });
-    
     return counts;
 }
 
-// OpenRarity implementation
+// OpenRarity — normalized information content scoring
 function calculateRarityScores() {
     const totalNFTs = Object.keys(traitsData).length;
     const scores = {};
-    
-    // Step 1: Calculate Information Content (IC) for each trait
-    // IC = -log(probability) where probability = trait_count / total_nfts
+
+    // Step 1: Information Content per trait — IC = -log(probability)
     const traitIC = {};
     Object.entries(traitCounts).forEach(([category, traits]) => {
         traitIC[category] = {};
         Object.entries(traits).forEach(([traitName, count]) => {
-            const probability = count / totalNFTs;
-            // Information Content: higher IC = rarer trait
-            traitIC[category][traitName] = -Math.log(probability);
+            traitIC[category][traitName] = -Math.log(count / totalNFTs);
         });
     });
-    
-    // Step 2: Calculate max IC per trait category for normalization
+
+    // Step 2: Max IC per category (for normalization)
     const maxICPerCategory = {};
     Object.entries(traitIC).forEach(([category, traits]) => {
         maxICPerCategory[category] = Math.max(...Object.values(traits));
     });
-    
-    // Step 3: Calculate normalized rarity score for each NFT
+
+    // Step 3: Normalized score per NFT (average across all trait categories)
     Object.entries(traitsData).forEach(([id, traits]) => {
         let normalizedScore = 0;
-        
         Object.entries(traits).forEach(([category, traitData]) => {
             const traitName = getTraitName(traitData);
-            const ic = traitIC[category][traitName];
-            const maxIC = maxICPerCategory[category];
-            
-            // Normalize IC by dividing by max IC in category
-            // This ensures each trait category contributes equally
-            const normalizedIC = ic / maxIC;
-            normalizedScore += normalizedIC;
+            normalizedScore += traitIC[category][traitName] / maxICPerCategory[category];
         });
-        
-        // Average across all trait categories for final score
-        const numTraitCategories = Object.keys(traits).length;
-        scores[id] = normalizedScore / numTraitCategories;
+        scores[id] = normalizedScore / Object.keys(traits).length;
     });
-    
-    // Step 4: Rank NFTs by score (higher score = rarer)
-    const sortedByScore = Object.entries(scores)
-        .sort((a, b) => b[1] - a[1]);
-    
+
+    // Step 4: Rank by score (higher = rarer), detect ties
+    const sortedByScore = Object.entries(scores).sort((a, b) => b[1] - a[1]);
     const rankedScores = {};
     let currentRank = 1;
     let previousScore = null;
     let tieCount = 0;
 
     sortedByScore.forEach(([id, score], index) => {
-        // If score is different from previous, update rank
         if (previousScore !== null && score !== previousScore) {
             currentRank = index + 1;
             tieCount = 0;
         } else if (previousScore === score) {
             tieCount++;
         }
-        
         rankedScores[id] = {
-            score: score,
+            score,
             rank: currentRank,
-            isTied: tieCount > 0 || (index < sortedByScore.length - 1 && sortedByScore[index + 1][1] === score)
+            isTied: tieCount > 0 || (index < sortedByScore.length - 1 && sortedByScore[index + 1][1] === score),
         };
-        
         previousScore = score;
     });
-    
+
     return rankedScores;
 }
 
-// NEW: Extract affinity data from traits
+// Builds a flat lookup map for O(1) trait → affinity resolution
+// Replaces the expensive Object.values(traitsData).find() pattern in hot paths
+function buildTraitAffinityLookup() {
+    const lookup = { body: {}, hand: {} };
+    Object.values(traitsData).forEach(nft => {
+        ['body', 'hand'].forEach(type => {
+            const trait = nft[type];
+            if (trait && typeof trait === 'object' && trait.name && trait.affinity) {
+                lookup[type][trait.name] = trait.affinity;
+            }
+        });
+    });
+    return lookup;
+}
+
 function extractAffinityData() {
     const affinities = {};
-    
     Object.entries(traitsData).forEach(([id, traits]) => {
         affinities[id] = {
-            body: 'NORMAL', // default
-            hand: 'NORMAL'  // default
+            body: (traits.body && typeof traits.body === 'object' && traits.body.affinity) ? traits.body.affinity : 'NORMAL',
+            hand: (traits.hand && typeof traits.hand === 'object' && traits.hand.affinity) ? traits.hand.affinity : 'NORMAL',
         };
-        
-        // Extract body affinity
-        if (traits.body && typeof traits.body === 'object' && traits.body.affinity) {
-            affinities[id].body = traits.body.affinity;
-        }
-        
-        // Extract hand affinity
-        if (traits.hand && typeof traits.hand === 'object' && traits.hand.affinity) {
-            affinities[id].hand = traits.hand.affinity;
-        }
     });
-    
     return affinities;
 }
 
-// Get sorted NFT IDs based on current sort order (with stats support)
-// ALWAYS keeps clone groups together
+
+// ============================================================
+// SORTING
+// ============================================================
+
+// Returns sorted NFT IDs respecting current sort order; always keeps clone groups adjacent
 function getSortedNFTIds(idsToSort) {
     const ids = idsToSort || Object.keys(traitsData);
-    
-    // Helper function to get stat value
-    const getStatValue = (id, sortOrder) => {
-        switch(sortOrder) {
-            case 'rarity':
-                return nftRarityScores[id]?.rank || 9999;
-            case 'harmony':
-                return kamiStatsData[id]?.stats.harmony || 0;
-            case 'health':
-                return kamiStatsData[id]?.stats.health || 0;
-            case 'power':
-                return kamiStatsData[id]?.stats.power || 0;
-            case 'violence':
-                return kamiStatsData[id]?.stats.violence || 0;
-            default:
-                return 0;
+
+    const getStatValue = (id) => {
+        switch (currentSortOrder) {
+            case 'rarity':   return nftRarityScores[id]?.rank || 9999;
+            case 'harmony':  return kamiStatsData[id]?.stats.harmony || 0;
+            case 'health':   return kamiStatsData[id]?.stats.health || 0;
+            case 'power':    return kamiStatsData[id]?.stats.power || 0;
+            case 'violence': return kamiStatsData[id]?.stats.violence || 0;
+            default:         return 0;
         }
     };
-    
-    // 1. CHRONOLOGICAL SORTING (Latest/Oldest)
+
+    // Chronological sort
     if (currentSortOrder === 'latest' || currentSortOrder === 'oldest') {
         if (isShowingClonesOnly) {
-            // Group clones together based on a representative member
-            const signatureToRepId = {};
+            // Group clones by their representative (highest/lowest) ID
+            const repId = {};
             ids.forEach(id => {
                 const sig = traitSignatures.signatures[id];
-                const numId = Number(id);
-                if (!signatureToRepId[sig]) {
-                    signatureToRepId[sig] = numId;
+                const num = Number(id);
+                if (!repId[sig]) {
+                    repId[sig] = num;
                 } else {
-                    if (currentSortOrder === 'latest') {
-                        signatureToRepId[sig] = Math.max(signatureToRepId[sig], numId);
-                    } else {
-                        signatureToRepId[sig] = Math.min(signatureToRepId[sig], numId);
-                    }
+                    repId[sig] = currentSortOrder === 'latest'
+                        ? Math.max(repId[sig], num)
+                        : Math.min(repId[sig], num);
                 }
             });
-            
             return ids.sort((a, b) => {
                 const sigA = traitSignatures.signatures[a];
                 const sigB = traitSignatures.signatures[b];
                 if (sigA !== sigB) {
-                    const repA = signatureToRepId[sigA];
-                    const repB = signatureToRepId[sigB];
-                    return currentSortOrder === 'latest' ? repB - repA : repA - repB;
+                    return currentSortOrder === 'latest' ? repId[sigB] - repId[sigA] : repId[sigA] - repId[sigB];
                 }
-                // Within a clone group, always sort by ID
-                return currentSortOrder === 'latest' ? Number(b) - Number(a) : Number(a) - Number(b);
-            });
-        } else {
-            // Standard individual sorting (No grouping)
-            return ids.sort((a, b) => {
                 return currentSortOrder === 'latest' ? Number(b) - Number(a) : Number(a) - Number(b);
             });
         }
+        return ids.sort((a, b) =>
+            currentSortOrder === 'latest' ? Number(b) - Number(a) : Number(a) - Number(b)
+        );
     }
-    
-    // 2. STAT/RARITY SORTING (Always groups clones)
+
+    // Stat / rarity sort — always groups clones, uses latest ID as tiebreaker
     return ids.sort((a, b) => {
         const sigA = traitSignatures.signatures[a];
         const sigB = traitSignatures.signatures[b];
-        
-        // Step A: If they belong to different clone groups
+
         if (sigA !== sigB) {
-            const statA = getStatValue(a, currentSortOrder);
-            const statB = getStatValue(b, currentSortOrder);
-            
-            // If the stats are different, sort by stat
+            const statA = getStatValue(a);
+            const statB = getStatValue(b);
             if (statA !== statB) {
-                if (currentSortOrder === 'rarity') return statA - statB;
-                return statB - statA;
+                return currentSortOrder === 'rarity' ? statA - statB : statB - statA;
             }
-            
-            // IF STATS ARE EQUAL: Tiebreaker is the LATEST ID in each group
-            // This ensures groups with the same Harmony/Health etc. are listed newest first
             const repA = Math.max(...traitSignatures.groups[sigA].map(Number));
             const repB = Math.max(...traitSignatures.groups[sigB].map(Number));
-            return repB - repA; 
+            return repB - repA;
         }
-        
-        // Step B: If they are in the same clone group
-        // Always list the newest ID of that specific group first
+
         return Number(b) - Number(a);
     });
 }
 
-// Setup sort button event listeners
-function setupSortButtons() {
-    const sortButtons = document.querySelectorAll('.sort-btn');
-    
-    sortButtons.forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const newSort = e.target.dataset.sort;
-            
-            // Check if we are clearing the sort back to default
-            if (newSort === 'latest' && currentSortOrder === 'latest') {
-                 // Do nothing if already on default and trying to set default
-                 return;
-            } else if (newSort !== currentSortOrder) {
-                currentSortOrder = newSort;
-                
-                sortButtons.forEach(b => b.classList.remove('active'));
-                e.target.classList.add('active');
-                
-                // FIXED: Re-apply the active filter state after sort change
-                if (isShowingClonesOnly) {
-                    preserveScroll(() => filterClones()); // Re-sort and display clones
-                } else if (isFiltering) {
-                    preserveScroll(() => filterByTraits()); // Re-apply trait filters with new sort
-                } else {
-                    // Just re-sort all NFTs
-                    preserveScroll(() => {
-                        allNFTIds = getSortedNFTIds();
-                        loadInitialNFTs();
-                    });
-                }
-                
-                // Update selected cards display to match new sort order
-                if (selectedIDs.size > 0) {
-                    updateSelectedIDsDisplay();
-                }
-                
-                updateURL(); // Update URL after all changes
+
+// ============================================================
+// FILTER HELPERS
+// ============================================================
+
+function isStatFilterDefault(statName) {
+    const f = statMinMaxFilters[statName];
+    const slider = document.querySelector(`.stat-control.${statName} .stat-control-input`);
+    if (!slider) return true;
+    return f.isMax ? f.value >= Number(slider.max) : f.value <= Number(slider.min);
+}
+
+function hasActiveStatFilters() {
+    return Object.keys(statMinMaxFilters).some(s => !isStatFilterDefault(s));
+}
+
+function passesStatMinMaxFilters(id) {
+    const kamiData = kamiStatsData[id];
+    for (const [statName, filter] of Object.entries(statMinMaxFilters)) {
+        if (isStatFilterDefault(statName)) continue;
+        const statVal = kamiData ? (kamiData.stats?.[statName] ?? 0) : 0;
+        if (filter.isMax ? statVal > filter.value : statVal < filter.value) return false;
+    }
+    return true;
+}
+
+// Helper used in filterClones and filterByTraits to build the affinity short-code string "(N/I)" etc.
+const AFFINITY_MAP = { NORMAL: 'N', INSECT: 'I', SCRAP: 'S', EERIE: 'E' };
+
+function getAffinityNotation() {
+    if (selectedBodyAffinities.size === 0 && selectedHandAffinities.size === 0) return '';
+    const bChar = AFFINITY_MAP[Array.from(selectedBodyAffinities)[0]] || '';
+    const hChar = AFFINITY_MAP[Array.from(selectedHandAffinities)[0]] || '';
+    return ` (${bChar}/${hChar})`;
+}
+
+// Builds the removable filter-tag buttons HTML from a map of { traitType: [values] }
+function buildTraitSummaryButtonsHTML(selectedTraits) {
+    return Object.entries(selectedTraits).flatMap(([type, values]) =>
+        values.map(value => `
+            <button class="count-header-trait-btn" data-trait-type="${type}" data-trait-value="${value}"
+                    title="Click to remove filter: ${type}: ${value}">
+                ${type}: ${value} ×
+            </button>`)
+    ).join('');
+}
+
+// Collects currently checked trait checkboxes into a { traitType: [values] } map
+function getSelectedTraitsFromCheckboxes() {
+    const selectedTraits = {};
+    document.querySelectorAll('.trait-checkbox:checked').forEach(checkbox => {
+        const type = checkbox.dataset.traitType;
+        const value = checkbox.dataset.traitValue;
+        if (!selectedTraits[type]) selectedTraits[type] = [];
+        selectedTraits[type].push(value);
+    });
+    return selectedTraits;
+}
+
+function buildStatFilterSummaryHTML() {
+    let html = '';
+    Object.entries(statMinMaxFilters).forEach(([statName, filter]) => {
+        if (isStatFilterDefault(statName)) return;
+        const op = filter.isMax ? '&lt;=' : '&gt;=';
+        html += `<button class="count-header-trait-btn stat-filter-summary-btn" data-stat-name="${statName}">
+                    ${statName} ${op} ${filter.value} ×
+                 </button>`;
+    });
+    return html
+        ? `<div class="filter-summary-buttons-container" style="display:flex;flex-wrap:wrap;gap:5px;margin:10px;">${html}</div>`
+        : '';
+}
+
+function attachStatFilterSummaryListeners(container) {
+    container.querySelectorAll('.stat-filter-summary-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const statName = btn.dataset.statName;
+            const slider = document.querySelector(`.stat-control.${statName} .stat-control-input`);
+            const valueDisplay = document.querySelector(`.stat-control.${statName} .stat-control-input-value`);
+            const toggleInput = document.querySelector(`.stat-control.${statName} .toggle-input`);
+            if (slider) {
+                slider.value = slider.min;
+                if (valueDisplay) valueDisplay.textContent = slider.min;
             }
+            if (toggleInput) toggleInput.checked = false;
+            statMinMaxFilters[statName].value = slider ? Number(slider.min) : 0;
+            statMinMaxFilters[statName].isMax = false;
+            triggerStatFilter();
         });
     });
 }
 
-// Setup clone filter button
-function setupCloneFilterButton() {
-    const cloneBtn = document.getElementById('cloneFilterBtn');
-    if (!cloneBtn) return;
-    
-    cloneBtn.addEventListener('click', () => {
-        isShowingClonesOnly = !isShowingClonesOnly;
-        
-        if (isShowingClonesOnly) {
-            cloneBtn.classList.add('active');
-            preserveScroll(() => { filterClones(); updateURL(); });
-        } else {
-            cloneBtn.classList.remove('active');
-            // Return to normal view
-            if (isFiltering) {
-                preserveScroll(() => { filterByTraits(); updateURL(); });
-            } else {
-                const hasAffinityFilters = selectedBodyAffinities.size > 0 || selectedHandAffinities.size > 0; // NEW
-                if (hasAffinityFilters) { // NEW
-                    preserveScroll(() => { filterByTraits(); updateURL(); }); // NEW
-                } else { // NEW
-                    preserveScroll(() => {
-                        allNFTIds = getSortedNFTIds();
-                        loadInitialNFTs();
-                        updateURL();
-                    }); // NEW
-                } // NEW
-            }
-        }
-    });
-}
-
-function filterClones() {
-    const resultsDiv = document.getElementById('results');
-    resultsDiv.textContent = '';
-    
-    // 1. Identify which IDs to display
-    const checkboxes = document.querySelectorAll('.trait-checkbox:checked');
-    const hasTraitFilters = checkboxes.length > 0;
-    const hasAffinityFilters = selectedBodyAffinities.size > 0 || selectedHandAffinities.size > 0;
-    
-    let cloneIds;
-    if (hasTraitFilters && isFiltering) {
-        // Intersection of current trait filters and clone IDs
-        cloneIds = filteredNFTIds.filter(id => traitSignatures.cloneIds.has(id));
-    } else {
-        // All known clones
-        cloneIds = Array.from(traitSignatures.cloneIds);
-    }
-    
-    // Apply affinity filters to clone IDs
-    if (hasAffinityFilters) {
-        cloneIds = cloneIds.filter(id => {
-            const nftAffinity = affinityData[id];
-            if (!nftAffinity) return false;
-            
-            const bodyMatch = selectedBodyAffinities.size === 0 || selectedBodyAffinities.has(nftAffinity.body);
-            const handMatch = selectedHandAffinities.size === 0 || selectedHandAffinities.has(nftAffinity.hand);
-            
-            return bodyMatch && handMatch;
-        });
-    }
-
-    // Apply stat min/max filters to clone IDs
-    if (hasActiveStatFilters()) {
-        cloneIds = cloneIds.filter(id => passesStatMinMaxFilters(id));
-    }
-    
-    // 2. Use the centralized sorting logic
-    filteredNFTIds = getSortedNFTIds(cloneIds);
-    isFiltering = true; 
-    
-    // --- NEW: AFFINITY NOTATION LOGIC ---
-    let affinityNotation = "";
-    if (hasAffinityFilters) {
-        const affinityMap = {
-            'NORMAL': 'N',
-            'INSECT': 'I',
-            'SCRAP': 'S',
-            'EERIE': 'E'
-        };
-
-        // UI logic typically handles single affinity selection via Sets
-        const bValue = Array.from(selectedBodyAffinities)[0];
-        const hValue = Array.from(selectedHandAffinities)[0];
-
-        const bChar = bValue ? (affinityMap[bValue] || "?") : "";
-        const hChar = hValue ? (affinityMap[hValue] || "?") : "";
-            
-        affinityNotation = ` (${bChar}/${hChar})`;
-    }
-    // ------------------------------------
-
-    // 3. UI Construction
+// Builds and appends a count/filter-summary header div into resultsDiv
+function appendCountHeader(resultsDiv, summaryText, filterSummaryHTML = '') {
     const countDiv = document.createElement('div');
     countDiv.className = 'count-header';
-    
-    const uniqueSignatures = new Set();
-    cloneIds.forEach(id => {
-        uniqueSignatures.add(traitSignatures.signatures[id]);
-    });
-    
-    // Build filter summary buttons if trait filters are active
-    let filterSummaryHTML = '';
-    if (hasTraitFilters) {
-        const selectedTraits = {};
-        checkboxes.forEach(checkbox => {
-            const traitType = checkbox.dataset.traitType;
-            const traitValue = checkbox.dataset.traitValue;
-            if (!selectedTraits[traitType]) selectedTraits[traitType] = [];
-            selectedTraits[traitType].push(traitValue);
-        });
-        
-        let summaryButtonsHTML = Object.entries(selectedTraits).map(([type, values]) => 
-            values.map(value => `
-                <button class="count-header-trait-btn" data-trait-type="${type}" data-trait-value="${value}">
-                    ${type}: ${value} ×
-                </button>`).join('')
-        ).join('');
-        
-        filterSummaryHTML = `<div class="filter-summary-buttons-container" style="display: flex; flex-wrap: wrap; gap: 5px; margin: 10px;">${summaryButtonsHTML}</div>`;
-    }
-    
     countDiv.innerHTML = `
-        <div id="count-summary" style="font-size: 14px;">
-            Found ${cloneIds.length} clones in ${uniqueSignatures.size} groups${affinityNotation}
-        </div>
+        <div id="count-summary" style="font-size: 14px;">${summaryText}</div>
         <div class="note">** dear mobile user, click card to show og stats **</div>
         ${filterSummaryHTML}
         ${buildStatFilterSummaryHTML()}
     `;
-    
     resultsDiv.appendChild(countDiv);
     attachStatFilterSummaryListeners(countDiv);
-    
-    // Re-attach listeners to the new summary buttons
     countDiv.querySelectorAll('.count-header-trait-btn:not(.stat-filter-summary-btn)').forEach(btn => {
         btn.addEventListener('click', removeSelectedTrait);
     });
+    return countDiv;
+}
+
+// Shared "return to previous view" logic used by clone and listing toggle buttons
+function restoreViewAfterToggle() {
+    const hasAffinityFilters = selectedBodyAffinities.size > 0 || selectedHandAffinities.size > 0;
+    if (isFiltering || hasAffinityFilters) {
+        preserveScroll(() => { filterByTraits(); updateURL(); });
+    } else {
+        preserveScroll(() => { allNFTIds = getSortedNFTIds(); loadInitialNFTs(); updateURL(); });
+    }
+}
+
+
+// ============================================================
+// SETUP — SORT & FILTER BUTTON WIRING
+// ============================================================
+
+function setupSortButtons() {
+    const sortButtons = document.querySelectorAll('.sort-btn');
+    sortButtons.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const newSort = e.target.dataset.sort;
+            if (newSort === currentSortOrder) return;
+
+            currentSortOrder = newSort;
+            sortButtons.forEach(b => b.classList.remove('active'));
+            e.target.classList.add('active');
+
+            if (isShowingClonesOnly)       preserveScroll(() => filterClones());
+            else if (isShowingListingOnly) preserveScroll(() => filterListing());
+            else if (isFiltering)          preserveScroll(() => filterByTraits());
+            else                           preserveScroll(() => { allNFTIds = getSortedNFTIds(); loadInitialNFTs(); });
+
+            if (selectedIDs.size > 0) updateSelectedIDsDisplay();
+            updateURL();
+        });
+    });
+}
+
+function setupCloneFilterButton() {
+    const cloneBtn = document.getElementById('cloneFilterBtn');
+    if (!cloneBtn) return;
+
+    cloneBtn.addEventListener('click', () => {
+        isShowingClonesOnly = !isShowingClonesOnly;
+        cloneBtn.classList.toggle('active', isShowingClonesOnly);
+
+        if (isShowingClonesOnly) {
+            preserveScroll(() => { filterClones(); updateURL(); });
+        } else if (isShowingListingOnly) {
+            preserveScroll(() => { filterListing(); updateURL(); });
+        } else {
+            restoreViewAfterToggle();
+        }
+    });
+}
+
+function setupListingFilterButton() {
+    const listingBtn = document.getElementById('listingFilterBtn');
+    if (!listingBtn) return;
+
+    listingBtn.addEventListener('click', () => {
+        isShowingListingOnly = !isShowingListingOnly;
+        listingBtn.classList.toggle('active', isShowingListingOnly);
+
+        if (isShowingListingOnly) {
+            preserveScroll(() => { filterListing(); updateURL(); });
+        } else if (isShowingClonesOnly) {
+            preserveScroll(() => { filterClones(); updateURL(); });
+        } else {
+            restoreViewAfterToggle();
+        }
+    });
+}
+
+function setupAffinityFilterToggle() {
+    const toggleBtn = document.getElementById('affinityFilterToggle');
+    const affinitySection = document.querySelector('.affinity-filter-section');
+    if (!toggleBtn || !affinitySection) return;
+
+    toggleBtn.addEventListener('click', () => {
+        const isVisible = affinitySection.style.display !== 'none';
+        affinitySection.style.display = isVisible ? 'none' : 'block';
+        toggleBtn.classList.toggle('active', !isVisible);
+    });
+}
+
+function setupMinMaxFilterToggle() {
+    const toggleBtn = document.getElementById('minmaxFilterToggle');
+    const minmaxSection = document.querySelector('.minmax-filter-section');
+    if (!toggleBtn || !minmaxSection) return;
+
+    toggleBtn.addEventListener('click', () => {
+        const isVisible = minmaxSection.style.display !== 'none';
+        minmaxSection.style.display = isVisible ? 'none' : 'block';
+        toggleBtn.classList.toggle('active', !isVisible);
+    });
+}
+
+// Clicking an affinity button selects all traits of that affinity and deselects the previous one
+function setupAffinityFilters() {
+    document.querySelectorAll('.affinity-btn').forEach(button => {
+        button.addEventListener('click', () => {
+            const affinityValue = button.textContent.trim();
+            const isBody = button.closest('#bodyAffinity') !== null;
+            const traitType = isBody ? 'body' : 'hand';
+            const affinitySet = isBody ? selectedBodyAffinities : selectedHandAffinities;
+
+            if (affinitySet.has(affinityValue)) {
+                affinitySet.delete(affinityValue);
+                button.classList.remove('active');
+                toggleTraitCheckboxesByAffinity(traitType, affinityValue, false);
+            } else {
+                affinitySet.clear();
+                document.querySelectorAll(`.trait-checkbox[data-trait-type="${traitType}"]`).forEach(cb => cb.checked = false);
+                affinitySet.add(affinityValue);
+                updateAffinityButtonStates();
+                toggleTraitCheckboxesByAffinity(traitType, affinityValue, true);
+            }
+
+            updateSelectedTraitsDisplay(true);
+        });
+    });
+}
+
+function toggleTraitCheckboxesByAffinity(type, affinity, shouldCheck) {
+    const lookup = traitAffinityLookup[type] || {};
+    Object.entries(lookup).forEach(([traitName, aff]) => {
+        if (aff !== affinity) return;
+        const cb = document.querySelector(`.trait-checkbox[data-trait-type="${type}"][data-trait-value="${traitName}"]`);
+        if (cb) cb.checked = shouldCheck;
+    });
+}
+
+function updateAffinityButtonStates() {
+    document.querySelectorAll('.affinity-btn').forEach(button => {
+        const affinity = button.textContent.trim();
+        const isBodyButton = button.closest('#bodyAffinity') !== null;
+        button.classList.toggle('active', isBodyButton
+            ? selectedBodyAffinities.has(affinity)
+            : selectedHandAffinities.has(affinity)
+        );
+    });
+}
+
+function removeSelectedAffinity(event) {
+    const { affinityType, affinityValue } = event.currentTarget.dataset;
+    if (affinityType === 'body') selectedBodyAffinities.delete(affinityValue);
+    else if (affinityType === 'hand') selectedHandAffinities.delete(affinityValue);
+    updateAffinityButtonStates();
+    preserveScroll(() => { filterByTraits(); updateURL(); });
+}
+
+// Validates whether the current checkbox state still matches an active affinity; deactivates if not
+function validateAffinitiesAgainstCheckboxes() {
+    let stateChanged = false;
+
+    ['body', 'hand'].forEach(type => {
+        const activeAffinities = type === 'body' ? selectedBodyAffinities : selectedHandAffinities;
+        const lookup = traitAffinityLookup[type] || {};
+
+        const checkedTraitNames = Array.from(
+            document.querySelectorAll(`.trait-checkbox[data-trait-type="${type}"]:checked`)
+        ).map(cb => cb.dataset.traitValue);
+
+        const representedAffinities = new Set(
+            checkedTraitNames.map(name => lookup[name]).filter(Boolean)
+        );
+
+        if (representedAffinities.size === 1) {
+            const currentAffinity = Array.from(representedAffinities)[0];
+            const requiredTraits = Object.entries(lookup)
+                .filter(([, aff]) => aff === currentAffinity)
+                .map(([name]) => name);
+            const checkedSet = new Set(checkedTraitNames);
+            const isComplete = requiredTraits.every(name => checkedSet.has(name));
+
+            if (isComplete && !activeAffinities.has(currentAffinity)) {
+                activeAffinities.add(currentAffinity);
+                stateChanged = true;
+            } else if (!isComplete && activeAffinities.size > 0) {
+                activeAffinities.clear();
+                stateChanged = true;
+            }
+        } else if (activeAffinities.size > 0) {
+            activeAffinities.clear();
+            stateChanged = true;
+        }
+    });
+
+    if (stateChanged) updateAffinityButtonStates();
+}
+
+// Wires up stat slider + min/max toggle controls
+const controls = document.querySelectorAll('.stat-control');
+controls.forEach(control => {
+    const statName = ['health', 'power', 'violence', 'harmony', 'slots'].find(s => control.classList.contains(s));
+    const slider = control.querySelector('input[type="range"]');
+    const valueDisplay = control.querySelector('.stat-control-input-value');
+    const toggleInput = control.querySelector('.toggle-input');
+
+    if (statName && slider) {
+        statMinMaxFilters[statName].value = Number(slider.value);
+        statMinMaxFilters[statName].isMax = toggleInput ? toggleInput.checked : false;
+    }
+
+    slider.addEventListener('input', (event) => {
+        valueDisplay.textContent = event.target.value;
+        if (statName) {
+            statMinMaxFilters[statName].value = Number(event.target.value);
+            triggerStatFilter();
+        }
+    });
+
+    if (toggleInput && statName) {
+        toggleInput.addEventListener('change', () => {
+            statMinMaxFilters[statName].isMax = toggleInput.checked;
+            triggerStatFilter();
+        });
+    }
+});
+
+let _statFilterTimer = null;
+function triggerStatFilter() {
+    clearTimeout(_statFilterTimer);
+    _statFilterTimer = setTimeout(() => {
+        preserveScroll(() => {
+            if (isShowingClonesOnly)            filterClones();
+            else if (isShowingListingOnly)      filterListing();
+            else if (isFiltering || hasActiveStatFilters()) filterByTraits();
+            else { allNFTIds = getSortedNFTIds(Object.keys(traitsData)); loadInitialNFTs(); }
+            updateURL();
+        });
+    }, 200);
+}
+
+// Preserves scroll position across a filter re-render
+function preserveScroll(fn) {
+    const scrollY = window.scrollY;
+    fn();
+    requestAnimationFrame(() => window.scrollTo({ top: scrollY, behavior: 'instant' }));
+}
+
+
+// ============================================================
+// FILTER CONTROLS UI
+// ============================================================
+
+function createFilterControls() {
+    const filterControls = document.getElementById('filterControls');
+    const allTraits = {};
+    const traitDetails = {};
+
+    Object.values(traitsData).forEach(nft => {
+        Object.entries(nft).forEach(([traitType, traitData]) => {
+            if (!allTraits[traitType]) { allTraits[traitType] = new Set(); traitDetails[traitType] = {}; }
+            const traitName = getTraitName(traitData);
+            allTraits[traitType].add(traitName);
+            if (typeof traitData === 'object' && traitData.name && !traitDetails[traitType][traitName]) {
+                traitDetails[traitType][traitName] = {
+                    affinity: traitData.affinity || null,
+                    stats: traitData.stats || {},
+                };
+            }
+        });
+    });
+
+    // Dropdown
+    const dropdownWrapper = document.createElement('div');
+    dropdownWrapper.className = 'dropdown-wrapper';
+    const dropdownLabel = document.createElement('label');
+    dropdownLabel.textContent = 'Select Trait Category:';
+    dropdownLabel.className = 'dropdown-label';
+    const dropdown = document.createElement('select');
+    dropdown.id = 'traitCategoryDropdown';
+    dropdown.className = 'trait-dropdown';
+    const defaultOption = document.createElement('option');
+    defaultOption.value = '';
+    defaultOption.textContent = '-- Choose a category --';
+    dropdown.appendChild(defaultOption);
+    Object.keys(allTraits).sort().forEach(traitType => {
+        const option = document.createElement('option');
+        option.value = traitType;
+        option.textContent = traitType.charAt(0).toUpperCase() + traitType.slice(1);
+        dropdown.appendChild(option);
+    });
+    dropdownWrapper.appendChild(dropdownLabel);
+    dropdownWrapper.appendChild(dropdown);
+    filterControls.appendChild(dropdownWrapper);
+
+    const filterGroupsContainer = document.createElement('div');
+    filterGroupsContainer.id = 'filterGroupsContainer';
+    filterControls.appendChild(filterGroupsContainer);
+
+    const totalNFTs = Object.keys(traitsData).length;
+
+    Object.keys(allTraits).sort().forEach(traitType => {
+        const filterGroup = document.createElement('div');
+        filterGroup.className = 'filter-group';
+        filterGroup.dataset.traitType = traitType;
+        filterGroup.style.display = 'none';
+
+        const header = document.createElement('div');
+        header.className = 'filter-header';
+        header.textContent = traitType.charAt(0).toUpperCase() + traitType.slice(1);
+        filterGroup.appendChild(header);
+
+        const searchInput = document.createElement('input');
+        searchInput.type = 'text';
+        searchInput.className = 'trait-search';
+        searchInput.placeholder = `Search ${traitType}...`;
+        searchInput.autocomplete = 'off';
+        searchInput.dataset.traitType = traitType;
+        filterGroup.appendChild(searchInput);
+
+        const checkboxContainer = document.createElement('div');
+        checkboxContainer.className = 'checkbox-container';
+        checkboxContainer.dataset.traitType = traitType;
+
+        const sortedValues = [...allTraits[traitType]].sort((a, b) =>
+            (traitCounts[traitType][a] || 0) - (traitCounts[traitType][b] || 0)
+        );
+
+        sortedValues.forEach(value => {
+            const count = traitCounts[traitType][value] || 0;
+            const percentage = ((count / totalNFTs) * 100).toFixed(1);
+            const details = traitDetails[traitType][value] || {};
+
+            const affinityHTML = (details.affinity && (traitType === 'body' || traitType === 'hand'))
+                ? `<span class="trait-affinity ${details.affinity}" title="Affinity">${details.affinity}</span>`
+                : '';
+
+            let statsHTML = '';
+            if (details.stats && Object.keys(details.stats).length > 0) {
+                const statBadges = Object.entries(details.stats).map(([statName, val]) => {
+                    const sign = val > 0 ? '+' : '';
+                    return `<span class="trait-stat ${statName}" title="${statName.charAt(0).toUpperCase() + statName.slice(1)}">${statName.slice(0, 3).toUpperCase()} ${sign}${val}</span>`;
+                }).join('');
+                statsHTML = `<span class="trait-stats">${statBadges}</span>`;
+            }
+
+            const checkboxWrapper = document.createElement('label');
+            checkboxWrapper.className = 'checkbox-label';
+            checkboxWrapper.dataset.traitValue = value.toLowerCase();
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.className = 'trait-checkbox';
+            checkbox.dataset.traitType = traitType;
+            checkbox.dataset.traitValue = value;
+            checkbox.addEventListener('change', () => updateSelectedTraitsDisplay(false));
+
+            const span = document.createElement('span');
+            span.className = 'trait-label-text';
+            span.innerHTML = `
+                <span class="trait-name-row">
+                    <span class="trait-name">${value}</span>
+                    ${affinityHTML}
+                </span>
+                <span class="trait-info-row">
+                    <span class="trait-count">${count} (${percentage}%)</span>
+                    ${statsHTML}
+                </span>
+            `;
+
+            checkboxWrapper.appendChild(checkbox);
+            checkboxWrapper.appendChild(span);
+            checkboxContainer.appendChild(checkboxWrapper);
+        });
+
+        filterGroup.appendChild(checkboxContainer);
+        filterGroupsContainer.appendChild(filterGroup);
+
+        searchInput.addEventListener('input', (e) => filterTraitOptions(traitType, e.target.value));
+    });
+
+    dropdown.addEventListener('change', (e) => {
+        document.querySelectorAll('.filter-group').forEach(group => group.style.display = 'none');
+        if (e.target.value) {
+            const selectedGroup = document.querySelector(`.filter-group[data-trait-type="${e.target.value}"]`);
+            if (selectedGroup) selectedGroup.style.display = 'block';
+        }
+    });
+}
+
+function filterTraitOptions(traitType, searchTerm) {
+    const container = document.querySelector(`.checkbox-container[data-trait-type="${traitType}"]`);
+    const searchLower = searchTerm.toLowerCase().trim();
+    let visibleCount = 0;
+
+    container.querySelectorAll('.checkbox-label').forEach(label => {
+        const matches = searchLower === '' || label.dataset.traitValue.includes(searchLower);
+        label.style.display = matches ? 'flex' : 'none';
+        if (matches) visibleCount++;
+    });
+
+    let noResultsMsg = container.querySelector('.no-trait-results');
+    if (visibleCount === 0) {
+        if (!noResultsMsg) {
+            noResultsMsg = document.createElement('div');
+            noResultsMsg.className = 'no-trait-results';
+            noResultsMsg.textContent = 'No matching traits found';
+            container.appendChild(noResultsMsg);
+        }
+    } else {
+        noResultsMsg?.remove();
+    }
+}
+
+
+// ============================================================
+// FILTER ACTIONS
+// ============================================================
+
+function filterClones() {
+    const resultsDiv = document.getElementById('results');
+    resultsDiv.textContent = '';
+
+    const checkboxes = document.querySelectorAll('.trait-checkbox:checked');
+    const hasTraitFilters = checkboxes.length > 0;
+    const hasAffinityFilters = selectedBodyAffinities.size > 0 || selectedHandAffinities.size > 0;
+
+    let cloneIds = (hasTraitFilters && isFiltering)
+        ? filteredNFTIds.filter(id => traitSignatures.cloneIds.has(id))
+        : Array.from(traitSignatures.cloneIds);
+
+    if (hasAffinityFilters) {
+        cloneIds = cloneIds.filter(id => {
+            const a = affinityData[id];
+            return a
+                && (selectedBodyAffinities.size === 0 || selectedBodyAffinities.has(a.body))
+                && (selectedHandAffinities.size === 0 || selectedHandAffinities.has(a.hand));
+        });
+    }
+    if (hasActiveStatFilters()) cloneIds = cloneIds.filter(id => passesStatMinMaxFilters(id));
+    if (isShowingListingOnly) cloneIds = cloneIds.filter(id => listingNFTs.has(String(id)));
+
+    filteredNFTIds = getSortedNFTIds(cloneIds);
+    isFiltering = true;
+
+    const uniqueSignatures = new Set(cloneIds.map(id => traitSignatures.signatures[id]));
+    const filterSummaryHTML = hasTraitFilters
+        ? `<div class="filter-summary-buttons-container" style="display:flex;flex-wrap:wrap;gap:5px;margin:10px;">${buildTraitSummaryButtonsHTML(getSelectedTraitsFromCheckboxes())}</div>`
+        : '';
+
+    appendCountHeader(
+        resultsDiv,
+        `Found ${cloneIds.length} clones in ${uniqueSignatures.size} groups${getAffinityNotation()}`,
+        filterSummaryHTML
+    );
+
     if (filteredNFTIds.length === 0) {
         const noResultsDiv = document.createElement('div');
         noResultsDiv.className = 'no-results';
@@ -937,334 +1204,363 @@ function filterClones() {
         resultsDiv.appendChild(noResultsDiv);
         return;
     }
-    
+
     currentLoadIndex = 0;
     loadMoreNFTs();
     setupInfiniteScroll();
 }
 
-// Enhanced fetch function with cache-busting and proper headers
-async function fetchWithCacheBusting(url, options = {}) {
-    const cacheBuster = getCacheBuster();
-    const urlWithCacheBuster = `${url}?v=${cacheBuster}`;
-    
-    const fetchOptions = {
-        ...options,
-        headers: {
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache',
-            'Expires': '0',
-            ...options.headers
-        },
-        cache: 'no-store'
-    };
-    
-    return fetch(urlWithCacheBuster, fetchOptions);
+function filterListing() {
+    const resultsDiv = document.getElementById('results');
+    resultsDiv.textContent = '';
+
+    const checkboxes = document.querySelectorAll('.trait-checkbox:checked');
+    const hasTraitFilters = checkboxes.length > 0;
+    const hasAffinityFilters = selectedBodyAffinities.size > 0 || selectedHandAffinities.size > 0;
+
+    let listingIds;
+    if (isShowingClonesOnly) {
+        const cloneBase = (hasTraitFilters && isFiltering)
+            ? filteredNFTIds.filter(id => traitSignatures.cloneIds.has(id))
+            : Array.from(traitSignatures.cloneIds);
+        listingIds = cloneBase.filter(id => listingNFTs.has(String(id)));
+    } else if (hasTraitFilters && isFiltering) {
+        listingIds = filteredNFTIds.filter(id => listingNFTs.has(String(id)));
+    } else {
+        listingIds = Object.keys(traitsData).filter(id => listingNFTs.has(String(id)));
+    }
+
+    if (hasAffinityFilters) {
+        listingIds = listingIds.filter(id => {
+            const a = affinityData[id];
+            return a
+                && (selectedBodyAffinities.size === 0 || selectedBodyAffinities.has(a.body))
+                && (selectedHandAffinities.size === 0 || selectedHandAffinities.has(a.hand));
+        });
+    }
+    if (hasActiveStatFilters()) listingIds = listingIds.filter(id => passesStatMinMaxFilters(id));
+
+    filteredNFTIds = getSortedNFTIds(listingIds);
+    isFiltering = true;
+
+    const filterSummaryHTML = hasTraitFilters
+        ? `<div class="filter-summary-buttons-container" style="display:flex;flex-wrap:wrap;gap:5px;margin:10px;">${buildTraitSummaryButtonsHTML(getSelectedTraitsFromCheckboxes())}</div>`
+        : '';
+
+    appendCountHeader(resultsDiv, `Found ${listingIds.length} listing Kamigotchi`, filterSummaryHTML);
+
+    if (filteredNFTIds.length === 0) {
+        const noResultsDiv = document.createElement('div');
+        noResultsDiv.className = 'no-results';
+        noResultsDiv.textContent = 'No listing Kamigotchi found with current filters';
+        resultsDiv.appendChild(noResultsDiv);
+        return;
+    }
+
+    currentLoadIndex = 0;
+    loadMoreNFTs();
+    setupInfiniteScroll();
 }
 
-async function loadSacrificeData(v) {
-    try {
-    // Uses the timestamp to ensure the API doesn't return a cached 403 or old data
-    const response = await fetch(`/api/sacrifices?v=${v}`);
-        
-        if (response.ok) {
-            const data = await response.json();
-            sacrificedNFTs = new Set(data.map(item => String(item.kami_index)));
-            console.log(`🕳️ Loaded ${sacrificedNFTs.size} sacrifice records`);
-        }
-    } catch (err) {
-        // Silent fail
+function filterByTraits() {
+    const resultsDiv = document.getElementById('results');
+    resultsDiv.textContent = '';
+
+    const checkboxes = document.querySelectorAll('.trait-checkbox:checked');
+    const hasTraitFilters = checkboxes.length > 0;
+    const hasAffinityFilters = selectedBodyAffinities.size > 0 || selectedHandAffinities.size > 0;
+    const hasStatFilters = hasActiveStatFilters();
+
+    if (!hasTraitFilters && !hasAffinityFilters && !hasStatFilters) {
+        isFiltering = false;
+        if (isShowingClonesOnly) filterClones();
+        else { allNFTIds = getSortedNFTIds(Object.keys(traitsData)); loadInitialNFTs(); }
+        return;
     }
+
+    const filteringMessage = document.createElement('div');
+    filteringMessage.className = 'no-results';
+    filteringMessage.textContent = 'Filtering...';
+    resultsDiv.appendChild(filteringMessage);
+
+    const selectedTraits = {};
+    checkboxes.forEach(checkbox => {
+        const type = checkbox.dataset.traitType;
+        const value = checkbox.dataset.traitValue;
+        if (!selectedTraits[type]) selectedTraits[type] = [];
+        selectedTraits[type].push(value);
+    });
+
+    const baseIDs = isShowingClonesOnly ? Array.from(traitSignatures.cloneIds) : Object.keys(traitsData);
+
+    let matchingNFTs = baseIDs.filter(id => {
+        const nftTraits = traitsData[id];
+        return Object.entries(selectedTraits).every(([traitType, selectedValues]) =>
+            selectedValues.includes(getTraitName(nftTraits[traitType]))
+        );
+    });
+
+    if (hasAffinityFilters) {
+        matchingNFTs = matchingNFTs.filter(id => {
+            const a = affinityData[id];
+            return a
+                && (selectedBodyAffinities.size === 0 || selectedBodyAffinities.has(a.body))
+                && (selectedHandAffinities.size === 0 || selectedHandAffinities.has(a.hand));
+        });
+    }
+    if (hasStatFilters)          matchingNFTs = matchingNFTs.filter(id => passesStatMinMaxFilters(id));
+    if (isShowingListingOnly)    matchingNFTs = matchingNFTs.filter(id => listingNFTs.has(String(id)));
+
+    filteredNFTIds = getSortedNFTIds(matchingNFTs);
+    isFiltering = true;
+
+    if (isShowingClonesOnly) { filterClones(); return; }
+
+    resultsDiv.textContent = '';
+
+    const filterSummaryHTML = `
+        <div class="filter-summary-buttons-container" style="display:flex;flex-wrap:wrap;gap:5px;margin:10px;">
+            ${buildTraitSummaryButtonsHTML(selectedTraits)}
+        </div>
+    `;
+
+    appendCountHeader(
+        resultsDiv,
+        `Found matching Kamigotchi: ${filteredNFTIds.length}${getAffinityNotation()}`,
+        filterSummaryHTML
+    );
+
+    if (filteredNFTIds.length === 0) {
+        const noResultsDiv = document.createElement('div');
+        noResultsDiv.className = 'no-results';
+        noResultsDiv.textContent = 'No Kamigotchi match your selected traits';
+        resultsDiv.appendChild(noResultsDiv);
+        isFiltering = false;
+        return;
+    }
+
+    currentLoadIndex = 0;
+    loadMoreNFTs();
+    setupInfiniteScroll();
 }
 
-/**
- * Fetch the full bundle once, split it into the 5 data sections,
- * and immediately release the bundle reference so the GC can free it.
- * Populates the global variables directly; returns nothing.
- */
-async function fetchAndSplitBundle(v) {
-    // 1. Figure out WHERE to look
-    const isLocal = window.location.hostname === 'localhost' || window.location.hostname.startsWith('192.168.');
-    
-    // If local, go directly to Cloudflare. If live, use the "middleman" path.
-    const finalUrl = isLocal 
-        ? `https://data.kami.h80h.xyz/kamiBundle.json?v=${v}` 
-        : `/api/data/kamiBundle.json?v=${v}`;
-
-    const response = await fetch(finalUrl);
-    if (!response.ok) {
-        throw new Error(`Failed to load kamiBundle.json: ${response.status}`);
-    }
-
-    // Parse into a local variable
-    let bundle = await response.json();
-
-    // 2. Validate the bundle
-    if (!bundle.kamiImage || !bundle.kamiTraits) {
-        bundle = null; 
-        throw new Error('Bundle is missing required sections (kamiImage / kamiTraits)');
-    }
-
-    // 3. Move data to global variables and clean up memory (Good for mobile!)
-    imagesData = bundle.kamiImage;   bundle.kamiImage   = null;
-    traitsData  = bundle.kamiTraits; bundle.kamiTraits  = null;
-
-    if (bundle.kamiStats) {
-        kamiStatsData = bundle.kamiStats;
-    } else {
-        kamiStatsData = {};
-    }
-    bundle.kamiStats = null;
-
-    if (bundle.kamiMetadata) {
-        metadataInfo = bundle.kamiMetadata;
-    } else {
-        metadataInfo = { newKamiIds: [] };
-    }
-    bundle.kamiMetadata = null;
-
-    if (bundle.kamiListed) {
-        listedNFTs = new Set(bundle.kamiListed.map(String));
-        console.log(`🛍️ Loaded ${listedNFTs.size} Kamigotchi which is listed on KamiSwap`);
-    } else {
-        listedNFTs = new Set();
-    }
-    bundle.kamiListed = null;
-
-    // 4. Fully release the bundle for Garbage Collection
-    bundle = null;
+function removeSelectedTrait(event) {
+    const { traitType, traitValue } = event.currentTarget.dataset;
+    const checkbox = document.querySelector(`.trait-checkbox[data-trait-type="${traitType}"][data-trait-value="${traitValue}"]`);
+    if (checkbox) { checkbox.checked = false; updateSelectedTraitsDisplay(true); }
 }
 
-// Load all data via a single bundle fetch
-async function loadData() {
-    try {
-        console.log('📄 Loading bundle with cache-busting...');
+function updateSelectedTraitsDisplay(forceUpdate = false) {
+    const selectedTraitsDiv = document.getElementById('selectedTraitsDisplay');
+    if (selectedTraitsDiv) selectedTraitsDiv.style.display = 'none';
 
-        // --- CACHE BUSTING STRATEGY ---
-        // We create a version string based on the current time.
-        // This forces Cloudflare and Vercel to bypass their 5-minute cache.
-        const v = Date.now(); 
-        
-        // Single network request + sacrifice fetch run in parallel
-        // We pass the timestamp to our fetching functions
-        await Promise.all([
-            fetchAndSplitBundle(v), // Pass 'v' here
-            loadSacrificeData(v),   // Pass 'v' here
-        ]);
+    validateAffinitiesAgainstCheckboxes();
 
-        if (Object.keys(kamiStatsData).length > 0) {
-            console.log(`✅ Loaded stats data for ${Object.keys(kamiStatsData).length} Kamigotchi`);
-        }
+    const checkboxes = document.querySelectorAll('.trait-checkbox:checked');
 
-        if (metadataInfo.newKamiIds?.length > 0) {
-            console.log(`✨ Found ${metadataInfo.newKamiIds.length} new Kamigotchi!`);
-            console.log(`   New IDs: ${metadataInfo.newKamiIds.join(', ')}`);
-        }
-        
-        // NEW: Extract affinity data
-        affinityData = extractAffinityData();
-        
-        // Build trait signatures for clone detection
-        traitSignatures = buildTraitSignatures();
+    if (checkboxes.length === 0 && (isFiltering || forceUpdate)) {
+        isFiltering = false;
+        filteredNFTIds = [];
+        selectedBodyAffinities.clear();
+        selectedHandAffinities.clear();
+        updateAffinityButtonStates();
 
-        traitCounts = calculateTraitCounts();
-        nftRarityScores = calculateRarityScores();
-        console.log('✅ OpenRarity calculation complete!');
-        
-        // Setup controls
-        setupSortButtons();
-        setupCloneFilterButton();
-        setupAffinityFilterToggle(); 
-        setupMinMaxFilterToggle(); 
-        setupAffinityFilters();
-        createFilterControls();
-        
-        // --- URL Integration START ---
-        const initialFilterActive = loadStateFromURL(); 
-        
-        // Update sort button visual state based on URL
-        document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
-        const sortButton = document.querySelector(`.sort-btn[data-sort="${currentSortOrder}"]`);
-        if (sortButton) sortButton.classList.add('active');
+        if (isShowingClonesOnly)          preserveScroll(() => { filterClones(); updateURL(); });
+        else if (isShowingListingOnly)    preserveScroll(() => { filterListing(); updateURL(); });
+        else if (hasActiveStatFilters())  preserveScroll(() => { filterByTraits(); updateURL(); });
+        else                              preserveScroll(() => { allNFTIds = getSortedNFTIds(Object.keys(traitsData)); loadInitialNFTs(); updateURL(); });
+        return;
+    }
 
-        // Update clone button visual state
-        const cloneBtn = document.getElementById('cloneFilterBtn');
-        if (cloneBtn && isShowingClonesOnly) {
-            cloneBtn.classList.add('active');
-        }
+    updateURL();
+    preserveScroll(() => filterByTraits());
+}
 
-        updateSelectedIDsDisplay(); // Display IDs loaded from URL
-        
-        allNFTIds = getSortedNFTIds(); // Sort all IDs initially
+function clearFilters() {
+    document.querySelectorAll('.trait-checkbox').forEach(cb => cb.checked = false);
+    document.querySelectorAll('.trait-search').forEach(input => {
+        input.value = '';
+        filterTraitOptions(input.dataset.traitType, '');
+    });
 
-        // Handle filter state on page load
-        if (initialFilterActive) {
-            // Trait filters are active (will handle clone filter if also active)
-            filterByTraits();
-        } else if (isShowingClonesOnly) {
-            // Only clone filter is active
-            filterClones();
-        } else {
-            // No filters active
-            loadInitialNFTs();
-        }
-        
-        updateURL(true); // Replace initial URL with the canonical state
-        // --- URL Integration END ---
-        
-    } catch (error) {
-        console.error('Detailed error:', error);
-        document.getElementById('results').innerHTML = 
-            `<div class="no-results">
-                <strong>Error loading NFT data</strong><br><br>
-                ${error.message}<br><br>
-                <strong>Troubleshooting:</strong><br>
-                1. Make sure you're running a local server (not opening HTML directly)<br>
-                2. Check that kamiImage.json and kamiTraits.json are in the same folder<br>
-                3. Check the browser console (F12) for more details<br>
-                4. Try clicking the refresh button
+    const dropdown = document.getElementById('traitCategoryDropdown');
+    if (dropdown) dropdown.value = '';
+    document.querySelectorAll('.filter-group').forEach(group => group.style.display = 'none');
+
+    selectedBodyAffinities.clear();
+    selectedHandAffinities.clear();
+    updateAffinityButtonStates();
+
+    document.querySelectorAll('.stat-control').forEach(control => {
+        const slider = control.querySelector('input[type="range"]');
+        const valueDisplay = control.querySelector('.stat-control-input-value');
+        const toggleInput = control.querySelector('.toggle-input');
+        if (slider) { slider.value = slider.min; if (valueDisplay) valueDisplay.textContent = slider.min; }
+        if (toggleInput) toggleInput.checked = false;
+    });
+    Object.keys(statMinMaxFilters).forEach(statName => {
+        const slider = document.querySelector(`.stat-control.${statName} .stat-control-input`);
+        statMinMaxFilters[statName].value = slider ? Number(slider.min) : 0;
+        statMinMaxFilters[statName].isMax = false;
+    });
+
+    isFiltering = false;
+    filteredNFTIds = [];
+
+    if (isShowingClonesOnly)       preserveScroll(() => { filterClones(); updateURL(); });
+    else if (isShowingListingOnly) preserveScroll(() => { filterListing(); updateURL(); });
+    else                           preserveScroll(() => { allNFTIds = getSortedNFTIds(Object.keys(traitsData)); loadInitialNFTs(); updateURL(); });
+}
+
+
+// ============================================================
+// NFT CARD RENDERING
+// ============================================================
+
+function getStatColorClass() {
+    const statSorts = ['harmony', 'health', 'power', 'violence'];
+    return statSorts.includes(currentSortOrder) ? currentSortOrder : '';
+}
+
+function displayNFT(id, showCloseButton = false) {
+    const imageUrl = imagesData[id];
+    const traits = traitsData[id];
+    const stats = kamiStatsData[id];
+
+    if (!imageUrl || !traits) {
+        console.warn(`NFT #${id} not found in data`);
+        return null;
+    }
+
+    const rarityData = nftRarityScores[id];
+    const rank = rarityData ? rarityData.rank : '?';
+    const score = rarityData ? rarityData.score.toFixed(4) : '?';
+    const isTied = rarityData ? rarityData.isTied : false;
+
+    const isNew = metadataInfo.kamiNewWindow && Object.prototype.hasOwnProperty.call(metadataInfo.kamiNewWindow, String(id));
+    const isClone = traitSignatures.cloneIds.has(id);
+    const isSacrificed = sacrificedNFTs.has(String(id));
+    const listingPrice = listingNFTs.get(String(id));
+    const isListing = listingPrice !== undefined;
+
+    const card = document.createElement('div');
+    card.className = 'nft-card hover_wrapper';
+    card.dataset.nftId = id;
+
+    let rankClass = 'rank-common';
+    const totalNFTs = Object.keys(traitsData).length;
+    const rankPercentile = (rank / totalNFTs) * 100;
+    if (rankPercentile <= 1)       rankClass = 'rank-legendary';
+    else if (rankPercentile <= 5)  rankClass = 'rank-epic';
+    else if (rankPercentile <= 15) rankClass = 'rank-rare';
+    else if (rankPercentile <= 40) rankClass = 'rank-uncommon';
+
+    const statColorClass = getStatColorClass();
+    const statValue = stats?.stats[currentSortOrder] || '';
+    const rankTooltip = isTied
+        ? `OpenRarity Rank: #${rank} (Tied) | Score: ${score}`
+        : `OpenRarity Rank: #${rank} | Score: ${score}`;
+
+    const closeButtonHTML = showCloseButton
+        ? `<button class="close-btn" onclick="removeSelectedID('${id}')" title="Remove this Kamigotchi">×</button>` : '';
+    const newBadgeHTML = isNew
+        ? `<div class="new-badge" title="Recently Added!">NEW</div>` : '';
+    const cloneBadgeHTML = isClone
+        ? `<div class="clone-badge" title="This Kamigotchi has identical traits to others">CLONE</div>` : '';
+    const sacrificeBadgeHTML = isSacrificed
+        ? `<div class="sacrifice-badge" title="This Kamigotchi has been sacrificed">🕳️</div>` : '';
+    const listingBadgeHTML = isListing
+        ? `<div class="listing-badge" title="Ξ${listingPrice} on KamiSwap"><img id="kamiswap_icon" src="https://app.kamigotchi.io/assets/marketplace-BqMKbOFC.png" style="border:none"></div>` : '';
+    const statColorHTML = statColorClass
+        ? `<div class="stat-color-box ${statColorClass}" title="${statColorClass.charAt(0).toUpperCase() + statColorClass.slice(1)} Sort">${statValue}</div>` : '';
+
+    const statsHTML = stats ? `
+        <div class="kami-stats">
+            <div class="stat-row one">
+                <div class="stat-item health"><div class="stat-value">${stats.stats.health}</div></div>
+                <div class="stat-item power"><div class="stat-value">${stats.stats.power}</div></div>
+            </div>
+            <div class="stat-row">
+                <div class="stat-item violence"><div class="stat-value">${stats.stats.violence}</div></div>
+                <div class="stat-item harmony"><div class="stat-value">${stats.stats.harmony}</div></div>
+            </div>
+        </div>` : '';
+
+    const traitsHTML = Object.entries(traits)
+        .map(([key, traitData]) => `
+            <div class="trait">
+                <p>${key.charAt(0).toUpperCase() + key.slice(1)}: ${getTraitName(traitData)}</p>
+            </div>`)
+        .join('');
+
+    const rankBadge = `
+        <div class="rank-stat-container">
+            <div class="rank-badge ${rankClass}" title="${rankTooltip}">${rank}</div>
+            ${statColorHTML}
+        </div>`;
+
+    const imageBlock = `
+        <div class="image-container">
+            <img src="${imageUrl}" alt="NFT #${id}" loading="lazy" onerror="this.src='https://via.placeholder.com/250?text=Not+Found'">
+            ${sacrificeBadgeHTML}
+            ${listingBadgeHTML}
+        </div>`;
+
+    // On mobile, stats render inside the details panel; on desktop they sit above the image block
+    if (isMobile) {
+        card.innerHTML = `
+            ${closeButtonHTML}${newBadgeHTML}${cloneBadgeHTML}
+            ${rankBadge}
+            <div class="nft-card-content">
+                ${imageBlock}
+                <div class="nft-details hover_wrapper">
+                    <div class="nft-id">Kamigotchi ${id}</div>
+                    ${traitsHTML}
+                    ${statsHTML}
+                </div>
             </div>`;
-    } finally {
-        hideLoader();
-        showContainer();
+    } else {
+        card.innerHTML = `
+            ${closeButtonHTML}${newBadgeHTML}${cloneBadgeHTML}
+            ${rankBadge}
+            ${statsHTML}
+            <div class="nft-card-content">
+                ${imageBlock}
+                <div class="nft-details hover_wrapper">
+                    <div class="nft-id">Kamigotchi ${id}</div>
+                    ${traitsHTML}
+                </div>
+            </div>`;
     }
+
+    card.addEventListener('click', (event) => {
+        event.stopPropagation();
+        card.querySelector('.kami-stats')?.classList.toggle('is-active');
+    });
+
+    return card;
 }
 
-// Refresh data without reloading entire page
-async function refreshData() {
-    if (isRefreshing) return;
-    
-    isRefreshing = true;
-    const refreshBtn = document.getElementById('refreshDataBtn');
-    const originalText = refreshBtn.innerHTML;
-    
-    refreshBtn.disabled = true;
-    
-    try {
-        console.log('🔄 Refreshing data...');
-        
-        // Save current filters
-        const currentFilters = getTraitStringFromState();
-        const currentSort = currentSortOrder;
-        const wasShowingClones = isShowingClonesOnly;
-        
-        const v = Date.now(); 
-        
-        await Promise.all([
-            fetchAndSplitBundle(v),
-            loadSacrificeData(v),   
-        ]);
-        
-        if (Object.keys(kamiStatsData).length > 0) {
-            console.log(`✅ Re-loaded stats data for ${Object.keys(kamiStatsData).length} Kamigotchi`);
-        }
 
-        if (metadataInfo.newKamiIds?.length > 0) {
-            console.log(`✨ Found ${metadataInfo.newKamiIds.length} new Kamigotchi!`);
-            console.log(`   New IDs: ${metadataInfo.newKamiIds.join(', ')}`);
-        } else {
-            console.log("💤 No new Kamigotchi")
-        }
-
-        // NEW: Re-extract affinity data
-        affinityData = extractAffinityData();
-        
-        // Rebuild trait signatures
-        traitSignatures = buildTraitSignatures();
-
-        // Recalculate everything with OpenRarity
-        traitCounts = calculateTraitCounts();
-        nftRarityScores = calculateRarityScores();
-        console.log('✅ OpenRarity recalculation complete!');
-        
-        // Restore sort and filters
-        currentSortOrder = currentSort;
-        isShowingClonesOnly = wasShowingClones;
-        allNFTIds = getSortedNFTIds();
-        
-        // Rebuild filter controls with updated data
-        const filterControls = document.getElementById('filterControls');
-        filterControls.innerHTML = '';
-        createFilterControls();
-        
-        // Restore filters by manually setting the checkboxes
-        if (currentFilters) {
-             const params = new URLSearchParams();
-             params.set('traits', currentFilters);
-             
-             // Temporarily set the URL search string to reload the state
-             const originalSearch = window.location.search;
-             history.replaceState(null, '', `?${params.toString()}`);
-             loadStateFromURL();
-             history.replaceState(null, '', originalSearch); // Restore original URL
-        }
-        
-        // Update clone button state
-        const cloneBtn = document.getElementById('cloneFilterBtn');
-        if (cloneBtn) {
-            if (isShowingClonesOnly) {
-                cloneBtn.classList.add('active');
-            } else {
-                cloneBtn.classList.remove('active');
-            }
-        }
-        
-        // Reload display based on active filters
-        if (isShowingClonesOnly) {
-            filterClones();
-        } else if (currentFilters) {
-            filterByTraits();
-        } else {
-            isFiltering = false;
-            loadInitialNFTs();
-        }
-        
-        updateURL(true); // Ensure final URL reflects current state
-        
-        // Show success feedback
-        refreshBtn.innerHTML = `<svg id="refreshComplete" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><mask id="SVGkzXYXbbR"><g fill="none" stroke="#fff" stroke-dasharray="24" stroke-dashoffset="24" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M2 13.5l4 4l10.75 -10.75"><animate fill="freeze" attributeName="stroke-dashoffset" dur="0.4s" values="24;0"/></path><path stroke="#000" stroke-width="6" d="M7.5 13.5l4 4l10.75 -10.75"><animate fill="freeze" attributeName="stroke-dashoffset" begin="0.4s" dur="0.4s" values="24;0"/></path><path d="M7.5 13.5l4 4l10.75 -10.75"><animate fill="freeze" attributeName="stroke-dashoffset" begin="0.4s" dur="0.4s" values="24;0"/></path></g></mask><rect width="24" height="24" fill="currentColor" mask="url(#SVGkzXYXbbR)"/></svg>`;
-        setTimeout(() => {
-            refreshBtn.innerHTML = originalText;
-            refreshBtn.disabled = false;
-            refreshBtn.style.opacity = '1';
-            isRefreshing = false;
-        }, 2000);
-        
-    } catch (error) {
-        console.error('Error refreshing data:', error);
-        // Using custom modal/message box instead of alert()
-        const messageBox = document.getElementById('messageBox');
-        messageBox.textContent = 'Failed to refresh data. Please try again.';
-        messageBox.style.display = 'block';
-        setTimeout(() => messageBox.style.display = 'none', 3000);
-
-        refreshBtn.innerHTML = originalText;
-        refreshBtn.disabled = false;
-        refreshBtn.style.opacity = '1';
-        isRefreshing = false;
-    }
-}
+// ============================================================
+// INFINITE SCROLL & CARD LOADING
+// ============================================================
 
 function loadInitialNFTs() {
     const resultsDiv = document.getElementById('results');
     resultsDiv.textContent = '';
-    
+
     const idsToDisplay = isFiltering ? filteredNFTIds : allNFTIds;
-    
+
     let title = 'Showing all Kamigotchi';
     if (isShowingClonesOnly) {
-        const uniqueSignatures = new Set();
-        idsToDisplay.forEach(id => {
-            uniqueSignatures.add(traitSignatures.signatures[id]);
-        });
+        const uniqueSignatures = new Set(idsToDisplay.map(id => traitSignatures.signatures[id]));
         title = `Showing ${idsToDisplay.length} clones in ${uniqueSignatures.size} groups`;
     } else if (isFiltering) {
         title = 'Found matching Kamigotchi';
     }
-    
-    const countDiv = createCountHeader(idsToDisplay.length, title);
-    resultsDiv.appendChild(countDiv);
-    
+
+    resultsDiv.appendChild(createCountHeader(idsToDisplay.length, title));
     currentLoadIndex = 0;
     loadMoreNFTs();
     setupInfiniteScroll();
@@ -1272,24 +1568,28 @@ function loadInitialNFTs() {
 
 function loadMoreNFTs() {
     if (isLoading) return;
-    
     isLoading = true;
+
     const resultsDiv = document.getElementById('results');
     const idsToDisplay = isFiltering ? filteredNFTIds : allNFTIds;
     const endIndex = Math.min(currentLoadIndex + LAZY_LOAD_COUNT, idsToDisplay.length);
-    
+
     requestAnimationFrame(() => {
         const fragment = document.createDocumentFragment();
-        
         for (let i = currentLoadIndex; i < endIndex; i++) {
             const card = displayNFT(idsToDisplay[i], false);
             if (card) fragment.appendChild(card);
         }
-        
         resultsDiv.appendChild(fragment);
         currentLoadIndex = endIndex;
         isLoading = false;
         updateLoadingIndicator();
+
+        // Re-observe the new last card for infinite scroll triggering
+        if (nftObserver) {
+            const cards = resultsDiv.querySelectorAll('.nft-card');
+            if (cards.length > 0) nftObserver.observe(cards[cards.length - 1]);
+        }
     });
 }
 
@@ -1304,23 +1604,17 @@ function createLoadingIndicator() {
 
 function updateLoadingIndicator() {
     let indicator = document.getElementById('loadingIndicator');
-    
     if (!indicator) {
         indicator = createLoadingIndicator();
         document.getElementById('results').appendChild(indicator);
     }
-    
     const idsToDisplay = isFiltering ? filteredNFTIds : allNFTIds;
-    if (currentLoadIndex >= idsToDisplay.length) {
-        indicator.style.display = 'none';
-    }
+    if (currentLoadIndex >= idsToDisplay.length) indicator.style.display = 'none';
 }
 
 function setupInfiniteScroll() {
-    if (nftObserver) {
-        nftObserver.disconnect();
-    }
-    
+    if (nftObserver) nftObserver.disconnect();
+
     nftObserver = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
             const idsToDisplay = isFiltering ? filteredNFTIds : allNFTIds;
@@ -1328,25 +1622,10 @@ function setupInfiniteScroll() {
                 loadMoreNFTs();
             }
         });
-    }, {
-        rootMargin: '200px'
-    });
-    
-    const observeLastCard = () => {
-        const cards = document.querySelectorAll('.nft-card');
-        if (cards.length > 0) {
-            const lastCard = cards[cards.length - 1];
-            nftObserver.observe(lastCard);
-        }
-    };
-    
-    setTimeout(observeLastCard, 100);
-    
-    const originalLoadMore = loadMoreNFTs;
-    loadMoreNFTs = function() {
-        originalLoadMore();
-        setTimeout(observeLastCard, 100);
-    };
+    }, { rootMargin: '200px' });
+
+    const cards = document.querySelectorAll('.nft-card');
+    if (cards.length > 0) nftObserver.observe(cards[cards.length - 1]);
 }
 
 function createCountHeader(count, title) {
@@ -1354,1136 +1633,382 @@ function createCountHeader(count, title) {
     countDiv.className = 'count-header';
     countDiv.innerHTML = `
         <div style="font-size: 14px;">${title}: ${count}</div>
-        <div class="note">** dear mobile user, click card to show og stats **<div>
+        <div class="note">** dear mobile user, click card to show og stats **</div>
     `;
     return countDiv;
 }
 
-function removeSelectedTrait(event) {
-    const btn = event.currentTarget;
-    const traitType = btn.dataset.traitType;
-    const traitValue = btn.dataset.traitValue;
-    
-    const checkbox = document.querySelector(
-        `.trait-checkbox[data-trait-type="${traitType}"][data-trait-value="${traitValue}"]`
-    );
-    
-    if (checkbox) {
-        checkbox.checked = false;
-        updateSelectedTraitsDisplay(true);
-    }
-}
 
-// MODIFIED: Added logic to stop affinity filter if traits are partially removed
-function updateSelectedTraitsDisplay(forceUpdate = false) {
-    const selectedTraitsDiv = document.getElementById('selectedTraitsDisplay');
-    if (selectedTraitsDiv) selectedTraitsDiv.style.display = 'none';
-    
-    // 1. Sync Affinities: This now checks if any NEW traits were selected 
-    // that aren't part of the current affinity sets.
-    validateAffinitiesAgainstCheckboxes();
-
-    const checkboxes = document.querySelectorAll('.trait-checkbox:checked');
-    
-    if (checkboxes.length === 0 && (isFiltering || forceUpdate)) {
-    isFiltering = false;
-    filteredNFTIds = [];
-    selectedBodyAffinities.clear();
-    selectedHandAffinities.clear();
-    updateAffinityButtonStates();
-
-    if (isShowingClonesOnly) {
-        preserveScroll(() => { filterClones(); updateURL(); });
-    } else if (hasActiveStatFilters()) {
-        preserveScroll(() => { filterByTraits(); updateURL(); });
-    } else {
-        preserveScroll(() => {
-            allNFTIds = getSortedNFTIds(Object.keys(traitsData));
-            loadInitialNFTs();
-            updateURL();
-        });
-    }
-    return;
-}
-    
-    updateURL(); 
-    preserveScroll(() => filterByTraits());
-}
-
-/**
- * NEW LOGIC: Validates that ONLY traits belonging to the active affinities are selected.
- * If a user selects a trait outside the affinity, the affinity filter is deactivated.
- */
-function validateAffinitiesAgainstCheckboxes() {
-    let stateChanged = false;
-
-    ['body', 'hand'].forEach(type => {
-        const activeAffinities = type === 'body' ? selectedBodyAffinities : selectedHandAffinities;
-        
-        // 1. Get all currently checked traits for this category
-        const checkedBoxes = document.querySelectorAll(`.trait-checkbox[data-trait-type="${type}"]:checked`);
-        const checkedTraitNames = Array.from(checkedBoxes).map(cb => cb.dataset.traitValue);
-
-        // 2. Identify which affinities are represented by the current checkbox selection
-        const representedAffinities = new Set();
-        checkedTraitNames.forEach(name => {
-            const nft = Object.values(traitsData).find(n => n[type]?.name === name);
-            if (nft && nft[type]?.affinity) {
-                representedAffinities.add(nft[type].affinity);
-            }
-        });
-
-        // 3. Logic: An affinity should be "Active" IF AND ONLY IF:
-        //    a) All traits belonging to that affinity are checked.
-        //    b) No traits from OTHER affinities are checked in this category.
-        
-        // We only allow an affinity to be "active" if there is exactly ONE affinity type selected in this category
-        if (representedAffinities.size === 1) {
-            const currentAffinity = Array.from(representedAffinities)[0];
-            
-            // Get all traits that belong to this specific affinity
-            const requiredTraits = new Set();
-            Object.values(traitsData).forEach(nft => {
-                if (nft[type]?.affinity === currentAffinity) {
-                    requiredTraits.add(nft[type].name);
-                }
-            });
-
-            // Check if every required trait is checked
-            const isComplete = Array.from(requiredTraits).every(name => checkedTraitNames.includes(name));
-            
-            // If it's complete and wasn't active, or if it was active and is still complete
-            if (isComplete) {
-                if (!activeAffinities.has(currentAffinity)) {
-                    activeAffinities.add(currentAffinity);
-                    stateChanged = true;
-                }
-            } else {
-                // Traits are missing from this affinity
-                if (activeAffinities.size > 0) {
-                    activeAffinities.clear();
-                    stateChanged = true;
-                }
-            }
-        } else {
-            // Either 0 traits are selected, or traits from multiple affinities (e.g. NORMAL + INSECT)
-            if (activeAffinities.size > 0) {
-                activeAffinities.clear();
-                stateChanged = true;
-            }
-        }
-    });
-
-    if (stateChanged) {
-        updateAffinityButtonStates();
-    }
-}
-
-function createFilterControls() {
-    const filterControls = document.getElementById('filterControls');
-    const allTraits = {};
-    const traitDetails = {};
-    
-    Object.values(traitsData).forEach(nft => {
-        Object.entries(nft).forEach(([traitType, traitData]) => {
-            if (!allTraits[traitType]) {
-                allTraits[traitType] = new Set();
-                traitDetails[traitType] = {};
-            }
-            
-            const traitName = getTraitName(traitData);
-            allTraits[traitType].add(traitName);
-            
-            if (typeof traitData === 'object' && traitData.name) {
-                if (!traitDetails[traitType][traitName]) {
-                    traitDetails[traitType][traitName] = {
-                        affinity: traitData.affinity || null,
-                        stats: traitData.stats || {}
-                    };
-                }
-            }
-        });
-    });
-    
-    const dropdownWrapper = document.createElement('div');
-    dropdownWrapper.className = 'dropdown-wrapper';
-    
-    const dropdownLabel = document.createElement('label');
-    dropdownLabel.textContent = 'Select Trait Category:';
-    dropdownLabel.className = 'dropdown-label';
-    
-    const dropdown = document.createElement('select');
-    dropdown.id = 'traitCategoryDropdown';
-    dropdown.className = 'trait-dropdown';
-    
-    const defaultOption = document.createElement('option');
-    defaultOption.value = '';
-    defaultOption.textContent = '-- Choose a category --';
-    dropdown.appendChild(defaultOption);
-    
-    Object.keys(allTraits).sort().forEach(traitType => {
-        const option = document.createElement('option');
-        option.value = traitType;
-        option.textContent = traitType.charAt(0).toUpperCase() + traitType.slice(1);
-        dropdown.appendChild(option);
-    });
-    
-    dropdownWrapper.appendChild(dropdownLabel);
-    dropdownWrapper.appendChild(dropdown);
-    filterControls.appendChild(dropdownWrapper);
-    
-    const filterGroupsContainer = document.createElement('div');
-    filterGroupsContainer.id = 'filterGroupsContainer';
-    filterControls.appendChild(filterGroupsContainer);
-    
-    Object.keys(allTraits).sort().forEach(traitType => {
-        const filterGroup = document.createElement('div');
-        filterGroup.className = 'filter-group';
-        filterGroup.dataset.traitType = traitType;
-        filterGroup.style.display = 'none';
-        
-        const header = document.createElement('div');
-        header.className = 'filter-header';
-        header.textContent = traitType.charAt(0).toUpperCase() + traitType.slice(1);
-        filterGroup.appendChild(header);
-        
-        const searchInput = document.createElement('input');
-        searchInput.type = 'text';
-        searchInput.className = 'trait-search';
-        searchInput.placeholder = `Search ${traitType}...`;
-        searchInput.autocomplete = 'off';
-        searchInput.dataset.traitType = traitType;
-        filterGroup.appendChild(searchInput);
-        
-        const checkboxContainer = document.createElement('div');
-        checkboxContainer.className = 'checkbox-container';
-        checkboxContainer.dataset.traitType = traitType;
-        
-        const sortedValues = [...allTraits[traitType]].sort((a, b) => {
-            const countA = traitCounts[traitType][a] || 0;
-            const countB = traitCounts[traitType][b] || 0;
-            return countA - countB;
-        });
-        
-        sortedValues.forEach(value => {
-            const count = traitCounts[traitType][value] || 0;
-            const totalNFTs = Object.keys(traitsData).length;
-            const percentage = ((count / totalNFTs) * 100).toFixed(1);
-            
-            const checkboxWrapper = document.createElement('label');
-            checkboxWrapper.className = 'checkbox-label';
-            checkboxWrapper.dataset.traitValue = value.toLowerCase();
-            
-            const checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.className = 'trait-checkbox';
-            checkbox.dataset.traitType = traitType;
-            checkbox.dataset.traitValue = value;
-            checkbox.addEventListener('change', () => updateSelectedTraitsDisplay(false));
-            
-            const details = traitDetails[traitType][value] || {};
-            
-            let affinityHTML = '';
-            if (details.affinity && (traitType === 'body' || traitType === 'hand')) {
-                affinityHTML = `<span class="trait-affinity ${details.affinity}" title="Affinity">${details.affinity}</span>`;
-            }
-            
-            let statsHTML = '';
-            if (details.stats && Object.keys(details.stats).length > 0) {
-                const statBadges = Object.entries(details.stats)
-                    .map(([statName, value]) => {
-                        const sign = value > 0 ? '+' : '';
-                        return `<span class="trait-stat ${statName}" title="${statName.charAt(0).toUpperCase() + statName.slice(1)}">${statName.slice(0, 3).toUpperCase()} ${sign}${value}</span>`;
-                    })
-                    .join('');
-                statsHTML = `<span class="trait-stats">${statBadges}</span>`;
-            }
-            
-            const span = document.createElement('span');
-            span.className = 'trait-label-text';
-            span.innerHTML = `
-                <span class="trait-name-row">
-                    <span class="trait-name">${value}</span>
-                    ${affinityHTML}
-                </span>
-                <span class="trait-info-row">
-                    <span class="trait-count">${count} (${percentage}%)</span>
-                    ${statsHTML}
-                </span>
-            `;
-            
-            checkboxWrapper.appendChild(checkbox);
-            checkboxWrapper.appendChild(span);
-            checkboxContainer.appendChild(checkboxWrapper);
-        });
-        
-        filterGroup.appendChild(checkboxContainer);
-        filterGroupsContainer.appendChild(filterGroup);
-        
-        searchInput.addEventListener('input', (e) => {
-            filterTraitOptions(traitType, e.target.value);
-        });
-    });
-    
-    dropdown.addEventListener('change', (e) => {
-        const selectedCategory = e.target.value;
-        const allFilterGroups = document.querySelectorAll('.filter-group');
-        allFilterGroups.forEach(group => group.style.display = 'none');
-        
-        if (selectedCategory) {
-            const selectedGroup = document.querySelector(`.filter-group[data-trait-type="${selectedCategory}"]`);
-            if (selectedGroup) selectedGroup.style.display = 'block';
-        }
-    });
-}
-
-function filterTraitOptions(traitType, searchTerm) {
-    const container = document.querySelector(`.checkbox-container[data-trait-type="${traitType}"]`);
-    const checkboxLabels = container.querySelectorAll('.checkbox-label');
-    const searchLower = searchTerm.toLowerCase().trim();
-    
-    let visibleCount = 0;
-    
-    checkboxLabels.forEach(label => {
-        const traitValue = label.dataset.traitValue;
-        if (searchLower === '' || traitValue.includes(searchLower)) {
-            label.style.display = 'flex';
-            visibleCount++;
-        } else {
-            label.style.display = 'none';
-        }
-    });
-    
-    let noResultsMsg = container.querySelector('.no-trait-results');
-    if (visibleCount === 0) {
-        if (!noResultsMsg) {
-            noResultsMsg = document.createElement('div');
-            noResultsMsg.className = 'no-trait-results';
-            noResultsMsg.textContent = 'No matching traits found';
-            container.appendChild(noResultsMsg);
-        }
-    } else {
-        if (noResultsMsg) noResultsMsg.remove();
-    }
-}
-
-// Helper function to get stat color class based on current sort
-function getStatColorClass() {
-    const statSorts = ['harmony', 'health', 'power', 'violence'];
-    return statSorts.includes(currentSortOrder) ? currentSortOrder : '';
-}
-
-// MODIFIED: Added check for sacrifice data and emoji badge
-function displayNFT(id, showCloseButton = false) {
-    const imageUrl = imagesData[id];
-    const traits = traitsData[id];
-    const stats = kamiStatsData[id];
-    
-    if (!imageUrl || !traits) {
-        console.warn(`NFT #${id} not found in data`);
-        return null;
-    }
-    
-    const rarityData = nftRarityScores[id];
-    const rank = rarityData ? rarityData.rank : '?';
-    const score = rarityData ? rarityData.score.toFixed(4) : '?';
-    const isTied = rarityData ? rarityData.isTied : false;
-    
-    const isNew = metadataInfo.kamiNewWindow && metadataInfo.kamiNewWindow.hasOwnProperty(String(id));
-    const isClone = traitSignatures.cloneIds.has(id);
-    const isSacrificed = sacrificedNFTs.has(String(id)); // NEW: Check sacrifice set
-    const isListed = listedNFTs.has(String(id)); // Check if listed for sale
-    
-    const card = document.createElement('div');
-    card.className = 'nft-card hover_wrapper';
-    card.dataset.nftId = id;
-    
-    let rankClass = 'rank-common';
-    const totalNFTs = Object.keys(traitsData).length;
-    const rankPercentile = (rank / totalNFTs) * 100;
-    
-    if (rankPercentile <= 1) rankClass = 'rank-legendary';
-    else if (rankPercentile <= 5) rankClass = 'rank-epic';
-    else if (rankPercentile <= 15) rankClass = 'rank-rare';
-    else if (rankPercentile <= 40) rankClass = 'rank-uncommon';
-    
-    // Get stat color class
-    const statColorClass = getStatColorClass();
-    
-    // Get the stat value for the current sort
-    const statValue = stats?.stats[currentSortOrder] || '';
-
-    // Build stat color indicator HTML (only show if sorting by a stat)
-    const statColorHTML = statColorClass ? 
-        `<div class="stat-color-box ${statColorClass}" title="${statColorClass.charAt(0).toUpperCase() + statColorClass.slice(1)} Sort">${statValue}</div>` : '';
-    
-    let statsHTML = '';
-    if (stats) {
-        statsHTML = `
-            <div class="kami-stats">
-                <div class="stat-row one">
-                    <div class="stat-item health">
-                        
-                        <div class="stat-value">${stats.stats.health}</div>
-                    </div>
-                    <div class="stat-item power">
-                        
-                        <div class="stat-value">${stats.stats.power}</div>
-                    </div>
-                </div>
-                <div class="stat-row">
-                    <div class="stat-item violence">
-                        
-                        <div class="stat-value">${stats.stats.violence}</div>
-                    </div>
-                    <div class="stat-item harmony">
-                        
-                        <div class="stat-value">${stats.stats.harmony}</div>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-    
-    const traitsHTML = Object.entries(traits)
-        .map(([key, traitData]) => {
-            const traitName = getTraitName(traitData);
-            return `
-                <div class="trait">
-                    <p>${key.charAt(0).toUpperCase() + key.slice(1)}: ${traitName}</p>
-                </div>
-            `;
-        }).join('');
-    
-    const closeButtonHTML = showCloseButton ? 
-        `<button class="close-btn" onclick="removeSelectedID('${id}')" title="Remove this Kamigotchi">×</button>` : '';
-    
-    const newBadgeHTML = isNew ? 
-        `<div class="new-badge" title="Recently Added!">NEW</div>` : '';
-
-    const cloneBadgeHTML = isClone ? 
-        `<div class="clone-badge" title="This Kamigotchi has identical traits to others">CLONE</div>` : '';
-
-    // NEW: Sacrifice Badge HTML
-    const sacrificeBadgeHTML = isSacrificed ?
-        `<div class="sacrifice-badge" title="This Kamigotchi has been sacrificed">🕳️</div>` : '';
-
-    // listed Badge HTML
-    const listedBadgeHTML = isListed ?
-        `<div class="listed-badge" title="This Kamigotchi is listed on KamiSwap"><img id="kamiswap_icon" src="https://app.kamigotchi.io/assets/marketplace-BqMKbOFC.png" style="border: none"></div>` : '';
-    
-    // Check if mobile view
-    const isMobile = window.innerWidth <= 390;
-
-    // Prepare tooltip text
-    const rankTooltip = isTied 
-        ? `OpenRarity Rank: #${rank} (Tied) | Score: ${score}` 
-        : `OpenRarity Rank: #${rank} | Score: ${score}`;
-
-    // Build the card HTML based on screen size
-    if (isMobile) {
-        card.innerHTML = `
-        ${closeButtonHTML}
-        ${newBadgeHTML}
-        ${cloneBadgeHTML}
-        <div class="rank-stat-container">
-            <div class="rank-badge ${rankClass}" title="Rarity Rank: #${rank} | Score: ${score}">
-                ${rank}
-            </div>
-            ${statColorHTML}
-        </div>
-        <div class="nft-card-content">
-            <div class="image-container">
-                <img src="${imageUrl}" alt="NFT #${id}" loading="lazy" onerror="this.src='https://via.placeholder.com/250?text=Not+Found'">
-                ${sacrificeBadgeHTML}
-                ${listedBadgeHTML}
-            </div>
-            <div class="nft-details hover_wrapper">
-                <div class="nft-id">Kamigotchi ${id}</div>
-                ${traitsHTML}
-                ${statsHTML}
-            </div>
-            
-        </div>
-        `;
-    } else {
-        card.innerHTML = `
-        ${closeButtonHTML}
-        ${newBadgeHTML}
-        ${cloneBadgeHTML}
-        <div class="rank-stat-container">
-            <div class="rank-badge ${rankClass}" title="Rarity Rank: #${rank} | Score: ${score}">
-                ${rank}
-            </div>
-            ${statColorHTML}
-        </div>
-        ${statsHTML}
-        <div class="nft-card-content">
-            <div class="image-container">
-                <img src="${imageUrl}" alt="NFT #${id}" loading="lazy" onerror="this.src='https://via.placeholder.com/250?text=Image+Not+Found'">
-                ${sacrificeBadgeHTML}
-                ${listedBadgeHTML}
-            </div>
-            <div class="nft-details hover_wrapper">
-                <div class="nft-id">Kamigotchi ${id}</div>
-                ${traitsHTML}
-            </div>
-            
-        </div>
-        `;
-    }
-    
-    card.addEventListener('click', (event) => {
-        event.stopPropagation();
-        const statsElement = card.querySelector('.kami-stats');
-        if (statsElement) {
-            statsElement.classList.toggle('is-active');
-        }
-    });
-
-    document.addEventListener('click', (event) => {
-        const statsElement = card.querySelector('.kami-stats');
-        if (statsElement && statsElement.classList.contains('is-active')) {
-            const isClickInsideContainer = card.contains(event.target);
-            if (!isClickInsideContainer) {
-                statsElement.classList.remove('is-active');
-            }
-        }
-    });
-
-    return card;
-}
+// ============================================================
+// SELECTED IDs (COMPARISON AREA)
+// ============================================================
 
 function updateSelectedIDsDisplay() {
     const selectedIDsDiv = document.getElementById('selectedIDs');
-    
+
     if (selectedIDs.size === 0) {
         selectedIDsDiv.style.display = 'none';
-    } else {
-        selectedIDsDiv.style.display = 'block';
-        selectedIDsDiv.innerHTML = '';
-        
-        const cardsContainer = document.createElement('div');
-        cardsContainer.className = 'selected-cards-grid';
-
-        // Sort selected IDs using the current sort order
-        const selectedIDsArray = Array.from(selectedIDs);
-        const sortedIDs = getSortedNFTIds(selectedIDsArray);
-        
-        sortedIDs.forEach(id => {
-            const card = displayNFT(id, true);
-            if (card) cardsContainer.appendChild(card);
-        });
-        
-        selectedIDsDiv.appendChild(cardsContainer);
+        return;
     }
-    
-    updateURL(); // Update URL whenever IDs change
+
+    selectedIDsDiv.style.display = 'block';
+    selectedIDsDiv.innerHTML = '';
+    const cardsContainer = document.createElement('div');
+    cardsContainer.className = 'selected-cards-grid';
+    getSortedNFTIds(Array.from(selectedIDs)).forEach(id => {
+        const card = displayNFT(id, true);
+        if (card) cardsContainer.appendChild(card);
+    });
+    selectedIDsDiv.appendChild(cardsContainer);
+    updateURL();
 }
 
 function searchByID() {
     const searchInput = document.getElementById('searchInput');
     const id = searchInput.value.trim();
-    
-    if (!id) {
-        // Using custom modal/message box instead of alert()
+
+    const showMessage = (text) => {
         const messageBox = document.getElementById('messageBox');
-        messageBox.textContent = 'Please enter an NFT ID';
+        messageBox.textContent = text;
         messageBox.style.display = 'block';
         setTimeout(() => messageBox.style.display = 'none', 3000);
-        return;
-    }
-    
-    if (!imagesData[id] || !traitsData[id]) {
-        // Using custom modal/message box instead of alert()
-        const messageBox = document.getElementById('messageBox');
-        messageBox.textContent = `Kamigotchi #${id} not found. Please check the ID and try again.`;
-        messageBox.style.display = 'block';
-        setTimeout(() => messageBox.style.display = 'none', 3000);
-        return;
-    }
-    
-    if (selectedIDs.has(id)) {
-        // Using custom modal/message box instead of alert()
-        const messageBox = document.getElementById('messageBox');
-        messageBox.textContent = `Kamigotchi #${id} is already added!`;
-        messageBox.style.display = 'block';
-        setTimeout(() => messageBox.style.display = 'none', 3000);
-        return;
-    }
-    
+    };
+
+    if (!id) { showMessage('Please enter an NFT ID'); return; }
+    if (!imagesData[id] || !traitsData[id]) { showMessage(`Kamigotchi #${id} not found. Please check the ID and try again.`); return; }
+    if (selectedIDs.has(id)) { showMessage(`Kamigotchi #${id} is already added!`); return; }
+
     selectedIDs.add(id);
     updateSelectedIDsDisplay();
     searchInput.value = '';
-    
-    updateURL(); // <<< URL Update
+    updateURL();
 }
 
 function removeSelectedID(id) {
     selectedIDs.delete(id);
     updateSelectedIDsDisplay();
-    
-    updateURL(); // <<< URL Update
+    updateURL();
 }
-
 window.removeSelectedID = removeSelectedID;
 
 function clearAllSelectedIDs() {
     selectedIDs.clear();
     updateSelectedIDsDisplay();
     document.getElementById('searchInput').value = '';
-    
-    updateURL(); // <<< URL Update
+    updateURL();
 }
 
-function filterByTraits() {
-    const resultsDiv = document.getElementById('results');
-    resultsDiv.textContent = '';
 
-    const checkboxes = document.querySelectorAll('.trait-checkbox:checked');
-    const hasTraitFilters = checkboxes.length > 0;
-    const hasAffinityFilters = selectedBodyAffinities.size > 0 || selectedHandAffinities.size > 0;
-    
-    const hasStatFilters = hasActiveStatFilters();
+// ============================================================
+// DATA FETCHING
+// ============================================================
 
-    if (!hasTraitFilters && !hasAffinityFilters && !hasStatFilters) {
-        isFiltering = false;
-        
-        if (isShowingClonesOnly) {
-            filterClones();
-        } else {
-            allNFTIds = getSortedNFTIds(Object.keys(traitsData));
-            loadInitialNFTs();
+async function loadSacrificeData(v) {
+    try {
+        const response = await fetch(`/api/sacrifices?v=${v}`);
+        if (response.ok) {
+            const data = await response.json();
+            sacrificedNFTs = new Set(data.map(item => String(item.kami_index)));
+            console.log(`🕳️ Loaded ${sacrificedNFTs.size} sacrifice records`);
         }
-        return;
+    } catch (err) {
+        // Silent fail
     }
-    
-    const filteringMessage = document.createElement('div');
-    filteringMessage.className = 'no-results';
-    filteringMessage.textContent = 'Filtering...';
-    resultsDiv.appendChild(filteringMessage);
+}
 
-    const selectedTraits = {};
-    checkboxes.forEach(checkbox => {
-        const traitType = checkbox.dataset.traitType;
-        const traitValue = checkbox.dataset.traitValue;
-        
-        if (!selectedTraits[traitType]) {
-            selectedTraits[traitType] = [];
+async function loadListingsData(v) {
+    try {
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname.startsWith('192.168.');
+        const finalUrl = isLocal
+            ? `https://data.kami.h80h.xyz/kamiListings.json?v=${v}`
+            : `/api/data/kamiListings.json?v=${v}`;
+        const response = await fetch(finalUrl);
+        if (response.ok) {
+            const data = await response.json();
+            listingNFTs = new Map(Object.entries(data).map(([id, price]) => [String(id), price]));
+            console.log(`🛍️ Loaded ${listingNFTs.size} listing Kamigotchi on KamiSwap`);
         }
-        selectedTraits[traitType].push(traitValue);
-    });
-    
-    let baseIDs = isShowingClonesOnly ? Array.from(traitSignatures.cloneIds) : Object.keys(traitsData);
-
-    let matchingNFTs = baseIDs.filter(id => {
-        const nftTraits = traitsData[id];
-        return Object.entries(selectedTraits).every(([traitType, selectedValues]) => {
-            const nftTraitName = getTraitName(nftTraits[traitType]);
-            return selectedValues.includes(nftTraitName);
-        });
-    });
-    
-    if (hasAffinityFilters) {
-        matchingNFTs = matchingNFTs.filter(id => {
-            const nftAffinity = affinityData[id];
-            if (!nftAffinity) return false;
-            
-            const bodyMatch = selectedBodyAffinities.size === 0 || selectedBodyAffinities.has(nftAffinity.body);
-            const handMatch = selectedHandAffinities.size === 0 || selectedHandAffinities.has(nftAffinity.hand);
-            
-            return bodyMatch && handMatch;
-        });
-    }
-
-    // Apply stat min/max filters
-    if (hasStatFilters) {
-        matchingNFTs = matchingNFTs.filter(id => passesStatMinMaxFilters(id));
-    }
-    
-    filteredNFTIds = getSortedNFTIds(matchingNFTs);
-    isFiltering = true;
-    
-    if (isShowingClonesOnly) {
-        filterClones();
-        return;
-    }
-    
-    resultsDiv.textContent = '';
-    
-    // --- NEW: AFFINITY NOTATION LOGIC ---
-    let affinityNotation = "";
-    if (hasAffinityFilters) {
-        const affinityMap = {
-            'NORMAL': 'N',
-            'INSECT': 'I',
-            'SCRAP': 'S',
-            'EERIE': 'E'
-        };
-
-        // Get the first item from the Sets (since UI logic handles single affinity selection)
-        const bValue = Array.from(selectedBodyAffinities)[0];
-        const hValue = Array.from(selectedHandAffinities)[0];
-
-        const bChar = bValue ? (affinityMap[bValue] || "?") : "";
-        const hChar = hValue ? (affinityMap[hValue] || "?") : "";
-            
-        affinityNotation = ` (${bChar}/${hChar})`;
-    }
-    // ------------------------------------
-
-    let summaryButtonsHTML = '';
-    Object.entries(selectedTraits).forEach(([type, values]) => {
-        values.forEach(value => {
-            summaryButtonsHTML += `
-                <button class="count-header-trait-btn" 
-                        data-trait-type="${type}" 
-                        data-trait-value="${value}"
-                        title="Click to remove filter: ${type}: ${value}">
-                    ${type}: ${value} ×
-                </button>
-            `;
-        });
-    });
-    
-    const countDiv = document.createElement('div');
-    countDiv.className = 'count-header';
-    countDiv.innerHTML = `
-        <div id="count-summary" style="font-size: 14px;">
-            Found matching Kamigotchi: ${filteredNFTIds.length}${affinityNotation}
-        </div>
-        <div class="note">** dear mobile user, click card to show og stats **</div>
-        <div class="filter-summary-buttons-container" style="display: flex; flex-wrap: wrap; gap: 5px; margin: 10px;">
-            ${summaryButtonsHTML}
-        </div>
-        ${buildStatFilterSummaryHTML()}
-    `;
-
-    resultsDiv.appendChild(countDiv);
-    
-    countDiv.querySelectorAll('.count-header-trait-btn:not(.stat-filter-summary-btn)').forEach(btn => {
-        btn.addEventListener('click', removeSelectedTrait);
-    });
-    attachStatFilterSummaryListeners(countDiv);
-
-    if (filteredNFTIds.length === 0) {
-        const noResultsDiv = document.createElement('div');
-        noResultsDiv.className = 'no-results';
-        noResultsDiv.textContent = 'No Kamigotchi match your selected traits';
-        resultsDiv.appendChild(noResultsDiv);
-        isFiltering = false;
-        return;
-    }
-    
-    currentLoadIndex = 0;
-    loadMoreNFTs();
-    setupInfiniteScroll();
-}
-
-// NEW: Setup affinity filter toggle button
-function setupAffinityFilterToggle() {
-    const toggleBtn = document.getElementById('affinityFilterToggle');
-    const affinitySection = document.querySelector('.affinity-filter-section');
-    
-    if (toggleBtn && affinitySection) {
-        toggleBtn.addEventListener('click', () => {
-            const isVisible = affinitySection.style.display !== 'none';
-            affinitySection.style.display = isVisible ? 'none' : 'block';
-            toggleBtn.classList.toggle('active', !isVisible);
-        });
+    } catch (err) {
+        // Silent fail — listing badges simply won't show if unavailable
     }
 }
 
-// MODIFIED: Clicking affinity now toggles all matching individual trait checkboxes
-function setupAffinityFilters() {
-    const affinityButtons = document.querySelectorAll('.affinity-btn');
-    
-    affinityButtons.forEach(button => {
-        button.addEventListener('click', () => {
-            const affinityValue = button.textContent.trim();
-            const isBody = button.closest('#bodyAffinity') !== null;
-            const traitType = isBody ? 'body' : 'hand';
-            const affinitySet = isBody ? selectedBodyAffinities : selectedHandAffinities;
+// Fetches kamiBundle.json, splits it into global data stores, then nulls the bundle for GC
+async function fetchAndSplitBundle(v) {
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname.startsWith('192.168.');
+    const finalUrl = isLocal
+        ? `https://data.kami.h80h.xyz/kamiBundle.json?v=${v}`
+        : `/api/data/kamiBundle.json?v=${v}`;
 
-            if (affinitySet.has(affinityValue)) {
-                affinitySet.delete(affinityValue);
-                button.classList.remove('active');
-                toggleTraitCheckboxesByAffinity(traitType, affinityValue, false);
-            } else {
-                // --- FIX: CLEAR PREVIOUS SELECTIONS ---
-                // 1. Clear the set for this category
-                affinitySet.clear(); 
-                
-                // 2. Uncheck EVERY checkbox in the filterGroupsContainer for this type
-                const allCheckboxesInType = document.querySelectorAll(`.trait-checkbox[data-trait-type="${traitType}"]`);
-                allCheckboxesInType.forEach(cb => cb.checked = false);
+    const response = await fetch(finalUrl);
+    if (!response.ok) throw new Error(`Failed to load kamiBundle.json: ${response.status}`);
 
-                // 3. Set this affinity as active
-                affinitySet.add(affinityValue);
-                updateAffinityButtonStates(); 
-                toggleTraitCheckboxesByAffinity(traitType, affinityValue, true);
-            }
-            
-            // Re-run display logic to clear summary buttons and refresh results
-            updateSelectedTraitsDisplay(true);
-        });
-    });
+    let bundle = await response.json();
+    if (!bundle.kamiImage || !bundle.kamiTraits) {
+        bundle = null;
+        throw new Error('Bundle is missing required sections (kamiImage / kamiTraits)');
+    }
+
+    imagesData     = bundle.kamiImage;    bundle.kamiImage    = null;
+    traitsData     = bundle.kamiTraits;   bundle.kamiTraits   = null;
+    kamiStatsData  = bundle.kamiStats  || {};  bundle.kamiStats    = null;
+    metadataInfo   = bundle.kamiMetadata || { newKamiIds: [] }; bundle.kamiMetadata = null;
+    bundle = null;
 }
 
-// NEW: Helper to sync checkboxes with the clicked affinity
-function toggleTraitCheckboxesByAffinity(type, affinity, shouldCheck) {
-    // Collect all traits that belong to this affinity from our data
-    const affinityTraitNames = new Set();
-    Object.values(traitsData).forEach(nft => {
-        const trait = nft[type];
-        if (trait && typeof trait === 'object' && trait.affinity === affinity) {
-            affinityTraitNames.add(trait.name);
+// Post-fetch data processing shared by loadData and refreshData
+function processLoadedData() {
+    affinityData       = extractAffinityData();
+    traitAffinityLookup = buildTraitAffinityLookup();
+    traitSignatures    = buildTraitSignatures();
+    traitCounts        = calculateTraitCounts();
+    nftRarityScores    = calculateRarityScores();
+    console.log('✅ OpenRarity calculation complete!');
+}
+
+async function loadData() {
+    try {
+        console.log('📄 Loading bundle with cache-busting...');
+        const v = Date.now();
+
+        await Promise.all([
+            fetchAndSplitBundle(v),
+            loadSacrificeData(v),
+            loadListingsData(v),
+        ]);
+
+        if (Object.keys(kamiStatsData).length > 0) {
+            console.log(`✅ Loaded stats data for ${Object.keys(kamiStatsData).length} Kamigotchi`);
         }
-    });
-
-    // Toggle only the checkboxes for those specific traits
-    affinityTraitNames.forEach(traitName => {
-        const cb = document.querySelector(`.trait-checkbox[data-trait-type="${type}"][data-trait-value="${traitName}"]`);
-        if (cb) cb.checked = shouldCheck;
-    });
-}
-
-// NEW: Update affinity button visual states
-function updateAffinityButtonStates() {
-    const affinityButtons = document.querySelectorAll('.affinity-btn');
-    
-    affinityButtons.forEach(button => {
-        const affinity = button.textContent.trim();
-        const isBodyButton = button.closest('#bodyAffinity') !== null;
-        
-        if (isBodyButton) {
-            button.classList.toggle('active', selectedBodyAffinities.has(affinity));
-        } else {
-            button.classList.toggle('active', selectedHandAffinities.has(affinity));
+        if (metadataInfo.newKamiIds?.length > 0) {
+            console.log(`✨ Found ${metadataInfo.newKamiIds.length} new Kamigotchi!`);
+            console.log(`   New IDs: ${metadataInfo.newKamiIds.join(', ')}`);
         }
-    });
-}
 
-// NEW: Remove affinity filter when clicking on summary button
-function removeSelectedAffinity(event) {
-    const button = event.currentTarget;
-    const affinityType = button.dataset.affinityType;
-    const affinityValue = button.dataset.affinityValue;
-    
-    if (affinityType === 'body') {
-        selectedBodyAffinities.delete(affinityValue);
-    } else if (affinityType === 'hand') {
-        selectedHandAffinities.delete(affinityValue);
-    }
-    
-    updateAffinityButtonStates();
-    preserveScroll(() => { filterByTraits(); updateURL(); });
-}
+        processLoadedData();
 
-function setupMinMaxFilterToggle() {
-    const toggleBtn = document.getElementById('minmaxFilterToggle');
-    const minmaxSection = document.querySelector('.minmax-filter-section');
-    
-    if (toggleBtn && minmaxSection) {
-        toggleBtn.addEventListener('click', () => {
-            const isVisible = minmaxSection.style.display !== 'none';
-            minmaxSection.style.display = isVisible ? 'none' : 'block';
-            toggleBtn.classList.toggle('active', !isVisible);
-        });
-    }
-}
+        // Wire up all controls
+        setupSortButtons();
+        setupCloneFilterButton();
+        setupListingFilterButton();
+        setupAffinityFilterToggle();
+        setupMinMaxFilterToggle();
+        setupAffinityFilters();
+        createFilterControls();
 
-// Helper: returns true if the stat min/max filters are at their default (no actual filtering)
-function isStatFilterDefault(statName) {
-    const f = statMinMaxFilters[statName];
-    const slider = document.querySelector(`.stat-control.${statName} .stat-control-input`);
-    if (!slider) return true;
-    const defaultVal = Number(slider.min);
-    // In min mode: at minimum value means "show all" (>= min = all pass)
-    // In max mode: at maximum value means "show all" (<= max = all pass)
-    if (f.isMax) {
-        return f.value >= Number(slider.max);
-    } else {
-        return f.value <= defaultVal;
-    }
-}
+        // Restore URL state
+        const initialFilterActive = loadStateFromURL();
 
-// Helper: returns true if a kamigotchi passes all active stat min/max filters
-function passesStatMinMaxFilters(id) {
-    const kamiData = kamiStatsData[id];
-    for (const [statName, filter] of Object.entries(statMinMaxFilters)) {
-        if (isStatFilterDefault(statName)) continue;
-        let statVal = 0;
-        if (kamiData) {
-            if (statName === 'slots') {
-                statVal = kamiData.stats?.slots ?? 0;
-            } else {
-                statVal = kamiData.stats?.[statName] ?? 0;
-            }
-        }
-        if (filter.isMax) {
-            if (statVal > filter.value) return false;
-        } else {
-            if (statVal < filter.value) return false;
-        }
-    }
-    return true;
-}
+        document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+        document.querySelector(`.sort-btn[data-sort="${currentSortOrder}"]`)?.classList.add('active');
+        document.getElementById('cloneFilterBtn')?.classList.toggle('active', isShowingClonesOnly);
+        document.getElementById('listingFilterBtn')?.classList.toggle('active', isShowingListingOnly);
 
-// Helper: returns true if any stat filter is meaningfully active
-function hasActiveStatFilters() {
-    return Object.keys(statMinMaxFilters).some(s => !isStatFilterDefault(s));
-}
+        updateSelectedIDsDisplay();
+        allNFTIds = getSortedNFTIds();
 
-const controls = document.querySelectorAll('.stat-control');
+        if (initialFilterActive)      filterByTraits();
+        else if (isShowingClonesOnly) filterClones();
+        else if (isShowingListingOnly) filterListing();
+        else                           loadInitialNFTs();
 
-controls.forEach(control => {
-  // Determine which stat this control is for
-  const statName = ['health', 'power', 'violence', 'harmony', 'slots'].find(s => control.classList.contains(s));
-  
-  const slider = control.querySelector('input[type="range"]');
-  const valueDisplay = control.querySelector('.stat-control-input-value');
-  const toggleInput = control.querySelector('.toggle-input');
+        updateURL(true);
 
-  // Initialize state from slider default
-  if (statName && slider) {
-    statMinMaxFilters[statName].value = Number(slider.value);
-    statMinMaxFilters[statName].isMax = toggleInput ? toggleInput.checked : false;
-  }
-
-  // Update the text and state whenever the slider moves
-  slider.addEventListener('input', (event) => {
-    valueDisplay.textContent = event.target.value;
-    if (statName) {
-      statMinMaxFilters[statName].value = Number(event.target.value);
-      triggerStatFilter();
-    }
-  });
-
-  // Update state and re-filter when min/MAX toggle changes
-  if (toggleInput && statName) {
-    toggleInput.addEventListener('change', () => {
-      statMinMaxFilters[statName].isMax = toggleInput.checked;
-      // Update display (the value stays the same)
-      triggerStatFilter();
-    });
-  }
-});
-
-function buildStatFilterSummaryHTML() {
-    let html = '';
-    Object.entries(statMinMaxFilters).forEach(([statName, filter]) => {
-        if (isStatFilterDefault(statName)) return;
-        const op = filter.isMax ? '&lt;=' : '&gt;=';
-        html += `<button class="count-header-trait-btn stat-filter-summary-btn" 
-                    data-stat-name="${statName}">
-                    ${statName} ${op} ${filter.value} ×
-                </button>`;
-    });
-    return html ? `<div class="filter-summary-buttons-container" style="display:flex;flex-wrap:wrap;gap:5px;margin:10px;">${html}</div>` : '';
-}
-
-function attachStatFilterSummaryListeners(container) {
-    container.querySelectorAll('.stat-filter-summary-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const statName = btn.dataset.statName;
-            const slider = document.querySelector(`.stat-control.${statName} .stat-control-input`);
-            const valueDisplay = document.querySelector(`.stat-control.${statName} .stat-control-input-value`);
-            const toggleInput = document.querySelector(`.stat-control.${statName} .toggle-input`);
-            if (slider) {
-                slider.value = slider.min;
-                if (valueDisplay) valueDisplay.textContent = slider.min;
-            }
-            // Reset toggle back to min mode
-            if (toggleInput) toggleInput.checked = false;
-            // Reset internal state fully
-            statMinMaxFilters[statName].value = slider ? Number(slider.min) : 0;
-            statMinMaxFilters[statName].isMax = false;
-            triggerStatFilter();
-        });
-    });
-}
-
-// Preserves scroll position across a filter re-render
-function preserveScroll(fn) {
-    const scrollY = window.scrollY;
-    fn();
-    requestAnimationFrame(() => window.scrollTo({ top: scrollY, behavior: 'instant' }));
-}
-
-// Trigger re-filter from stat sliders, integrating with existing filter logic
-let _statFilterTimer = null;
-function triggerStatFilter() {
-    clearTimeout(_statFilterTimer);
-    _statFilterTimer = setTimeout(() => {
-        preserveScroll(() => {
-            if (isShowingClonesOnly) {
-                filterClones();
-            } else if (isFiltering || hasActiveStatFilters()) {
-                filterByTraits();
-            } else {
-                allNFTIds = getSortedNFTIds(Object.keys(traitsData));
-                loadInitialNFTs();
-            };
-            updateURL();
-        });
-    }, 200);
-}
-
-
-function clearFilters() {
-    const checkboxes = document.querySelectorAll('.trait-checkbox');
-    checkboxes.forEach(checkbox => checkbox.checked = false);
-    
-    const searchInputs = document.querySelectorAll('.trait-search');
-    searchInputs.forEach(input => {
-        input.value = '';
-        const traitType = input.dataset.traitType;
-        filterTraitOptions(traitType, '');
-    });
-    
-    const dropdown = document.getElementById('traitCategoryDropdown');
-    if (dropdown) dropdown.value = '';
-    
-    const allFilterGroups = document.querySelectorAll('.filter-group');
-    allFilterGroups.forEach(group => group.style.display = 'none');
-
-    // --- ADDED: RESET AFFINITY STATE ---
-    selectedBodyAffinities.clear();
-    selectedHandAffinities.clear();
-    updateAffinityButtonStates(); // Resets the glowing/active state of buttons
-
-    // --- ADDED: RESET STAT MIN/MAX FILTERS ---
-    document.querySelectorAll('.stat-control').forEach(control => {
-        const slider = control.querySelector('input[type="range"]');
-        const valueDisplay = control.querySelector('.stat-control-input-value');
-        const toggleInput = control.querySelector('.toggle-input');
-        if (slider) {
-            slider.value = slider.min;
-            if (valueDisplay) valueDisplay.textContent = slider.min;
-        }
-        if (toggleInput) toggleInput.checked = false;
-    });
-    // Reset internal state
-    Object.keys(statMinMaxFilters).forEach(statName => {
-        const slider = document.querySelector(`.stat-control.${statName} .stat-control-input`);
-        statMinMaxFilters[statName].value = slider ? Number(slider.min) : 0;
-        statMinMaxFilters[statName].isMax = false;
-    });
-    
-    isFiltering = false;
-    filteredNFTIds = [];
-    
-    if (isShowingClonesOnly) {
-        preserveScroll(() => { filterClones(); updateURL(); });
-    } else {
-        preserveScroll(() => {
-            allNFTIds = getSortedNFTIds(Object.keys(traitsData));
-            loadInitialNFTs();
-            updateURL();
-        });
+    } catch (error) {
+        console.error('Detailed error:', error);
+        document.getElementById('results').innerHTML = `
+            <div class="no-results">
+                <strong>Error loading NFT data</strong><br><br>
+                ${error.message}<br><br>
+                <strong>Troubleshooting:</strong><br>
+                1. Make sure you're running a local server (not opening HTML directly)<br>
+                2. Check that kamiImage.json and kamiTraits.json are in the same folder<br>
+                3. Check the browser console (F12) for more details<br>
+                4. Try clicking the refresh button
+            </div>`;
+    } finally {
+        hideLoader();
+        showContainer();
     }
 }
 
-// Setup refresh button
-function setupRefreshButton() {
+async function refreshData() {
+    if (isRefreshing) return;
+    isRefreshing = true;
+
     const refreshBtn = document.getElementById('refreshDataBtn');
-    if (refreshBtn) {
-        refreshBtn.addEventListener('click', refreshData);
+    const originalText = refreshBtn.innerHTML;
+    refreshBtn.disabled = true;
+
+    try {
+        console.log('🔄 Refreshing data...');
+
+        // Snapshot current UI state before re-fetch
+        const currentFilters = getTraitStringFromState();
+        const currentSort = currentSortOrder;
+        const wasShowingClones = isShowingClonesOnly;
+        const wasShowingListing = isShowingListingOnly;
+
+        const v = Date.now();
+        await Promise.all([
+            fetchAndSplitBundle(v),
+            loadSacrificeData(v),
+            loadListingsData(v),
+        ]);
+
+        if (Object.keys(kamiStatsData).length > 0) {
+            console.log(`✅ Re-loaded stats data for ${Object.keys(kamiStatsData).length} Kamigotchi`);
+        }
+        console.log(metadataInfo.newKamiIds?.length > 0
+            ? `✨ Found ${metadataInfo.newKamiIds.length} new Kamigotchi! IDs: ${metadataInfo.newKamiIds.join(', ')}`
+            : '💤 No new Kamigotchi'
+        );
+
+        processLoadedData();
+
+        // Restore UI state
+        currentSortOrder = currentSort;
+        isShowingClonesOnly = wasShowingClones;
+        isShowingListingOnly = wasShowingListing;
+        allNFTIds = getSortedNFTIds();
+
+        const filterControls = document.getElementById('filterControls');
+        filterControls.innerHTML = '';
+        createFilterControls();
+
+        // Restore trait filter checkboxes via URL trick
+        if (currentFilters) {
+            const originalSearch = window.location.search;
+            const params = new URLSearchParams();
+            params.set('traits', currentFilters);
+            history.replaceState(null, '', `?${params.toString()}`);
+            loadStateFromURL();
+            history.replaceState(null, '', originalSearch);
+        }
+
+        document.getElementById('cloneFilterBtn')?.classList.toggle('active', isShowingClonesOnly);
+        document.getElementById('listingFilterBtn')?.classList.toggle('active', isShowingListingOnly);
+
+        if (isShowingClonesOnly)       filterClones();
+        else if (isShowingListingOnly) filterListing();
+        else if (currentFilters)       filterByTraits();
+        else                           { isFiltering = false; loadInitialNFTs(); }
+
+        updateURL(true);
+
+        // Show checkmark feedback briefly
+        refreshBtn.innerHTML = `<svg id="refreshComplete" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><mask id="SVGkzXYXbbR"><g fill="none" stroke="#fff" stroke-dasharray="24" stroke-dashoffset="24" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M2 13.5l4 4l10.75 -10.75"><animate fill="freeze" attributeName="stroke-dashoffset" dur="0.4s" values="24;0"/></path><path stroke="#000" stroke-width="6" d="M7.5 13.5l4 4l10.75 -10.75"><animate fill="freeze" attributeName="stroke-dashoffset" begin="0.4s" dur="0.4s" values="24;0"/></path><path d="M7.5 13.5l4 4l10.75 -10.75"><animate fill="freeze" attributeName="stroke-dashoffset" begin="0.4s" dur="0.4s" values="24;0"/></path></g></mask><rect width="24" height="24" fill="currentColor" mask="url(#SVGkzXYXbbR)"/></svg>`;
+        setTimeout(() => {
+            refreshBtn.innerHTML = originalText;
+            refreshBtn.disabled = false;
+            refreshBtn.style.opacity = '1';
+            isRefreshing = false;
+        }, 2000);
+
+    } catch (error) {
+        console.error('Error refreshing data:', error);
+        const messageBox = document.getElementById('messageBox');
+        messageBox.textContent = 'Failed to refresh data. Please try again.';
+        messageBox.style.display = 'block';
+        setTimeout(() => messageBox.style.display = 'none', 3000);
+        refreshBtn.innerHTML = originalText;
+        refreshBtn.disabled = false;
+        refreshBtn.style.opacity = '1';
+        isRefreshing = false;
     }
 }
 
-document.getElementById('searchBtn').addEventListener('click', searchByID);
-document.getElementById('searchInput').addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') searchByID();
-});
-document.getElementById('clearSearchBtn').addEventListener('click', clearAllSelectedIDs);
-document.getElementById('clearBtn').addEventListener('click', clearFilters);
+
+// ============================================================
+// SCROLL TO TOP
+// ============================================================
 
 function setupScrollToTop() {
     const scrollBtn = document.getElementById('scrollToTop');
     let lastScrollTop = 0;
-    
+
     window.addEventListener('scroll', () => {
         const currentScroll = window.pageYOffset;
-        
         if (currentScroll > 300) {
-            if (currentScroll > lastScrollTop) {
-                scrollBtn.classList.add('show');
-            } else {
-                scrollBtn.classList.remove('show');
-            }
+            scrollBtn.classList.toggle('show', currentScroll > lastScrollTop);
         } else {
             scrollBtn.classList.remove('show');
         }
-        
         lastScrollTop = currentScroll;
     });
-    
-    scrollBtn.addEventListener('click', () => {
-        window.scrollTo({
-            top: 0,
-            behavior: 'smooth'
-        });
-    });
+
+    scrollBtn.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
 }
+
+function setupRefreshButton() {
+    document.getElementById('refreshDataBtn')?.addEventListener('click', refreshData);
+}
+
+
+// ============================================================
+// INIT
+// ============================================================
+
+// Immediate event wiring (safe at parse time — elements exist in the HTML)
+document.getElementById('searchBtn').addEventListener('click', searchByID);
+document.getElementById('searchInput').addEventListener('keypress', (e) => { if (e.key === 'Enter') searchByID(); });
+document.getElementById('clearSearchBtn').addEventListener('click', clearAllSelectedIDs);
+document.getElementById('clearBtn').addEventListener('click', clearFilters);
 
 document.addEventListener('DOMContentLoaded', () => {
     setupScrollToTop();
     setupRefreshButton();
-    // Add event listener for browser history changes
     window.addEventListener('popstate', handlePopState);
 
     document.addEventListener('click', (e) => {
+        // Close any open stats panel when clicking outside a card
+        const openStats = document.querySelector('.kami-stats.is-active');
+        if (openStats) {
+            const parentCard = openStats.closest('.nft-card');
+            if (parentCard && !parentCard.contains(e.target)) openStats.classList.remove('is-active');
+        }
+
+        // Close open trait filter dropdown when clicking outside filter controls
         const filterControls = document.getElementById('filterControls');
         if (filterControls && !filterControls.contains(e.target)) {
-            document.querySelectorAll('.filter-group').forEach(group => {
-                group.style.display = 'none';
-            });
+            document.querySelectorAll('.filter-group').forEach(group => group.style.display = 'none');
             const dropdown = document.getElementById('traitCategoryDropdown');
             if (dropdown) dropdown.value = '';
         }
     });
 });
 
-// Inject enhanced styles for stats and badges
-const enhancedStyles = `
-
-/* Custom Message Box Style (For replacing alert()) */
-#messageBox {
-    position: fixed;
-    top: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    background-color: #f8d7da;
-    color: #721c24;
-    padding: 10px 20px;
-    border: 1px solid #f5c6cb;
-    border-radius: 5px;
-    z-index: 1000;
-    display: none;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-}
-`;
-
+// Inject message-box styles and create the DOM element (replaces alert())
 if (!document.getElementById('enhanced-trait-styles')) {
     const styleTag = document.createElement('style');
     styleTag.id = 'enhanced-trait-styles';
-    styleTag.textContent = enhancedStyles;
+    styleTag.textContent = `
+        #messageBox {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #f8d7da;
+            color: #721c24;
+            padding: 10px 20px;
+            border: 1px solid #f5c6cb;
+            border-radius: 5px;
+            z-index: 1000;
+            display: none;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+    `;
     document.head.appendChild(styleTag);
 
-    // Create a message box element (to replace alert)
     const messageBox = document.createElement('div');
     messageBox.id = 'messageBox';
     document.body.appendChild(messageBox);
 }
 
-// Clear any cached service workers on load
+// Unregister any stale service workers
 if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.getRegistrations().then(function(registrations) {
-        for (let registration of registrations) {
-            registration.unregister();
-        }
+    navigator.serviceWorker.getRegistrations().then(registrations => {
+        registrations.forEach(r => r.unregister());
     });
 }
 
