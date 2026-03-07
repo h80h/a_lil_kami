@@ -769,13 +769,15 @@ function setupSortButtons() {
                 
                 // FIXED: Re-apply the active filter state after sort change
                 if (isShowingClonesOnly) {
-                    filterClones(); // Re-sort and display clones
+                    preserveScroll(() => filterClones()); // Re-sort and display clones
                 } else if (isFiltering) {
-                    filterByTraits(); // Re-apply trait filters with new sort
+                    preserveScroll(() => filterByTraits()); // Re-apply trait filters with new sort
                 } else {
                     // Just re-sort all NFTs
-                    allNFTIds = getSortedNFTIds();
-                    loadInitialNFTs();
+                    preserveScroll(() => {
+                        allNFTIds = getSortedNFTIds();
+                        loadInitialNFTs();
+                    });
                 }
                 
                 // Update selected cards display to match new sort order
@@ -799,24 +801,25 @@ function setupCloneFilterButton() {
         
         if (isShowingClonesOnly) {
             cloneBtn.classList.add('active');
-            filterClones();
+            preserveScroll(() => { filterClones(); updateURL(); });
         } else {
             cloneBtn.classList.remove('active');
             // Return to normal view
             if (isFiltering) {
-                filterByTraits();
+                preserveScroll(() => { filterByTraits(); updateURL(); });
             } else {
                 const hasAffinityFilters = selectedBodyAffinities.size > 0 || selectedHandAffinities.size > 0; // NEW
                 if (hasAffinityFilters) { // NEW
-                    filterByTraits(); // NEW
+                    preserveScroll(() => { filterByTraits(); updateURL(); }); // NEW
                 } else { // NEW
-                    allNFTIds = getSortedNFTIds();
-                    loadInitialNFTs();
+                    preserveScroll(() => {
+                        allNFTIds = getSortedNFTIds();
+                        loadInitialNFTs();
+                        updateURL();
+                    }); // NEW
                 } // NEW
             }
         }
-        
-        updateURL();
     });
 }
 
@@ -1390,19 +1393,21 @@ function updateSelectedTraitsDisplay(forceUpdate = false) {
     updateAffinityButtonStates();
 
     if (isShowingClonesOnly) {
-        filterClones();
+        preserveScroll(() => { filterClones(); updateURL(); });
     } else if (hasActiveStatFilters()) {
-        filterByTraits();
+        preserveScroll(() => { filterByTraits(); updateURL(); });
     } else {
-        allNFTIds = getSortedNFTIds(Object.keys(traitsData));
-        loadInitialNFTs();
+        preserveScroll(() => {
+            allNFTIds = getSortedNFTIds(Object.keys(traitsData));
+            loadInitialNFTs();
+            updateURL();
+        });
     }
-    updateURL();
     return;
 }
     
     updateURL(); 
-    filterByTraits();
+    preserveScroll(() => filterByTraits());
 }
 
 /**
@@ -2172,8 +2177,7 @@ function removeSelectedAffinity(event) {
     }
     
     updateAffinityButtonStates();
-    filterByTraits();
-    updateURL();
+    preserveScroll(() => { filterByTraits(); updateURL(); });
 }
 
 function setupMinMaxFilterToggle() {
@@ -2300,20 +2304,29 @@ function attachStatFilterSummaryListeners(container) {
     });
 }
 
+// Preserves scroll position across a filter re-render
+function preserveScroll(fn) {
+    const scrollY = window.scrollY;
+    fn();
+    requestAnimationFrame(() => window.scrollTo({ top: scrollY, behavior: 'instant' }));
+}
+
 // Trigger re-filter from stat sliders, integrating with existing filter logic
 let _statFilterTimer = null;
 function triggerStatFilter() {
     clearTimeout(_statFilterTimer);
     _statFilterTimer = setTimeout(() => {
-        if (isShowingClonesOnly) {
-            filterClones();
-        } else if (isFiltering || hasActiveStatFilters()) {
-            filterByTraits();
-        } else {
-            allNFTIds = getSortedNFTIds(Object.keys(traitsData));
-            loadInitialNFTs();
-        };
-        updateURL();
+        preserveScroll(() => {
+            if (isShowingClonesOnly) {
+                filterClones();
+            } else if (isFiltering || hasActiveStatFilters()) {
+                filterByTraits();
+            } else {
+                allNFTIds = getSortedNFTIds(Object.keys(traitsData));
+                loadInitialNFTs();
+            };
+            updateURL();
+        });
     }, 200);
 }
 
@@ -2362,13 +2375,14 @@ function clearFilters() {
     filteredNFTIds = [];
     
     if (isShowingClonesOnly) {
-        filterClones();
+        preserveScroll(() => { filterClones(); updateURL(); });
     } else {
-        allNFTIds = getSortedNFTIds(Object.keys(traitsData));
-        loadInitialNFTs();
+        preserveScroll(() => {
+            allNFTIds = getSortedNFTIds(Object.keys(traitsData));
+            loadInitialNFTs();
+            updateURL();
+        });
     }
-    
-    updateURL();
 }
 
 // Setup refresh button
