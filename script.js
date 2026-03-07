@@ -169,6 +169,9 @@ let metadataInfo = {};
 let sacrificedNFTs = new Set();
 let listingNFTs = new Map();
 
+// Auto-refresh state
+let cachedListingsHash = null;
+
 // Derived lookup structures
 let traitSignatures = {};
 let traitAffinityLookup = {}; // { body: { TraitName: affinity }, hand: { ... } } — O(1) affinity lookups
@@ -1458,8 +1461,8 @@ function displayNFT(id, showCloseButton = false) {
     const statColorClass = getStatColorClass();
     const statValue = stats?.stats[currentSortOrder] || '';
     const rankTooltip = isTied
-        ? `OpenRarity Rank: #${rank} (Tied) | Score: ${score}`
-        : `OpenRarity Rank: #${rank} | Score: ${score}`;
+        ? `Rank: #${rank} (Tied) | Score: ${score}`
+        : `Rank: #${rank} | Score: ${score}`;
 
     const closeButtonHTML = showCloseButton
         ? `<button class="close-btn" onclick="removeSelectedID('${id}')" title="Remove this Kamigotchi">×</button>` : '';
@@ -1733,6 +1736,35 @@ async function loadListingsData(v) {
     }
 }
 
+async function checkForUpdates() {
+    try {
+        const v = Math.floor(Date.now() / (5 * 60 * 1000)); // aligns to 5-min windows
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname.startsWith('192.168.');
+        const finalUrl = isLocal
+            ? `https://data.kami.h80h.xyz/kamiListings.json?v=${v}`
+            : `/api/data/kamiListings.json?v=${v}`;
+
+        const res = await fetch(finalUrl);
+        if (!res.ok) return;
+
+        const newListings = await res.json();
+        const newHash = JSON.stringify(newListings);
+
+        if (cachedListingsHash && newHash !== cachedListingsHash) {
+            console.log('🛍️ Listings changed, refreshing all data...');
+            await refreshData();
+        }
+
+        cachedListingsHash = newHash;
+    } catch (err) {
+        // silent fail
+    }
+}
+
+function startAutoRefresh() {
+    setInterval(checkForUpdates, 5 * 60 * 1000);
+}
+
 // Fetches kamiBundle.json, splits it into global data stores, then nulls the bundle for GC
 async function fetchAndSplitBundle(v) {
     const isLocal = window.location.hostname === 'localhost' || window.location.hostname.startsWith('192.168.');
@@ -1814,17 +1846,22 @@ async function loadData() {
 
         updateURL(true);
 
+        // Update refresh button tooltip with last updated time
+        const now = new Date();
+        const label = `Last updated: ${now.toLocaleDateString([], { month: 'short', day: 'numeric' })} ${now.toLocaleTimeString()}`;
+        const svgTitle = document.querySelector('#refreshDataBtn_svg title');
+        if (svgTitle) svgTitle.textContent = label;
+
+        // Seed listings hash and begin polling for changes every 5 min
+        cachedListingsHash = JSON.stringify(Object.fromEntries(listingNFTs));
+        startAutoRefresh();
+
     } catch (error) {
         console.error('Detailed error:', error);
         document.getElementById('results').innerHTML = `
             <div class="no-results">
                 <strong>Error loading NFT data</strong><br><br>
                 ${error.message}<br><br>
-                <strong>Troubleshooting:</strong><br>
-                1. Make sure you're running a local server (not opening HTML directly)<br>
-                2. Check that kamiImage.json and kamiTraits.json are in the same folder<br>
-                3. Check the browser console (F12) for more details<br>
-                4. Try clicking the refresh button
             </div>`;
     } finally {
         hideLoader();
@@ -1903,6 +1940,11 @@ async function refreshData() {
             refreshBtn.disabled = false;
             refreshBtn.style.opacity = '1';
             isRefreshing = false;
+            // Update tooltip after originalText is restored (restoring innerHTML resets the SVG title)
+            const now = new Date();
+            const label = `Last updated: ${now.toLocaleDateString([], { month: 'short', day: 'numeric' })} ${now.toLocaleTimeString()}`;
+            const svgTitle = document.querySelector('#refreshDataBtn_svg title');
+            if (svgTitle) svgTitle.textContent = label;
         }, 2000);
 
     } catch (error) {
