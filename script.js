@@ -1684,7 +1684,7 @@ function displayNFT(id, showCloseButton = false) {
     const score = rarityData ? rarityData.score.toFixed(4) : '?';
     const isTied = rarityData ? rarityData.isTied : false;
     
-    const isNew = metadataInfo.newKamiIds && metadataInfo.newKamiIds.includes(Number(id));
+    const isNew = metadataInfo.kamiNewWindow && metadataInfo.kamiNewWindow.hasOwnProperty(String(id));
     const isClone = traitSignatures.cloneIds.has(id);
     const isSacrificed = sacrificedNFTs.has(String(id)); // NEW: Check sacrifice set
     const isListed = listedNFTs.has(String(id)); // Check if listed for sale
