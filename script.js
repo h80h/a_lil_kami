@@ -1954,10 +1954,12 @@ async function refreshData() {
         document.getElementById('cloneFilterBtn')?.classList.toggle('active', isShowingClonesOnly);
         document.getElementById('listingFilterBtn')?.classList.toggle('active', isShowingListingOnly);
 
-        if (isShowingClonesOnly)       filterClones();
-        else if (isShowingListingOnly) filterListing();
-        else if (currentFilters)       filterByTraits();
-        else                           { isFiltering = false; loadInitialNFTs(); }
+        preserveScroll(() => {
+            if (isShowingClonesOnly)       filterClones();
+            else if (isShowingListingOnly) filterListing();
+            else if (currentFilters)       filterByTraits();
+            else                           { isFiltering = false; loadInitialNFTs(); }
+        });
 
         updateURL(true);
 
