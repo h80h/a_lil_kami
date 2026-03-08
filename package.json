@@ -1,13 +1,11 @@
 {
-  "name": "kamigotchi-extractor",
+  "name": "kamigotchi-filter-tool",
   "version": "1.0.0",
   "description": "",
   "main": "script.js",
   "type": "commonjs",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "echo 'Static site - no build required'",
-    "extract": "node extract-kamigotchi-github.js"
+    "build": "echo 'Static site - no build required'"
   },
   "keywords": [],
   "author": "",

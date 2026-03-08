@@ -92,6 +92,29 @@ async function uploadBundleToR2(bundleData) {
   }
 }
 
+async function uploadMetaToR2(metaData) {
+  const filename = 'kamiMeta.json';
+  console.log(`\n📤 Uploading ${filename} to Cloudflare R2...`);
+  try {
+    const parallelUploads3 = new Upload({
+      client: r2Client,
+      params: {
+        Bucket: process.env.R2_BUCKET_NAME,
+        Key: filename,
+        Body: Readable.from(JSON.stringify(metaData)),
+        ContentType: 'application/json',
+        CacheControl: 'public, max-age=300',
+      },
+      queueSize: 1,
+      partSize: 1024 * 1024 * 5,
+    });
+    await parallelUploads3.done();
+    console.log(`   ✅ ${filename} uploaded successfully`);
+  } catch (error) {
+    throw new Error(`Meta upload failed: ${error.message}`);
+  }
+}
+
 async function fetchPreviousMetadata() {
   try {
     console.log('📋 Fetching previous metadata from R2 bundle...');
@@ -243,7 +266,10 @@ async function runExtraction() {
       }
     };
     
-    await uploadBundleToR2(bundle);
+    await Promise.all([
+      uploadBundleToR2(bundle),
+      uploadMetaToR2(bundle.kamiMetadata),
+    ]);
     
     console.log('\n' + '='.repeat(60));
     console.log(`✅ COMPLETE: ${bundle.kamiMetadata.totalCount} items | ${listedSet.length} listed | ${bundle.kamiMetadata.extractionDuration}s`);
