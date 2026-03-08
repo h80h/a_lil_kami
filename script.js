@@ -171,6 +171,7 @@ let listingNFTs = new Map();
 
 // Auto-refresh state
 let cachedListingsHash = null;
+let cachedMetaHash = null;
 
 // Derived lookup structures
 let traitSignatures = {};
@@ -1736,26 +1737,52 @@ async function loadListingsData(v) {
     }
 }
 
+function getSignificantMetaHash(meta) {
+    // Exclude lastUpdate and extractionDuration — these change every run regardless
+    return JSON.stringify({
+        previousMaxId: meta.previousMaxId,
+        newKamiIds:    meta.newKamiIds,
+        kamiNewWindow: meta.kamiNewWindow,
+        totalCount:    meta.totalCount,
+    });
+}
+
 async function checkForUpdates() {
     try {
         const v = Math.floor(Date.now() / (5 * 60 * 1000)); // aligns to 5-min windows
         const isLocal = window.location.hostname === 'localhost' || window.location.hostname.startsWith('192.168.');
-        const finalUrl = isLocal
-            ? `https://data.kami.h80h.xyz/kamiListings.json?v=${v}`
-            : `/api/data/kamiListings.json?v=${v}`;
+        const baseUrl = isLocal ? 'https://data.kami.h80h.xyz' : '/api/data';
 
-        const res = await fetch(finalUrl);
-        if (!res.ok) return;
+        // Fetch both files in parallel
+        const [listingsRes, metaRes] = await Promise.all([
+            fetch(`${baseUrl}/kamiListings.json?v=${v}`),
+            fetch(`${baseUrl}/kamiMeta.json?v=${v}`),
+        ]);
 
-        const newListings = await res.json();
-        const newHash = JSON.stringify(newListings);
+        let shouldRefresh = false;
 
-        if (cachedListingsHash && newHash !== cachedListingsHash) {
-            console.log('🛍️ Listings changed, refreshing all data...');
-            await refreshData();
+        if (listingsRes.ok) {
+            const newListings = await listingsRes.json();
+            const newHash = JSON.stringify(newListings);
+            if (cachedListingsHash && newHash !== cachedListingsHash) {
+                console.log('🛍️ Listings changed, refreshing all data...');
+                shouldRefresh = true;
+            }
+            cachedListingsHash = newHash;
         }
 
-        cachedListingsHash = newHash;
+        if (metaRes.ok) {
+            const newMeta = await metaRes.json();
+            const newHash = getSignificantMetaHash(newMeta);
+            if (cachedMetaHash && newHash !== cachedMetaHash) {
+                console.log('✨ Metadata changed, refreshing all data...');
+                shouldRefresh = true;
+            }
+            cachedMetaHash = newHash;
+        }
+
+        if (shouldRefresh) await refreshData();
+
     } catch (err) {
         // silent fail
     }
@@ -1852,8 +1879,9 @@ async function loadData() {
         const svgTitle = document.querySelector('#refreshDataBtn_svg title');
         if (svgTitle) svgTitle.textContent = label;
 
-        // Seed listings hash and begin polling for changes every 5 min
+        // Seed hashes and begin polling for changes every 5 min
         cachedListingsHash = JSON.stringify(Object.fromEntries(listingNFTs));
+        cachedMetaHash = getSignificantMetaHash(metadataInfo);
         startAutoRefresh();
 
     } catch (error) {
