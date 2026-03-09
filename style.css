@@ -528,6 +528,8 @@ button {
   padding: 1px 8px 5px 8px;
   transition: transform 0.3s, box-shadow 0.3s;
   box-shadow: 0px 2px 2px rgba(0,0,0,0.2);
+  overflow: hidden;
+  height: 242px;
 }
 
 /* Rank and Stat Color Container */
@@ -587,7 +589,7 @@ button {
 }
 
 .nft-id {
-  font-size: 10px;
+  font-size: 9.9px;
   color: #667eea;
   margin-bottom: 7px;
   font-weight: bold;
@@ -699,11 +701,6 @@ button {
     animation: newBadgeSparkle 1.5s ease-in-out infinite;
 }
 
-.nft-card {
-    position: relative;
-    overflow: hidden;
-}
-
 .trait-name-row {
     display: flex;
     align-items: center;
@@ -807,6 +804,7 @@ button {
   cursor: help;
   user-select: none;
   -webkit-user-select: none;
+  width: 100%
 }
 
 .kami-stats {
@@ -819,20 +817,19 @@ button {
   visibility: hidden;
   transition: opacity 0.3s, visibility 0.3s;
   
-  padding: 8px 0px;
+  padding: 7px 0px;
   border-radius: 4px;
   z-index: 10;
 
   bottom: 0%;
   left: 50%;
-  transform: translate(-50%, -10px);
+  transform: translate(-50%, 0);
 }
 
 .hover_wrapper:hover .kami-stats,
 .hover_wrapper.is-active .kami-stats {
   opacity: 0.9;
   visibility: visible;
-  transform: translate(-50%, -5px);
 }
 
 .stat-row {
@@ -841,7 +838,7 @@ button {
 }
 
 .stat-row.one {
-    margin-bottom: 10px;
+    margin-bottom: 8px;
 }
 
 .stat-item {
@@ -880,11 +877,8 @@ button {
 
 .listing-badge {
     position: absolute;
-    bottom: 5px;
+    bottom: 3px;
     right: 5px;
-    display: flex;
-    align-items: flex-end;
-    justify-content: flex-end;
     z-index: 5;
 }
 
@@ -1017,6 +1011,7 @@ button {
   letter-spacing: 0.5px;
   font-size: 9px;
   color: #93bbbf;
+  font-family: 'dogica_pixelregular', monospace;
 }
 
 .online-indicator-container {
@@ -1090,6 +1085,7 @@ button {
 
   .nft-card {
     padding: 3px 10px 8px 10px;
+    height: auto;
   }
 
   .nft-card img {
@@ -1207,14 +1203,17 @@ button {
     width: 130px;
   }
 
-  .sacrifice-badge {
-    right: unset;
-    left: 3px;
+  .kami-stats {
+    padding: 8px 0px;
   }
 
-  .listing-badge {
-    right: unset;
-    left: 3px;
+  .stat-row.one {
+    margin-bottom: 10px;
+  }
+
+  #refreshDataBtn[data-tooltip]::after {
+    white-space: pre-wrap;
+    min-width: 110px;
   }
 }
 
@@ -1316,4 +1315,52 @@ button {
     top: 2px;
     right: 3px;
   }
+}
+
+/* ============================================================
+   CUSTOM TOOLTIP (replaces native title attribute delay)
+   ============================================================ */
+[data-tooltip]:not(.listing-badge) {
+    position: relative;
+}
+
+[data-tooltip]::after {
+    content: attr(data-tooltip);
+    position: absolute;    
+    font-family: 'dogica_pixelregular', monospace;
+    white-space: nowrap;
+    border-radius: 4px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.1s ease;
+    z-index: 9999;
+}
+
+[data-tooltip]:hover::after {
+    opacity: 0.7;
+}
+
+#refreshDataBtn[data-tooltip]::after {
+  top: calc(100% + 4px);
+  left: auto;
+  right: calc(0% + 10px);
+  background: #000;
+  color: #fff;
+  font-size: 9px;
+  padding: 4px;
+}
+
+.listing-price {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 8px;
+  font-family: 'dogica_pixelregular', monospace;
+  background: #000;
+  color: #fff;
+  padding: 4px 8px;
+  border-radius: 4px;
+  z-index: 6;
+  opacity: 0;
 }

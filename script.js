@@ -1079,14 +1079,14 @@ function createFilterControls() {
             const details = traitDetails[traitType][value] || {};
 
             const affinityHTML = (details.affinity && (traitType === 'body' || traitType === 'hand'))
-                ? `<span class="trait-affinity ${details.affinity}" title="Affinity">${details.affinity}</span>`
+                ? `<span class="trait-affinity ${details.affinity}">${details.affinity}</span>`
                 : '';
 
             let statsHTML = '';
             if (details.stats && Object.keys(details.stats).length > 0) {
                 const statBadges = Object.entries(details.stats).map(([statName, val]) => {
                     const sign = val > 0 ? '+' : '';
-                    return `<span class="trait-stat ${statName}" title="${statName.charAt(0).toUpperCase() + statName.slice(1)}">${statName.slice(0, 3).toUpperCase()} ${sign}${val}</span>`;
+                    return `<span class="trait-stat ${statName}">${statName.slice(0, 3).toUpperCase()} ${sign}${val}</span>`;
                 }).join('');
                 statsHTML = `<span class="trait-stats">${statBadges}</span>`;
             }
@@ -1339,7 +1339,6 @@ function filterByTraits() {
         noResultsDiv.className = 'no-results';
         noResultsDiv.textContent = 'No Kamigotchi match your selected traits';
         resultsDiv.appendChild(noResultsDiv);
-        isFiltering = false;
         return;
     }
 
@@ -1474,7 +1473,9 @@ function displayNFT(id, showCloseButton = false) {
     const sacrificeBadgeHTML = isSacrificed
         ? `<div class="sacrifice-badge" title="This Kamigotchi has been sacrificed">🕳️</div>` : '';
     const listingBadgeHTML = isListing
-        ? `<div class="listing-badge" title="Ξ${listingPrice} on KamiSwap"><img id="kamiswap_icon" src="https://app.kamigotchi.io/assets/marketplace-BqMKbOFC.png" style="border:none"></div>` : '';
+        ? `<div class="listing-badge"><img id="kamiswap_icon" src="https://app.kamigotchi.io/assets/marketplace-BqMKbOFC.png" style="border:none"></div>` : '';
+    const listingPriceHTML = isListing
+        ? `<div class="listing-price">Ξ${listingPrice}</div>` : '';
     const statColorHTML = statColorClass
         ? `<div class="stat-color-box ${statColorClass}" title="${statColorClass.charAt(0).toUpperCase() + statColorClass.slice(1)} Sort">${statValue}</div>` : '';
 
@@ -1508,6 +1509,7 @@ function displayNFT(id, showCloseButton = false) {
             <img src="${imageUrl}" alt="NFT #${id}" loading="lazy" onerror="this.src='https://via.placeholder.com/250?text=Not+Found'">
             ${sacrificeBadgeHTML}
             ${listingBadgeHTML}
+            ${listingPriceHTML}
         </div>`;
 
     // On mobile, stats render inside the details panel; on desktop they sit above the image block
@@ -1875,9 +1877,8 @@ async function loadData() {
 
         // Update refresh button tooltip with last updated time
         const now = new Date();
-        const label = `Last updated: ${now.toLocaleDateString([], { month: 'short', day: 'numeric' })} ${now.toLocaleTimeString()}`;
-        const svgTitle = document.querySelector('#refreshDataBtn_svg title');
-        if (svgTitle) svgTitle.textContent = label;
+        const label = `Last updated:\n${now.toLocaleDateString([], { month: 'short', day: 'numeric' })} ${now.toLocaleTimeString()}`;
+        document.getElementById('refreshDataBtn')?.setAttribute('data-tooltip', label);
 
         // Seed hashes and begin polling for changes every 5 min
         cachedListingsHash = JSON.stringify(Object.fromEntries(listingNFTs));
@@ -1973,8 +1974,7 @@ async function refreshData() {
             // Update tooltip after originalText is restored (restoring innerHTML resets the SVG title)
             const now = new Date();
             const label = `Last updated: ${now.toLocaleDateString([], { month: 'short', day: 'numeric' })} ${now.toLocaleTimeString()}`;
-            const svgTitle = document.querySelector('#refreshDataBtn_svg title');
-            if (svgTitle) svgTitle.textContent = label;
+            document.getElementById('refreshDataBtn')?.setAttribute('data-tooltip', label);
         }, 2000);
 
     } catch (error) {
@@ -2075,6 +2075,22 @@ if (!document.getElementById('enhanced-trait-styles')) {
     const messageBox = document.createElement('div');
     messageBox.id = 'messageBox';
     document.body.appendChild(messageBox);
+
+    // When .listing-badge is hovered, set sibling .listing-price opacity to 0.7
+    document.addEventListener('mouseover', (e) => {
+        if (e.target.closest('.listing-badge')) {
+            const container = e.target.closest('.image-container');
+            const price = container?.querySelector('.listing-price');
+            if (price) price.style.opacity = '0.7';
+        }
+    });
+    document.addEventListener('mouseout', (e) => {
+        if (e.target.closest('.listing-badge')) {
+            const container = e.target.closest('.image-container');
+            const price = container?.querySelector('.listing-price');
+            if (price) price.style.opacity = '';
+        }
+    });
 }
 
 // Unregister any stale service workers
