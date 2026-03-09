@@ -1947,8 +1947,18 @@ async function refreshData() {
         allNFTIds = getSortedNFTIds();
 
         const filterControls = document.getElementById('filterControls');
+        // Snapshot which filter-group is currently visible so we can restore it after rebuild
+        const visibleFilterGroup = document.querySelector('.filter-group[style*="display: block"], .filter-group[style*="display:block"]');
+        const visibleTraitType = visibleFilterGroup ? visibleFilterGroup.dataset.traitType : null;
         filterControls.innerHTML = '';
         createFilterControls();
+        // Restore the previously visible filter-group and sync the dropdown
+        if (visibleTraitType) {
+            const restoredGroup = document.querySelector(`.filter-group[data-trait-type="${visibleTraitType}"]`);
+            if (restoredGroup) restoredGroup.style.display = 'block';
+            const dropdown = document.getElementById('traitCategoryDropdown');
+            if (dropdown) dropdown.value = visibleTraitType;
+        }
 
         // Restore trait filter checkboxes via URL trick
         if (currentFilters) {
