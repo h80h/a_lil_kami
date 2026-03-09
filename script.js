@@ -491,37 +491,45 @@ function calculateTraitCounts() {
     return counts;
 }
 
-// OpenRarity — normalized information content scoring
+// OpenRarity — official information content scoring
+// Formula: score = I(x) / E[I(x)]
+// where I(x) = Σ -log₂(P(trait_i))  and  E[I(x)] = probability-weighted average of I(x) across the collection
+// See: https://openrarity.gitbook.io/developers/fundamentals/methodology
 function calculateRarityScores() {
     const totalNFTs = Object.keys(traitsData).length;
     const scores = {};
 
-    // Step 1: Information Content per trait — IC = -log(probability)
+    // Step 1: IC per trait value — IC = -log₂(P(trait))
+    // OpenRarity uses log base 2 ("bits" of information)
     const traitIC = {};
     Object.entries(traitCounts).forEach(([category, traits]) => {
         traitIC[category] = {};
         Object.entries(traits).forEach(([traitName, count]) => {
-            traitIC[category][traitName] = -Math.log(count / totalNFTs);
+            traitIC[category][traitName] = -Math.log2(count / totalNFTs);
         });
     });
 
-    // Step 2: Max IC per category (for normalization)
-    const maxICPerCategory = {};
-    Object.entries(traitIC).forEach(([category, traits]) => {
-        maxICPerCategory[category] = Math.max(...Object.values(traits));
-    });
-
-    // Step 3: Normalized score per NFT (average across all trait categories)
+    // Step 2: I(x) per NFT — sum of IC across all of its traits
     Object.entries(traitsData).forEach(([id, traits]) => {
-        let normalizedScore = 0;
+        let ix = 0;
         Object.entries(traits).forEach(([category, traitData]) => {
             const traitName = getTraitName(traitData);
-            normalizedScore += traitIC[category][traitName] / maxICPerCategory[category];
+            ix += traitIC[category][traitName];
         });
-        scores[id] = normalizedScore / Object.keys(traits).length;
+        scores[id] = ix;
     });
 
-    // Step 4: Rank by score (higher = rarer), detect ties
+    // Step 3: E[I(x)] — probability-weighted average of I(x) across all NFTs
+    // Each NFT has equal probability (1/totalNFTs), so this is simply the arithmetic mean of I(x)
+    const totalIx = Object.values(scores).reduce((sum, ix) => sum + ix, 0);
+    const expectedIx = totalIx / totalNFTs;
+
+    // Step 4: Normalize each score by E[I(x)]
+    Object.keys(scores).forEach(id => {
+        scores[id] = scores[id] / expectedIx;
+    });
+
+    // Step 5: Rank by score (higher = rarer), detect ties
     const sortedByScore = Object.entries(scores).sort((a, b) => b[1] - a[1]);
     const rankedScores = {};
     let currentRank = 1;
