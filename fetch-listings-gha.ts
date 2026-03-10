@@ -55,8 +55,16 @@ async function fetchAllListings() {
   }
 }
 
-async function uploadListingsToR2(listings: Record<string, number>, newListingId: string[], listingNewWindow: Record<string, number>) {
-  const filename = "kamiListings.json";
+interface SimpleListing {
+  id: number;
+  price: number;
+  seller: string;
+  time: string;
+  rawTime: string;
+}
+
+async function uploadListingsToR2(listings: Record<number, SimpleListing>, newListingId: string[], listingNewWindow: Record<string, number>) {
+  const filename = "kamiListing.json";
   console.log(`\n📤 Uploading ${filename} to Cloudflare R2...`);
 
   const payload = {
@@ -82,14 +90,13 @@ async function uploadListingsToR2(listings: Record<string, number>, newListingId
   console.log(`   ✅ ${filename} uploaded successfully`);
 }
 
-async function fetchPreviousListings(): Promise<{ listings: Record<string, number>; listingNewWindow: Record<string, number> }> {
+async function fetchPreviousListings(): Promise<{ listings: Record<string, SimpleListing>; listingNewWindow: Record<string, number> }> {
   try {
-    const cmd = new GetObjectCommand({ Bucket: process.env.R2_BUCKET_NAME, Key: "kamiListings.json" });
+    const cmd = new GetObjectCommand({ Bucket: process.env.R2_BUCKET_NAME, Key: "kamiListing.json" });
     const res = await r2Client.send(cmd);
     const body = await res.Body?.transformToString();
     if (!body) return { listings: {}, listingNewWindow: {} };
     const parsed = JSON.parse(body);
-    // Support both legacy flat format and new structured format
     if (parsed && typeof parsed === "object" && "listings" in parsed) {
       return {
         listings: parsed.listings ?? {},
@@ -119,19 +126,48 @@ async function main() {
     const NEW_WINDOW_RUNS = 13;
 
     if (response.Listings && response.Listings.length > 0) {
-      const listings: Record<string, number> = {};
-      response.Listings.forEach((listing: { KamiIndex: string; Price: string }) => {
-        listings[listing.KamiIndex] = Number(BigInt(listing.Price)) / 1e18;
+      // Build a map keyed by KamiIndex for newListingId / listingNewWindow tracking
+      const byId: Record<string, SimpleListing> = {};
+      response.Listings.forEach((listing: { KamiIndex: string; Price: string; SellerAccountID: string; Timestamp: string }) => {
+        const sellerHex = "0x" + BigInt(listing.SellerAccountID).toString(16).padStart(40, "0");
+
+        // Convert raw timestamp to "Mar 8, 2026, 12:34:49 AM"
+        const ts = Number(listing.Timestamp);
+        const date = new Date(ts < 10000000000 ? ts * 1000 : ts);
+        const formattedTime = date.toLocaleString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+          second: "2-digit",
+          hour12: true
+        });
+
+        byId[listing.KamiIndex] = {
+          id: Number(listing.KamiIndex),
+          price: Number(BigInt(listing.Price)) / 1e18,
+          seller: sellerHex,
+          time: formattedTime,       // The UI-friendly string
+          rawTime: listing.Timestamp // The raw string for the filter logic
+        };
       });
 
-      // IDs that weren't in the previous listings snapshot are brand-new listings
-      const newListingId = Object.keys(listings).filter(id => !(id in prevListings));
+      // IDs that weren't in the previous snapshot, or whose time changed, are new listings
+      const prevIdTimeMap = new Map(Object.values(prevListings).map(l => [String(l.id), l.rawTime]));
+
+      const newListingId = Object.keys(byId).filter(id => {
+        const prevTime = prevIdTimeMap.get(id);
+        
+        // Cast both sides to String to ensure the comparison is type-safe
+        return prevTime === undefined || String(prevTime) !== String(byId[id].rawTime);
+      });
 
       // Decrement existing entries; drop any that have expired or are no longer listed
       const listingNewWindow: Record<string, number> = {};
       for (const [id, remaining] of Object.entries(prevWindow)) {
         const next = remaining - 1;
-        if (next > 0 && id in listings) listingNewWindow[id] = next;
+        if (next > 0 && id in byId) listingNewWindow[id] = next;
       }
       // Add brand-new listing IDs
       for (const id of newListingId) {
@@ -143,14 +179,18 @@ async function main() {
       }
       console.log(`⏱️  IDs in listing-window: ${Object.keys(listingNewWindow).length > 0 ? Object.keys(listingNewWindow).join(", ") : "none"}`);
 
-      const sorted = Object.entries(listings).sort(([, a], [, b]) => a - b);
-      console.log(`\nSuccessfully fetched ${sorted.length} listings:`);
-      console.dir(Object.fromEntries(sorted), { maxArrayLength: null });
+      // Build rank-keyed listings: sorted by price asc, ties broken by id asc
+      const sortedEntries = Object.values(byId).sort((a, b) => a.id - b.id);
+      const listings: Record<number, SimpleListing> = {};
+      sortedEntries.forEach((item, i) => { listings[i + 1] = item; });
+
+      console.log(`\nSuccessfully fetched ${sortedEntries.length} listings:`);
+      console.dir(listings, { maxArrayLength: null });
 
       await uploadListingsToR2(listings, newListingId, listingNewWindow);
     } else {
       console.log("No active listings found.");
-      await uploadListingsToR2({}, [], {});
+      await uploadListingsToR2({} as Record<number, SimpleListing>, [], {});
     }
 
     console.log("\n" + "=".repeat(60));

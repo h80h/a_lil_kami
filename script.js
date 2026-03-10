@@ -1455,7 +1455,7 @@ function displayNFT(id, showCloseButton = false) {
     const isSacrificed = sacrificedNFTs.has(String(id));
     const listingPrice = listingNFTs.get(String(id));
     const isListing = listingPrice !== undefined;
-    const isNewListing = isListing && listingMetaInfo.listingNewWindow && Object.prototype.hasOwnProperty.call(listingMetaInfo.listingNewWindow, String(id));
+    const isNewListing = isListing && listingMetaInfo.listingNewWindow && String(id) in listingMetaInfo.listingNewWindow;
 
     const card = document.createElement('div');
     card.className = 'nft-card hover_wrapper';
@@ -1740,14 +1740,18 @@ async function loadListingsData(v) {
     try {
         const isLocal = window.location.hostname === 'localhost' || window.location.hostname.startsWith('192.168.');
         const finalUrl = isLocal
-            ? `https://data.kami.h80h.xyz/kamiListings.json?v=${v}`
-            : `/api/data/kamiListings.json?v=${v}`;
+            ? `https://data.kami.h80h.xyz/kamiListing.json?v=${v}`
+            : `/api/data/kamiListing.json?v=${v}`;
         const response = await fetch(finalUrl);
         if (response.ok) {
             const data = await response.json();
             // Support both new structured format and legacy flat format
             const rawListings = (data && typeof data === 'object' && 'listings' in data) ? data.listings : data;
-            listingNFTs = new Map(Object.entries(rawListings).map(([id, price]) => [String(id), price]));
+            listingNFTs = new Map(Object.values(rawListings).map((item) =>
+                (item !== null && typeof item === 'object')
+                    ? [String(item.id), item.price]   // new structured format: rank-keyed, value is SimpleListing
+                    : [String(item), item]             // legacy flat format: id-keyed, value is price
+            ));
             listingMetaInfo = {
                 newListingId: (data?.newListingId ?? []).map(String),
                 listingNewWindow: data?.listingNewWindow ?? {},
@@ -1788,7 +1792,7 @@ async function checkForUpdates() {
 
         // Fetch both files in parallel
         const [listingsRes, metaRes] = await Promise.all([
-            fetch(`${baseUrl}/kamiListings.json?v=${v}`),
+            fetch(`${baseUrl}/kamiListing.json?v=${v}`),
             fetch(`${baseUrl}/kamiMeta.json?v=${v}`),
         ]);
 
@@ -1796,6 +1800,7 @@ async function checkForUpdates() {
 
         if (listingsRes.ok) {
             const newListings = await listingsRes.json();
+
             const newHash = getSignificantListingsHash(newListings);
             if (cachedListingsHash && newHash !== cachedListingsHash) {
                 console.log('🛍️ Listings changed, refreshing all data...');
