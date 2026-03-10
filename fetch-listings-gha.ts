@@ -64,7 +64,7 @@ interface SimpleListing {
 }
 
 async function uploadListingsToR2(listings: Record<number, SimpleListing>, newListingId: string[], listingNewWindow: Record<string, number>) {
-  const filename = "kamiListing.json";
+  const filename = "kamiListings.json";
   console.log(`\n📤 Uploading ${filename} to Cloudflare R2...`);
 
   const payload = {
@@ -92,7 +92,7 @@ async function uploadListingsToR2(listings: Record<number, SimpleListing>, newLi
 
 async function fetchPreviousListings(): Promise<{ listings: Record<string, SimpleListing>; listingNewWindow: Record<string, number> }> {
   try {
-    const cmd = new GetObjectCommand({ Bucket: process.env.R2_BUCKET_NAME, Key: "kamiListing.json" });
+    const cmd = new GetObjectCommand({ Bucket: process.env.R2_BUCKET_NAME, Key: "kamiListings.json" });
     const res = await r2Client.send(cmd);
     const body = await res.Body?.transformToString();
     if (!body) return { listings: {}, listingNewWindow: {} };

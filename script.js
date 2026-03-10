@@ -1740,8 +1740,8 @@ async function loadListingsData(v) {
     try {
         const isLocal = window.location.hostname === 'localhost' || window.location.hostname.startsWith('192.168.');
         const finalUrl = isLocal
-            ? `https://data.kami.h80h.xyz/kamiListing.json?v=${v}`
-            : `/api/data/kamiListing.json?v=${v}`;
+            ? `https://data.kami.h80h.xyz/kamiListings.json?v=${v}`
+            : `/api/data/kamiListings.json?v=${v}`;
         const response = await fetch(finalUrl);
         if (response.ok) {
             const data = await response.json();
@@ -1792,7 +1792,7 @@ async function checkForUpdates() {
 
         // Fetch both files in parallel
         const [listingsRes, metaRes] = await Promise.all([
-            fetch(`${baseUrl}/kamiListing.json?v=${v}`),
+            fetch(`${baseUrl}/kamiListings.json?v=${v}`),
             fetch(`${baseUrl}/kamiMeta.json?v=${v}`),
         ]);
 
