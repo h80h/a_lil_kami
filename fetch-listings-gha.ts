@@ -1,6 +1,6 @@
 import { execSync } from "child_process";
 import { existsSync } from "fs";
-import { S3Client } from "@aws-sdk/client-s3";
+import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import { Upload } from "@aws-sdk/lib-storage";
 import { Readable } from "stream";
 import { createRequire } from "module";
@@ -55,11 +55,17 @@ async function fetchAllListings() {
   }
 }
 
-async function uploadListingsToR2(listings: Record<string, number>) {
+async function uploadListingsToR2(listings: Record<string, number>, newListingId: string[], listingNewWindow: Record<string, number>) {
   const filename = "kamiListings.json";
   console.log(`\n📤 Uploading ${filename} to Cloudflare R2...`);
 
-  const stream = Readable.from(JSON.stringify(listings));
+  const payload = {
+    listings,
+    newListingId,
+    listingNewWindow,
+  };
+
+  const stream = Readable.from(JSON.stringify(payload));
 
   const parallelUploads3 = new Upload({
     client: r2Client,
@@ -76,13 +82,41 @@ async function uploadListingsToR2(listings: Record<string, number>) {
   console.log(`   ✅ ${filename} uploaded successfully`);
 }
 
+async function fetchPreviousListings(): Promise<{ listings: Record<string, number>; listingNewWindow: Record<string, number> }> {
+  try {
+    const cmd = new GetObjectCommand({ Bucket: process.env.R2_BUCKET_NAME, Key: "kamiListings.json" });
+    const res = await r2Client.send(cmd);
+    const body = await res.Body?.transformToString();
+    if (!body) return { listings: {}, listingNewWindow: {} };
+    const parsed = JSON.parse(body);
+    // Support both legacy flat format and new structured format
+    if (parsed && typeof parsed === "object" && "listings" in parsed) {
+      return {
+        listings: parsed.listings ?? {},
+        listingNewWindow: parsed.listingNewWindow ?? {},
+      };
+    }
+    // Legacy: entire object was the listings map
+    return { listings: parsed ?? {}, listingNewWindow: {} };
+  } catch {
+    return { listings: {}, listingNewWindow: {} };
+  }
+}
+
 async function main() {
   try {
     console.log("=".repeat(60));
     console.log("🛒 Kamigotchi Listings Fetch");
     console.log("=".repeat(60));
 
-    const response = await fetchAllListings() as any;
+    const [response, { listings: prevListings, listingNewWindow: prevWindow }] = await Promise.all([
+      fetchAllListings() as Promise<any>,
+      fetchPreviousListings(),
+    ]);
+
+    // Each newly listed ID enters listingNewWindow with 13 runs remaining (including this run).
+    // Every run decrements all counters. IDs reaching 0 are removed (~1 hour at 5-min intervals).
+    const NEW_WINDOW_RUNS = 13;
 
     if (response.Listings && response.Listings.length > 0) {
       const listings: Record<string, number> = {};
@@ -90,14 +124,33 @@ async function main() {
         listings[listing.KamiIndex] = Number(BigInt(listing.Price)) / 1e18;
       });
 
+      // IDs that weren't in the previous listings snapshot are brand-new listings
+      const newListingId = Object.keys(listings).filter(id => !(id in prevListings));
+
+      // Decrement existing entries; drop any that have expired or are no longer listed
+      const listingNewWindow: Record<string, number> = {};
+      for (const [id, remaining] of Object.entries(prevWindow)) {
+        const next = remaining - 1;
+        if (next > 0 && id in listings) listingNewWindow[id] = next;
+      }
+      // Add brand-new listing IDs
+      for (const id of newListingId) {
+        listingNewWindow[id] = NEW_WINDOW_RUNS;
+      }
+
+      if (newListingId.length > 0) {
+        console.log(`\n✨ Found ${newListingId.length} new listing(s): ${newListingId.join(", ")}`);
+      }
+      console.log(`⏱️  IDs in listing-window: ${Object.keys(listingNewWindow).length > 0 ? Object.keys(listingNewWindow).join(", ") : "none"}`);
+
       const sorted = Object.entries(listings).sort(([, a], [, b]) => a - b);
       console.log(`\nSuccessfully fetched ${sorted.length} listings:`);
       console.dir(Object.fromEntries(sorted), { maxArrayLength: null });
 
-      await uploadListingsToR2(listings);
+      await uploadListingsToR2(listings, newListingId, listingNewWindow);
     } else {
       console.log("No active listings found.");
-      await uploadListingsToR2({});
+      await uploadListingsToR2({}, [], {});
     }
 
     console.log("\n" + "=".repeat(60));

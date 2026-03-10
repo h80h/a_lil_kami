@@ -882,6 +882,17 @@ button {
     z-index: 5;
 }
 
+.new-listing-icon {
+  font-size: 6px;
+  color: red;
+  position: absolute;
+  bottom: 12px;
+  right: 5px;
+  z-index: 6;
+  text-shadow: 1px 1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, -1px -1px 0 #fff, 1px 0px 0 #fff, 0px 1px 0 #fff, -1px 0px 0 #fff, 0px -1px 0 #fff;
+  transform: skewY(-12deg);
+}
+
 .stat-control {
   display: flex;
   -webkit-box-align: center;
@@ -1361,6 +1372,6 @@ button {
   color: #fff;
   padding: 4px 8px;
   border-radius: 4px;
-  z-index: 6;
+  z-index: 7;
   opacity: 0;
 }

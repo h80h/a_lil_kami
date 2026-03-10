@@ -168,9 +168,11 @@ let affinityData = {};
 let metadataInfo = {};
 let sacrificedNFTs = new Set();
 let listingNFTs = new Map();
+let listingMetaInfo = { newListingId: [], listingNewWindow: {} };
 
 // Auto-refresh state
 let cachedListingsHash = null;
+let cachedListingsMetaHash = null;
 let cachedMetaHash = null;
 
 // Derived lookup structures
@@ -293,7 +295,7 @@ function updateURL(replace = false) {
     }
 }
 
-function loadStateFromURL() {
+function loadStateFromURL({ restorePanels = true } = {}) {
     const params = new URLSearchParams(window.location.search);
     let hasFilters = false;
 
@@ -349,7 +351,7 @@ function loadStateFromURL() {
 
         const affinitySection = document.querySelector('.affinity-filter-section');
         const toggleBtn = document.getElementById('affinityFilterToggle');
-        if (affinitySection && toggleBtn) {
+        if (restorePanels && affinitySection && toggleBtn) {
             affinitySection.style.display = 'block';
             toggleBtn.classList.add('active');
         }
@@ -377,7 +379,7 @@ function loadStateFromURL() {
 
         const minmaxSection = document.querySelector('.minmax-filter-section');
         const toggleBtn = document.getElementById('minmaxFilterToggle');
-        if (minmaxSection && toggleBtn) {
+        if (restorePanels && minmaxSection && toggleBtn) {
             minmaxSection.style.display = 'block';
             toggleBtn.classList.add('active');
         }
@@ -1453,6 +1455,7 @@ function displayNFT(id, showCloseButton = false) {
     const isSacrificed = sacrificedNFTs.has(String(id));
     const listingPrice = listingNFTs.get(String(id));
     const isListing = listingPrice !== undefined;
+    const isNewListing = isListing && listingMetaInfo.listingNewWindow && Object.prototype.hasOwnProperty.call(listingMetaInfo.listingNewWindow, String(id));
 
     const card = document.createElement('div');
     card.className = 'nft-card hover_wrapper';
@@ -1484,6 +1487,8 @@ function displayNFT(id, showCloseButton = false) {
         ? `<div class="listing-badge"><img id="kamiswap_icon" src="https://app.kamigotchi.io/assets/marketplace-BqMKbOFC.png" style="border:none"></div>` : '';
     const listingPriceHTML = isListing
         ? `<div class="listing-price">Ξ${listingPrice}</div>` : '';
+    const newListingIconHTML = isNewListing
+        ? `<div class="new-listing-icon">New</div>` : '';
     const statColorHTML = statColorClass
         ? `<div class="stat-color-box ${statColorClass}" title="${statColorClass.charAt(0).toUpperCase() + statColorClass.slice(1)} Sort">${statValue}</div>` : '';
 
@@ -1518,6 +1523,7 @@ function displayNFT(id, showCloseButton = false) {
             ${sacrificeBadgeHTML}
             ${listingBadgeHTML}
             ${listingPriceHTML}
+            ${newListingIconHTML}
         </div>`;
 
     // On mobile, stats render inside the details panel; on desktop they sit above the image block
@@ -1739,12 +1745,29 @@ async function loadListingsData(v) {
         const response = await fetch(finalUrl);
         if (response.ok) {
             const data = await response.json();
-            listingNFTs = new Map(Object.entries(data).map(([id, price]) => [String(id), price]));
+            // Support both new structured format and legacy flat format
+            const rawListings = (data && typeof data === 'object' && 'listings' in data) ? data.listings : data;
+            listingNFTs = new Map(Object.entries(rawListings).map(([id, price]) => [String(id), price]));
+            listingMetaInfo = {
+                newListingId: (data?.newListingId ?? []).map(String),
+                listingNewWindow: data?.listingNewWindow ?? {},
+            };
             console.log(`🛍️ Loaded ${listingNFTs.size} listing Kamigotchi on KamiSwap`);
+            if (listingMetaInfo.newListingId.length > 0) {
+                console.log(`✨ Found ${listingMetaInfo.newListingId.length} new listing(s): ${listingMetaInfo.newListingId.join(', ')}`);
+            }
         }
     } catch (err) {
         // Silent fail — listing badges simply won't show if unavailable
     }
+}
+
+function getSignificantListingsHash(listingsData) {
+    // Exclude volatile-only changes; track the listing map AND listingNewWindow entries
+    return JSON.stringify({
+        listings: Object.fromEntries(listingNFTs),
+        listingNewWindow: listingsData?.listingNewWindow ?? {},
+    });
 }
 
 function getSignificantMetaHash(meta) {
@@ -1773,12 +1796,19 @@ async function checkForUpdates() {
 
         if (listingsRes.ok) {
             const newListings = await listingsRes.json();
-            const newHash = JSON.stringify(newListings);
+            const newHash = getSignificantListingsHash(newListings);
             if (cachedListingsHash && newHash !== cachedListingsHash) {
                 console.log('🛍️ Listings changed, refreshing all data...');
                 shouldRefresh = true;
             }
             cachedListingsHash = newHash;
+            // Also detect listingNewWindow updates independently
+            const newListingMetaHash = JSON.stringify(newListings?.listingNewWindow ?? {});
+            if (cachedListingsMetaHash && newListingMetaHash !== cachedListingsMetaHash) {
+                console.log('✨ Listing window changed, refreshing all data...');
+                shouldRefresh = true;
+            }
+            cachedListingsMetaHash = newListingMetaHash;
         }
 
         if (metaRes.ok) {
@@ -1889,7 +1919,8 @@ async function loadData() {
         document.getElementById('refreshDataBtn')?.setAttribute('data-tooltip', label);
 
         // Seed hashes and begin polling for changes every 5 min
-        cachedListingsHash = JSON.stringify(Object.fromEntries(listingNFTs));
+        cachedListingsHash = getSignificantListingsHash(listingMetaInfo);
+        cachedListingsMetaHash = JSON.stringify(listingMetaInfo.listingNewWindow);
         cachedMetaHash = getSignificantMetaHash(metadataInfo);
         startAutoRefresh();
 
@@ -1919,6 +1950,8 @@ async function refreshData() {
 
         // Snapshot current UI state before re-fetch
         const currentFilters = getTraitStringFromState();
+        const currentAffinityString = getAffinityStringFromState();
+        const currentMinMaxString = getMinMaxStringFromState();
         const currentSort = currentSortOrder;
         const wasShowingClones = isShowingClonesOnly;
         const wasShowingListing = isShowingListingOnly;
@@ -1950,6 +1983,9 @@ async function refreshData() {
         // Snapshot which filter-group is currently visible so we can restore it after rebuild
         const visibleFilterGroup = document.querySelector('.filter-group[style*="display: block"], .filter-group[style*="display:block"]');
         const visibleTraitType = visibleFilterGroup ? visibleFilterGroup.dataset.traitType : null;
+        // Snapshot panel visibility — we honour the user's collapsed/expanded state across refreshes
+        const affinityWasVisible = document.querySelector('.affinity-filter-section')?.style.display === 'block';
+        const minmaxWasVisible   = document.querySelector('.minmax-filter-section')?.style.display === 'block';
         filterControls.innerHTML = '';
         createFilterControls();
         // Restore the previously visible filter-group and sync the dropdown
@@ -1961,22 +1997,36 @@ async function refreshData() {
         }
 
         // Restore trait filter checkboxes via URL trick
-        if (currentFilters) {
+        if (currentFilters || currentAffinityString || currentMinMaxString) {
             const originalSearch = window.location.search;
             const params = new URLSearchParams();
-            params.set('traits', currentFilters);
+            if (currentFilters)        params.set('traits',   currentFilters);
+            if (currentAffinityString) params.set('affinity', currentAffinityString);
+            if (currentMinMaxString)   params.set('minmax',   currentMinMaxString);
             history.replaceState(null, '', `?${params.toString()}`);
-            loadStateFromURL();
+            loadStateFromURL({ restorePanels: false });
             history.replaceState(null, '', originalSearch);
         }
+
+        // Re-apply panel visibility exactly as the user left it
+        const affinitySection = document.querySelector('.affinity-filter-section');
+        const affinityToggle  = document.getElementById('affinityFilterToggle');
+        if (affinitySection) affinitySection.style.display = affinityWasVisible ? 'block' : 'none';
+        if (affinityToggle)  affinityToggle.classList.toggle('active', affinityWasVisible);
+
+        const minmaxSection = document.querySelector('.minmax-filter-section');
+        const minmaxToggle  = document.getElementById('minmaxFilterToggle');
+        if (minmaxSection) minmaxSection.style.display = minmaxWasVisible ? 'block' : 'none';
+        if (minmaxToggle)  minmaxToggle.classList.toggle('active', minmaxWasVisible);
 
         document.getElementById('cloneFilterBtn')?.classList.toggle('active', isShowingClonesOnly);
         document.getElementById('listingFilterBtn')?.classList.toggle('active', isShowingListingOnly);
 
+        const hasAnyFilter = currentFilters || currentAffinityString || currentMinMaxString;
         preserveScroll(() => {
             if (isShowingClonesOnly)       filterClones();
             else if (isShowingListingOnly) filterListing();
-            else if (currentFilters)       filterByTraits();
+            else if (hasAnyFilter)         filterByTraits();
             else                           { isFiltering = false; loadInitialNFTs(); }
         });
 
