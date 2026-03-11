@@ -1971,10 +1971,10 @@ async function refreshData() {
         if (Object.keys(kamiStatsData).length > 0) {
             console.log(`✅ Re-loaded stats data for ${Object.keys(kamiStatsData).length} Kamigotchi`);
         }
-        console.log(metadataInfo.newKamiIds?.length > 0
-            ? `✨ Found ${metadataInfo.newKamiIds.length} new Kamigotchi! IDs: ${metadataInfo.newKamiIds.join(', ')}`
-            : '💤 No new Kamigotchi'
-        );
+        if (metadataInfo.newKamiIds?.length > 0) {
+            console.log(`✨ Found ${metadataInfo.newKamiIds.length} new Kamigotchi!`);
+            console.log(`   New IDs: ${metadataInfo.newKamiIds.join(', ')}`);
+        }
 
         processLoadedData();
 

@@ -125,7 +125,11 @@ async function main() {
     // Every run decrements all counters. IDs reaching 0 are removed (~1 hour at 5-min intervals).
     const NEW_WINDOW_RUNS = 13;
 
-    if (response.Listings && response.Listings.length > 0) {
+    if (!response || !Array.isArray(response.Listings)) {
+      throw new Error(`gRPC response malformed: expected response.Listings to be an array, got ${JSON.stringify(response)}`);
+    }
+
+    if (response.Listings.length > 0) {
       // Build a map keyed by KamiIndex for newListingId / listingNewWindow tracking
       const byId: Record<string, SimpleListing> = {};
       response.Listings.forEach((listing: { KamiIndex: string; Price: string; SellerAccountID: string; Timestamp: string }) => {

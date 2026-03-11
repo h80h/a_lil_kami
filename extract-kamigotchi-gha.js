@@ -1,9 +1,6 @@
-// extract-kamigotchi-gha.js
-// FINAL MERGED VERSION: Detailed Logging + RESTORED Detection Logic + 1.2GB Streaming Upload
-
 const { chromium } = require('playwright');
 const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
-const { Upload } = require("@aws-sdk/lib-storage"); // CRITICAL: For 1.2GB streaming
+const { Upload } = require("@aws-sdk/lib-storage");
 const { Readable } = require('stream');
 const fs = require('fs').promises;
 
@@ -163,6 +160,10 @@ async function runExtraction() {
       previousCount = testResult.count;
       retries--;
       if (!dataLoaded) await page.waitForTimeout(30000); 
+    }
+
+    if (!dataLoaded || previousCount === 0) {
+      throw new Error(`Data load failed: received 0 items after all retries. The site may be down or the network API did not load.`);
     }
 
     const { imageMap, traitsMap, listedSet } = await page.evaluate(() => {
