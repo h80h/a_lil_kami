@@ -1,6 +1,4 @@
-// ============================================================
 // BOT ARMOR — throttle duplicate requests to the database
-// ============================================================
 let lastRequestTime = 0;
 
 
@@ -160,7 +158,6 @@ async function updateLiveStatus() {
 // GLOBAL STATE
 // ============================================================
 
-// Data stores
 let imagesData = {};
 let traitsData = {};
 let kamiStatsData = {};
@@ -170,35 +167,31 @@ let sacrificedNFTs = new Set();
 let listingNFTs = new Map();
 let listingMetaInfo = { newListingId: [], listingNewWindow: {} };
 
-// Auto-refresh state
 let cachedListingsHash = null;
 let cachedListingsMetaHash = null;
 let cachedMetaHash = null;
 
-// Derived lookup structures
 let traitSignatures = {};
-let traitAffinityLookup = {}; // { body: { TraitName: affinity }, hand: { ... } } — O(1) affinity lookups
+let traitAffinityLookup = {};
 let traitCounts = {};
 let nftRarityScores = {};
 
-// Display state
 let allNFTIds = [];
 let filteredNFTIds = [];
 let selectedIDs = new Set();
 let currentLoadIndex = 0;
 let currentSortOrder = 'latest';
+let currentListingSortOrder = null;
 let isFiltering = false;
 let isLoading = false;
 let isRefreshing = false;
 let nftObserver = null;
 
-// Filter state
 let isShowingClonesOnly = false;
 let isShowingListingOnly = false;
 let selectedBodyAffinities = new Set();
 let selectedHandAffinities = new Set();
 
-// Stat min/max filter state — isMax=false means ">= value", isMax=true means "<= value"
 let statMinMaxFilters = {
     health:   { value: 50, isMax: false },
     power:    { value: 10, isMax: false },
@@ -210,7 +203,6 @@ let statMinMaxFilters = {
 const INITIAL_LOAD_COUNT = 50;
 const LAZY_LOAD_COUNT = 30;
 
-// Cache isMobile to avoid per-card layout reflow from window.innerWidth
 let isMobile = window.innerWidth <= 390;
 window.addEventListener('resize', () => { isMobile = window.innerWidth <= 390; }, { passive: true });
 
@@ -219,7 +211,6 @@ window.addEventListener('resize', () => { isMobile = window.innerWidth <= 390; }
 // URL SYNCHRONIZATION
 // ============================================================
 
-// Serialize trait checkboxes to URL string, skipping traits already covered by an active affinity
 function getTraitStringFromState() {
     const checkboxes = document.querySelectorAll('.trait-checkbox:checked');
     const selected = {};
@@ -232,9 +223,7 @@ function getTraitStringFromState() {
         if (type === 'body' || type === 'hand') {
             const affinitySet = type === 'body' ? selectedBodyAffinities : selectedHandAffinities;
             const traitData = Object.values(traitsData).find(nft => nft[type]?.name === value)?.[type];
-            if (traitData && affinitySet.has(traitData.affinity)) {
-                isCoveredByAffinity = true;
-            }
+            if (traitData && affinitySet.has(traitData.affinity)) isCoveredByAffinity = true;
         }
 
         if (!isCoveredByAffinity) {
@@ -265,7 +254,6 @@ function getMinMaxStringFromState() {
 
 function updateURL(replace = false) {
     const params = new URLSearchParams();
-
     if (currentSortOrder && currentSortOrder !== 'latest') params.set('sort', currentSortOrder);
 
     const traitString = getTraitStringFromState();
@@ -275,7 +263,10 @@ function updateURL(replace = false) {
     if (idArray.length > 0) params.set('ids', idArray.join(','));
 
     if (isShowingClonesOnly) params.set('clones', 'true');
-    if (isShowingListingOnly) params.set('listing', 'true');
+    if (isShowingListingOnly) {
+        params.set('listing', 'true');
+        if (currentListingSortOrder) params.set('listing-sort', currentListingSortOrder);
+    }
 
     const affinityString = getAffinityStringFromState();
     if (affinityString) params.set('affinity', affinityString);
@@ -288,32 +279,26 @@ function updateURL(replace = false) {
         ? `${window.location.pathname}?${queryString}${window.location.hash}`
         : `${window.location.pathname}${window.location.hash}`;
 
-    if (replace) {
-        history.replaceState(null, '', newUrl);
-    } else {
-        history.pushState(null, '', newUrl);
-    }
+    if (replace) history.replaceState(null, '', newUrl);
+    else         history.pushState(null, '', newUrl);
 }
 
 function loadStateFromURL({ restorePanels = true } = {}) {
     const params = new URLSearchParams(window.location.search);
     let hasFilters = false;
 
-    // Sort order
     const urlSort = params.get('sort');
     if (urlSort) currentSortOrder = urlSort;
 
-    // Selected IDs
     const urlIDs = params.get('ids');
-    if (urlIDs) {
-        selectedIDs = new Set(urlIDs.split(',').map(id => id.trim()).filter(Boolean));
-    }
+    if (urlIDs) selectedIDs = new Set(urlIDs.split(',').map(id => id.trim()).filter(Boolean));
 
-    // Clone / listing flags
-    isShowingClonesOnly = params.get('clones') === 'true';
+    isShowingClonesOnly  = params.get('clones') === 'true';
     isShowingListingOnly = params.get('listing') === 'true';
 
-    // Trait filters
+    const urlListingSort = params.get('listing-sort');
+    currentListingSortOrder = (isShowingListingOnly && urlListingSort) ? urlListingSort : null;
+
     const urlTraits = params.get('traits');
     if (urlTraits) {
         urlTraits.split(';').forEach(group => {
@@ -327,7 +312,6 @@ function loadStateFromURL({ restorePanels = true } = {}) {
         });
     }
 
-    // Affinity filters
     const urlAffinity = params.get('affinity');
     if (urlAffinity) {
         urlAffinity.split(';').forEach(group => {
@@ -349,16 +333,15 @@ function loadStateFromURL({ restorePanels = true } = {}) {
             }
         });
 
-        const affinitySection = document.querySelector('.affinity-filter-section');
-        const toggleBtn = document.getElementById('affinityFilterToggle');
-        if (restorePanels && affinitySection && toggleBtn) {
-            affinitySection.style.display = 'block';
-            toggleBtn.classList.add('active');
+        if (restorePanels) {
+            const affinitySection = document.querySelector('.affinity-filter-section');
+            const toggleBtn = document.getElementById('affinityFilterToggle');
+            if (affinitySection) affinitySection.style.display = 'block';
+            if (toggleBtn) toggleBtn.classList.add('active');
         }
         updateAffinityButtonStates();
     }
 
-    // Stat min/max filters
     const urlMinMax = params.get('minmax');
     if (urlMinMax) {
         urlMinMax.split(';').forEach(part => {
@@ -368,20 +351,20 @@ function loadStateFromURL({ restorePanels = true } = {}) {
                 statMinMaxFilters[statName].value = Number(value);
                 statMinMaxFilters[statName].isMax = isMax;
 
-                const slider = document.querySelector(`.stat-control.${statName} .stat-control-input`);
+                const slider       = document.querySelector(`.stat-control.${statName} .stat-control-input`);
                 const valueDisplay = document.querySelector(`.stat-control.${statName} .stat-control-input-value`);
-                const toggleInput = document.querySelector(`.stat-control.${statName} .toggle-input`);
-                if (slider) slider.value = value;
+                const toggleInput  = document.querySelector(`.stat-control.${statName} .toggle-input`);
+                if (slider)       slider.value = value;
                 if (valueDisplay) valueDisplay.textContent = value;
-                if (toggleInput) toggleInput.checked = isMax;
+                if (toggleInput)  toggleInput.checked = isMax;
             }
         });
 
-        const minmaxSection = document.querySelector('.minmax-filter-section');
-        const toggleBtn = document.getElementById('minmaxFilterToggle');
-        if (restorePanels && minmaxSection && toggleBtn) {
-            minmaxSection.style.display = 'block';
-            toggleBtn.classList.add('active');
+        if (restorePanels) {
+            const minmaxSection = document.querySelector('.minmax-filter-section');
+            const toggleBtn = document.getElementById('minmaxFilterToggle');
+            if (minmaxSection) minmaxSection.style.display = 'block';
+            if (toggleBtn) toggleBtn.classList.add('active');
         }
         hasFilters = true;
     }
@@ -394,18 +377,21 @@ function handlePopState() {
 
     updateSelectedIDsDisplay();
     document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
-    const sortButton = document.querySelector(`.sort-btn[data-sort="${currentSortOrder}"]`);
-    if (sortButton) sortButton.classList.add('active');
+    if (!currentListingSortOrder) {
+        document.querySelector(`.sort-btn[data-sort="${currentSortOrder}"]`)?.classList.add('active');
+    }
 
-    const cloneBtn = document.getElementById('cloneFilterBtn');
-    if (cloneBtn) cloneBtn.classList.toggle('active', isShowingClonesOnly);
+    document.querySelectorAll('.listing-sort-btn').forEach(b => b.classList.remove('active'));
+    if (currentListingSortOrder) {
+        document.querySelector(`.listing-sort-btn[listing-data-sort="${currentListingSortOrder}"]`)?.classList.add('active');
+    }
 
-    const listingBtn = document.getElementById('listingFilterBtn');
-    if (listingBtn) listingBtn.classList.toggle('active', isShowingListingOnly);
+    document.getElementById('cloneFilterBtn')?.classList.toggle('active', isShowingClonesOnly);
+    document.getElementById('listingFilterBtn')?.classList.toggle('active', isShowingListingOnly);
 
-    if (isShowingClonesOnly) filterClones();
+    if (isShowingClonesOnly)       filterClones();
     else if (isShowingListingOnly) filterListing();
-    else if (hasFilters) filterByTraits();
+    else if (hasFilters)           filterByTraits();
     else { isFiltering = false; allNFTIds = getSortedNFTIds(); loadInitialNFTs(); }
 }
 
@@ -423,20 +409,9 @@ function showLoader() {
 function hideLoader() {
     const loader = document.querySelector('.loader');
     loader.style.opacity = '0';
-
-    if (typeof window.startHonestTracking === 'function') {
-        window.startHonestTracking();
-    }
-
-    // Delay matches the loader's CSS fade-out duration
-    setTimeout(() => {
-        updateLiveStatus();
-        loader.style.display = 'none';
-    }, 300);
-
-    if (!window.liveStatusInterval) {
-        window.liveStatusInterval = setInterval(updateLiveStatus, 60000);
-    }
+    if (typeof window.startHonestTracking === 'function') window.startHonestTracking();
+    setTimeout(() => { updateLiveStatus(); loader.style.display = 'none'; }, 300);
+    if (!window.liveStatusInterval) window.liveStatusInterval = setInterval(updateLiveStatus, 60000);
 }
 
 function showContainer() {
@@ -450,12 +425,10 @@ function showContainer() {
 // DATA HELPERS
 // ============================================================
 
-// Handles both legacy string format and new object format for trait data
 function getTraitName(traitData) {
     return typeof traitData === 'string' ? traitData : traitData.name;
 }
 
-// Builds a deterministic signature string from an NFT's traits (used for clone detection)
 function createTraitSignature(traits) {
     return Object.keys(traits).sort()
         .map(category => `${category}:${getTraitName(traits[category])}`)
@@ -493,16 +466,12 @@ function calculateTraitCounts() {
     return counts;
 }
 
-// OpenRarity — official information content scoring
-// Formula: score = I(x) / E[I(x)]
-// where I(x) = Σ -log₂(P(trait_i))  and  E[I(x)] = probability-weighted average of I(x) across the collection
+// OpenRarity — information content scoring (score = I(x) / E[I(x)])
 // See: https://openrarity.gitbook.io/developers/fundamentals/methodology
 function calculateRarityScores() {
     const totalNFTs = Object.keys(traitsData).length;
     const scores = {};
 
-    // Step 1: IC per trait value — IC = -log₂(P(trait))
-    // OpenRarity uses log base 2 ("bits" of information)
     const traitIC = {};
     Object.entries(traitCounts).forEach(([category, traits]) => {
         traitIC[category] = {};
@@ -511,27 +480,17 @@ function calculateRarityScores() {
         });
     });
 
-    // Step 2: I(x) per NFT — sum of IC across all of its traits
     Object.entries(traitsData).forEach(([id, traits]) => {
         let ix = 0;
         Object.entries(traits).forEach(([category, traitData]) => {
-            const traitName = getTraitName(traitData);
-            ix += traitIC[category][traitName];
+            ix += traitIC[category][getTraitName(traitData)];
         });
         scores[id] = ix;
     });
 
-    // Step 3: E[I(x)] — probability-weighted average of I(x) across all NFTs
-    // Each NFT has equal probability (1/totalNFTs), so this is simply the arithmetic mean of I(x)
-    const totalIx = Object.values(scores).reduce((sum, ix) => sum + ix, 0);
-    const expectedIx = totalIx / totalNFTs;
+    const expectedIx = Object.values(scores).reduce((sum, ix) => sum + ix, 0) / totalNFTs;
+    Object.keys(scores).forEach(id => { scores[id] = scores[id] / expectedIx; });
 
-    // Step 4: Normalize each score by E[I(x)]
-    Object.keys(scores).forEach(id => {
-        scores[id] = scores[id] / expectedIx;
-    });
-
-    // Step 5: Rank by score (higher = rarer), detect ties
     const sortedByScore = Object.entries(scores).sort((a, b) => b[1] - a[1]);
     const rankedScores = {};
     let currentRank = 1;
@@ -556,8 +515,6 @@ function calculateRarityScores() {
     return rankedScores;
 }
 
-// Builds a flat lookup map for O(1) trait → affinity resolution
-// Replaces the expensive Object.values(traitsData).find() pattern in hot paths
 function buildTraitAffinityLookup() {
     const lookup = { body: {}, hand: {} };
     Object.values(traitsData).forEach(nft => {
@@ -587,7 +544,6 @@ function extractAffinityData() {
 // SORTING
 // ============================================================
 
-// Returns sorted NFT IDs respecting current sort order; always keeps clone groups adjacent
 function getSortedNFTIds(idsToSort) {
     const ids = idsToSort || Object.keys(traitsData);
 
@@ -602,10 +558,8 @@ function getSortedNFTIds(idsToSort) {
         }
     };
 
-    // Chronological sort
     if (currentSortOrder === 'latest' || currentSortOrder === 'oldest') {
         if (isShowingClonesOnly) {
-            // Group clones by their representative (highest/lowest) ID
             const repId = {};
             ids.forEach(id => {
                 const sig = traitSignatures.signatures[id];
@@ -632,7 +586,6 @@ function getSortedNFTIds(idsToSort) {
         );
     }
 
-    // Stat / rarity sort — always groups clones, uses latest ID as tiebreaker
     return ids.sort((a, b) => {
         const sigA = traitSignatures.signatures[a];
         const sigB = traitSignatures.signatures[b];
@@ -640,14 +593,53 @@ function getSortedNFTIds(idsToSort) {
         if (sigA !== sigB) {
             const statA = getStatValue(a);
             const statB = getStatValue(b);
-            if (statA !== statB) {
-                return currentSortOrder === 'rarity' ? statA - statB : statB - statA;
-            }
+            if (statA !== statB) return currentSortOrder === 'rarity' ? statA - statB : statB - statA;
             const repA = Math.max(...traitSignatures.groups[sigA].map(Number));
             const repB = Math.max(...traitSignatures.groups[sigB].map(Number));
             return repB - repA;
         }
 
+        return Number(b) - Number(a);
+    });
+}
+
+function getSortedListingIds(ids) {
+    // If no ids provided, return empty array immediately
+    if (!ids || ids.length === 0) return [];
+
+    // Use the array directly instead of spreading [...ids] 
+    // since we pass a new array from updateSelectedIDsDisplay
+    return ids.sort((a, b) => {
+        const itemA = listingNFTs.get(String(a));
+        const itemB = listingNFTs.get(String(b));
+
+        // Sorting by Price
+        if (currentListingSortOrder === 'price') {
+            const priceA = itemA?.price ?? Infinity;
+            const priceB = itemB?.price ?? Infinity;
+            
+            if (priceA !== priceB) return priceA - priceB;
+            
+            // Secondary sort: Most recent if prices are tied
+            const tsA = Number(itemA?.timestamp ?? 0);
+            const tsB = Number(itemB?.timestamp ?? 0);
+            return tsB - tsA;
+        } 
+        
+        // Sorting by Recent
+        if (currentListingSortOrder === 'recent') {
+            const tsA = Number(itemA?.timestamp ?? 0);
+            const tsB = Number(itemB?.timestamp ?? 0);
+            
+            if (tsA !== tsB) return tsB - tsA;
+            
+            // Secondary sort: Cheaper if timestamps are tied
+            const priceA = itemA?.price ?? Infinity;
+            const priceB = itemB?.price ?? Infinity;
+            return priceA - priceB;
+        }
+
+        // Default: Sort by ID descending
         return Number(b) - Number(a);
     });
 }
@@ -678,7 +670,25 @@ function passesStatMinMaxFilters(id) {
     return true;
 }
 
-// Helper used in filterClones and filterByTraits to build the affinity short-code string "(N/I)" etc.
+// Returns { traitType: [values] } for all currently checked trait checkboxes
+function getSelectedTraitsFromCheckboxes() {
+    const selectedTraits = {};
+    document.querySelectorAll('.trait-checkbox:checked').forEach(cb => {
+        const type = cb.dataset.traitType;
+        if (!selectedTraits[type]) selectedTraits[type] = [];
+        selectedTraits[type].push(cb.dataset.traitValue);
+    });
+    return selectedTraits;
+}
+
+// Returns true if the NFT matches all entries in a selectedTraits map
+function matchesSelectedTraits(id, selectedTraits) {
+    const nftTraits = traitsData[id];
+    return Object.entries(selectedTraits).every(([traitType, selectedValues]) =>
+        selectedValues.includes(getTraitName(nftTraits[traitType]))
+    );
+}
+
 const AFFINITY_MAP = { NORMAL: 'N', INSECT: 'I', SCRAP: 'S', EERIE: 'E' };
 
 function getAffinityNotation() {
@@ -688,7 +698,6 @@ function getAffinityNotation() {
     return ` (${bChar}/${hChar})`;
 }
 
-// Builds the removable filter-tag buttons HTML from a map of { traitType: [values] }
 function buildTraitSummaryButtonsHTML(selectedTraits) {
     return Object.entries(selectedTraits).flatMap(([type, values]) =>
         values.map(value => `
@@ -697,18 +706,6 @@ function buildTraitSummaryButtonsHTML(selectedTraits) {
                 ${type}: ${value} ×
             </button>`)
     ).join('');
-}
-
-// Collects currently checked trait checkboxes into a { traitType: [values] } map
-function getSelectedTraitsFromCheckboxes() {
-    const selectedTraits = {};
-    document.querySelectorAll('.trait-checkbox:checked').forEach(checkbox => {
-        const type = checkbox.dataset.traitType;
-        const value = checkbox.dataset.traitValue;
-        if (!selectedTraits[type]) selectedTraits[type] = [];
-        selectedTraits[type].push(value);
-    });
-    return selectedTraits;
 }
 
 function buildStatFilterSummaryHTML() {
@@ -729,9 +726,9 @@ function attachStatFilterSummaryListeners(container) {
     container.querySelectorAll('.stat-filter-summary-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             const statName = btn.dataset.statName;
-            const slider = document.querySelector(`.stat-control.${statName} .stat-control-input`);
+            const slider       = document.querySelector(`.stat-control.${statName} .stat-control-input`);
             const valueDisplay = document.querySelector(`.stat-control.${statName} .stat-control-input-value`);
-            const toggleInput = document.querySelector(`.stat-control.${statName} .toggle-input`);
+            const toggleInput  = document.querySelector(`.stat-control.${statName} .toggle-input`);
             if (slider) {
                 slider.value = slider.min;
                 if (valueDisplay) valueDisplay.textContent = slider.min;
@@ -744,7 +741,6 @@ function attachStatFilterSummaryListeners(container) {
     });
 }
 
-// Builds and appends a count/filter-summary header div into resultsDiv
 function appendCountHeader(resultsDiv, summaryText, filterSummaryHTML = '') {
     const countDiv = document.createElement('div');
     countDiv.className = 'count-header';
@@ -762,14 +758,10 @@ function appendCountHeader(resultsDiv, summaryText, filterSummaryHTML = '') {
     return countDiv;
 }
 
-// Shared "return to previous view" logic used by clone and listing toggle buttons
 function restoreViewAfterToggle() {
     const hasAffinityFilters = selectedBodyAffinities.size > 0 || selectedHandAffinities.size > 0;
-    if (isFiltering || hasAffinityFilters) {
-        preserveScroll(() => { filterByTraits(); updateURL(); });
-    } else {
-        preserveScroll(() => { allNFTIds = getSortedNFTIds(); loadInitialNFTs(); updateURL(); });
-    }
+    if (isFiltering || hasAffinityFilters) preserveScroll(() => { filterByTraits(); updateURL(); });
+    else                                   preserveScroll(() => { allNFTIds = getSortedNFTIds(); loadInitialNFTs(); updateURL(); });
 }
 
 
@@ -782,13 +774,18 @@ function setupSortButtons() {
     sortButtons.forEach(btn => {
         btn.addEventListener('click', (e) => {
             const newSort = e.target.dataset.sort;
-            if (newSort === currentSortOrder) return;
+            if (newSort === currentSortOrder && currentListingSortOrder === null) return;
+
+            if (currentListingSortOrder !== null) {
+                currentListingSortOrder = null;
+                document.querySelectorAll('.listing-sort-btn').forEach(b => b.classList.remove('active'));
+            }
 
             currentSortOrder = newSort;
             sortButtons.forEach(b => b.classList.remove('active'));
             e.target.classList.add('active');
 
-            if (isShowingClonesOnly)       preserveScroll(() => filterClones());
+            if (isShowingClonesOnly && !(isShowingListingOnly && currentListingSortOrder)) preserveScroll(() => filterClones());
             else if (isShowingListingOnly) preserveScroll(() => filterListing());
             else if (isFiltering)          preserveScroll(() => filterByTraits());
             else                           preserveScroll(() => { allNFTIds = getSortedNFTIds(); loadInitialNFTs(); });
@@ -807,13 +804,9 @@ function setupCloneFilterButton() {
         isShowingClonesOnly = !isShowingClonesOnly;
         cloneBtn.classList.toggle('active', isShowingClonesOnly);
 
-        if (isShowingClonesOnly) {
-            preserveScroll(() => { filterClones(); updateURL(); });
-        } else if (isShowingListingOnly) {
-            preserveScroll(() => { filterListing(); updateURL(); });
-        } else {
-            restoreViewAfterToggle();
-        }
+        if (isShowingClonesOnly)           preserveScroll(() => { filterClones(); updateURL(); });
+        else if (isShowingListingOnly)     preserveScroll(() => { filterListing(); updateURL(); });
+        else                               restoreViewAfterToggle();
     });
 }
 
@@ -825,13 +818,44 @@ function setupListingFilterButton() {
         isShowingListingOnly = !isShowingListingOnly;
         listingBtn.classList.toggle('active', isShowingListingOnly);
 
-        if (isShowingListingOnly) {
-            preserveScroll(() => { filterListing(); updateURL(); });
-        } else if (isShowingClonesOnly) {
-            preserveScroll(() => { filterClones(); updateURL(); });
-        } else {
-            restoreViewAfterToggle();
+        const listingSortSection = document.querySelector('.listing-sort-section');
+        if (listingSortSection) listingSortSection.style.display = isShowingListingOnly ? 'block' : 'none';
+
+        if (!isShowingListingOnly) {
+            currentListingSortOrder = null;
+            document.querySelectorAll('.listing-sort-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+            document.querySelector(`.sort-btn[data-sort="${currentSortOrder}"]`)?.classList.add('active');
         }
+
+        if (isShowingListingOnly)          preserveScroll(() => { filterListing(); updateURL(); });
+        else if (isShowingClonesOnly)      preserveScroll(() => { filterClones(); updateURL(); });
+        else                               restoreViewAfterToggle();
+
+        if (selectedIDs.size > 0) updateSelectedIDsDisplay();
+    });
+}
+
+function setupListingSortButtons() {
+    const listingSortBtns = document.querySelectorAll('.listing-sort-btn');
+    listingSortBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            if (!isShowingListingOnly) return;
+
+            const newListingSort = btn.getAttribute('listing-data-sort');
+            if (newListingSort === currentListingSortOrder) return;
+
+            listingSortBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentListingSortOrder = newListingSort;
+
+            document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+            currentSortOrder = 'latest';
+
+            preserveScroll(() => { filterListing(); updateURL(); });
+
+            if (selectedIDs.size > 0) updateSelectedIDsDisplay();
+        });
     });
 }
 
@@ -859,7 +883,6 @@ function setupMinMaxFilterToggle() {
     });
 }
 
-// Clicking an affinity button selects all traits of that affinity and deselects the previous one
 function setupAffinityFilters() {
     document.querySelectorAll('.affinity-btn').forEach(button => {
         button.addEventListener('click', () => {
@@ -910,10 +933,10 @@ function removeSelectedAffinity(event) {
     if (affinityType === 'body') selectedBodyAffinities.delete(affinityValue);
     else if (affinityType === 'hand') selectedHandAffinities.delete(affinityValue);
     updateAffinityButtonStates();
-    preserveScroll(() => { filterByTraits(); updateURL(); });
+    if (isShowingListingOnly) preserveScroll(() => { filterListing(); updateURL(); });
+    else                      preserveScroll(() => { filterByTraits(); updateURL(); });
 }
 
-// Validates whether the current checkbox state still matches an active affinity; deactivates if not
 function validateAffinitiesAgainstCheckboxes() {
     let stateChanged = false;
 
@@ -957,9 +980,9 @@ function validateAffinitiesAgainstCheckboxes() {
 const controls = document.querySelectorAll('.stat-control');
 controls.forEach(control => {
     const statName = ['health', 'power', 'violence', 'harmony', 'slots'].find(s => control.classList.contains(s));
-    const slider = control.querySelector('input[type="range"]');
+    const slider       = control.querySelector('input[type="range"]');
     const valueDisplay = control.querySelector('.stat-control-input-value');
-    const toggleInput = control.querySelector('.toggle-input');
+    const toggleInput  = control.querySelector('.toggle-input');
 
     if (statName && slider) {
         statMinMaxFilters[statName].value = Number(slider.value);
@@ -987,8 +1010,8 @@ function triggerStatFilter() {
     clearTimeout(_statFilterTimer);
     _statFilterTimer = setTimeout(() => {
         preserveScroll(() => {
-            if (isShowingClonesOnly)            filterClones();
-            else if (isShowingListingOnly)      filterListing();
+            if (isShowingClonesOnly && !(isShowingListingOnly && currentListingSortOrder)) filterClones();
+            else if (isShowingListingOnly)              filterListing();
             else if (isFiltering || hasActiveStatFilters()) filterByTraits();
             else { allNFTIds = getSortedNFTIds(Object.keys(traitsData)); loadInitialNFTs(); }
             updateURL();
@@ -996,7 +1019,6 @@ function triggerStatFilter() {
     }, 200);
 }
 
-// Preserves scroll position across a filter re-render
 function preserveScroll(fn) {
     const scrollY = window.scrollY;
     fn();
@@ -1027,7 +1049,6 @@ function createFilterControls() {
         });
     });
 
-    // Dropdown
     const dropdownWrapper = document.createElement('div');
     dropdownWrapper.className = 'dropdown-wrapper';
     const dropdownLabel = document.createElement('label');
@@ -1178,12 +1199,12 @@ function filterClones() {
     const resultsDiv = document.getElementById('results');
     resultsDiv.textContent = '';
 
-    const checkboxes = document.querySelectorAll('.trait-checkbox:checked');
-    const hasTraitFilters = checkboxes.length > 0;
+    const selectedTraits = getSelectedTraitsFromCheckboxes();
+    const hasTraitFilters   = Object.keys(selectedTraits).length > 0;
     const hasAffinityFilters = selectedBodyAffinities.size > 0 || selectedHandAffinities.size > 0;
 
-    let cloneIds = (hasTraitFilters && isFiltering)
-        ? filteredNFTIds.filter(id => traitSignatures.cloneIds.has(id))
+    let cloneIds = hasTraitFilters
+        ? Array.from(traitSignatures.cloneIds).filter(id => matchesSelectedTraits(id, selectedTraits))
         : Array.from(traitSignatures.cloneIds);
 
     if (hasAffinityFilters) {
@@ -1195,14 +1216,16 @@ function filterClones() {
         });
     }
     if (hasActiveStatFilters()) cloneIds = cloneIds.filter(id => passesStatMinMaxFilters(id));
-    if (isShowingListingOnly) cloneIds = cloneIds.filter(id => listingNFTs.has(String(id)));
+    if (isShowingListingOnly)   cloneIds = cloneIds.filter(id => listingNFTs.has(String(id)));
 
-    filteredNFTIds = getSortedNFTIds(cloneIds);
+    filteredNFTIds = (isShowingListingOnly && currentListingSortOrder)
+        ? getSortedListingIds(cloneIds)
+        : getSortedNFTIds(cloneIds);
     isFiltering = true;
 
     const uniqueSignatures = new Set(cloneIds.map(id => traitSignatures.signatures[id]));
     const filterSummaryHTML = hasTraitFilters
-        ? `<div class="filter-summary-buttons-container" style="display:flex;flex-wrap:wrap;gap:5px;margin:10px;">${buildTraitSummaryButtonsHTML(getSelectedTraitsFromCheckboxes())}</div>`
+        ? `<div class="filter-summary-buttons-container" style="display:flex;flex-wrap:wrap;gap:5px;margin:10px;">${buildTraitSummaryButtonsHTML(selectedTraits)}</div>`
         : '';
 
     appendCountHeader(
@@ -1228,18 +1251,20 @@ function filterListing() {
     const resultsDiv = document.getElementById('results');
     resultsDiv.textContent = '';
 
-    const checkboxes = document.querySelectorAll('.trait-checkbox:checked');
-    const hasTraitFilters = checkboxes.length > 0;
+    const selectedTraits = getSelectedTraitsFromCheckboxes();
+    const hasTraitFilters   = Object.keys(selectedTraits).length > 0;
     const hasAffinityFilters = selectedBodyAffinities.size > 0 || selectedHandAffinities.size > 0;
 
     let listingIds;
     if (isShowingClonesOnly) {
-        const cloneBase = (hasTraitFilters && isFiltering)
-            ? filteredNFTIds.filter(id => traitSignatures.cloneIds.has(id))
+        const cloneBase = hasTraitFilters
+            ? Array.from(traitSignatures.cloneIds).filter(id => matchesSelectedTraits(id, selectedTraits))
             : Array.from(traitSignatures.cloneIds);
         listingIds = cloneBase.filter(id => listingNFTs.has(String(id)));
-    } else if (hasTraitFilters && isFiltering) {
-        listingIds = filteredNFTIds.filter(id => listingNFTs.has(String(id)));
+    } else if (hasTraitFilters) {
+        listingIds = Object.keys(traitsData).filter(id =>
+            listingNFTs.has(String(id)) && matchesSelectedTraits(id, selectedTraits)
+        );
     } else {
         listingIds = Object.keys(traitsData).filter(id => listingNFTs.has(String(id)));
     }
@@ -1254,11 +1279,13 @@ function filterListing() {
     }
     if (hasActiveStatFilters()) listingIds = listingIds.filter(id => passesStatMinMaxFilters(id));
 
-    filteredNFTIds = getSortedNFTIds(listingIds);
+    filteredNFTIds = currentListingSortOrder
+        ? getSortedListingIds(listingIds)
+        : getSortedNFTIds(listingIds);
     isFiltering = true;
 
     const filterSummaryHTML = hasTraitFilters
-        ? `<div class="filter-summary-buttons-container" style="display:flex;flex-wrap:wrap;gap:5px;margin:10px;">${buildTraitSummaryButtonsHTML(getSelectedTraitsFromCheckboxes())}</div>`
+        ? `<div class="filter-summary-buttons-container" style="display:flex;flex-wrap:wrap;gap:5px;margin:10px;">${buildTraitSummaryButtonsHTML(selectedTraits)}</div>`
         : '';
 
     appendCountHeader(resultsDiv, `Found ${listingIds.length} listing Kamigotchi`, filterSummaryHTML);
@@ -1280,14 +1307,15 @@ function filterByTraits() {
     const resultsDiv = document.getElementById('results');
     resultsDiv.textContent = '';
 
-    const checkboxes = document.querySelectorAll('.trait-checkbox:checked');
-    const hasTraitFilters = checkboxes.length > 0;
+    const selectedTraits = getSelectedTraitsFromCheckboxes();
+    const hasTraitFilters   = Object.keys(selectedTraits).length > 0;
     const hasAffinityFilters = selectedBodyAffinities.size > 0 || selectedHandAffinities.size > 0;
-    const hasStatFilters = hasActiveStatFilters();
+    const hasStatFilters    = hasActiveStatFilters();
 
     if (!hasTraitFilters && !hasAffinityFilters && !hasStatFilters) {
         isFiltering = false;
-        if (isShowingClonesOnly) filterClones();
+        if (isShowingClonesOnly && !(isShowingListingOnly && currentListingSortOrder)) filterClones();
+        else if (isShowingListingOnly) filterListing();
         else { allNFTIds = getSortedNFTIds(Object.keys(traitsData)); loadInitialNFTs(); }
         return;
     }
@@ -1297,22 +1325,11 @@ function filterByTraits() {
     filteringMessage.textContent = 'Filtering...';
     resultsDiv.appendChild(filteringMessage);
 
-    const selectedTraits = {};
-    checkboxes.forEach(checkbox => {
-        const type = checkbox.dataset.traitType;
-        const value = checkbox.dataset.traitValue;
-        if (!selectedTraits[type]) selectedTraits[type] = [];
-        selectedTraits[type].push(value);
-    });
-
     const baseIDs = isShowingClonesOnly ? Array.from(traitSignatures.cloneIds) : Object.keys(traitsData);
 
-    let matchingNFTs = baseIDs.filter(id => {
-        const nftTraits = traitsData[id];
-        return Object.entries(selectedTraits).every(([traitType, selectedValues]) =>
-            selectedValues.includes(getTraitName(nftTraits[traitType]))
-        );
-    });
+    let matchingNFTs = hasTraitFilters
+        ? baseIDs.filter(id => matchesSelectedTraits(id, selectedTraits))
+        : baseIDs;
 
     if (hasAffinityFilters) {
         matchingNFTs = matchingNFTs.filter(id => {
@@ -1325,10 +1342,13 @@ function filterByTraits() {
     if (hasStatFilters)          matchingNFTs = matchingNFTs.filter(id => passesStatMinMaxFilters(id));
     if (isShowingListingOnly)    matchingNFTs = matchingNFTs.filter(id => listingNFTs.has(String(id)));
 
-    filteredNFTIds = getSortedNFTIds(matchingNFTs);
+    filteredNFTIds = (isShowingListingOnly && currentListingSortOrder)
+        ? getSortedListingIds(matchingNFTs)
+        : getSortedNFTIds(matchingNFTs);
     isFiltering = true;
 
-    if (isShowingClonesOnly) { filterClones(); return; }
+    if (isShowingClonesOnly && !(isShowingListingOnly && currentListingSortOrder)) { filterClones(); return; }
+    if (isShowingListingOnly) { filterListing(); return; }
 
     resultsDiv.textContent = '';
 
@@ -1378,7 +1398,7 @@ function updateSelectedTraitsDisplay(forceUpdate = false) {
         selectedHandAffinities.clear();
         updateAffinityButtonStates();
 
-        if (isShowingClonesOnly)          preserveScroll(() => { filterClones(); updateURL(); });
+        if (isShowingClonesOnly && !(isShowingListingOnly && currentListingSortOrder)) preserveScroll(() => { filterClones(); updateURL(); });
         else if (isShowingListingOnly)    preserveScroll(() => { filterListing(); updateURL(); });
         else if (hasActiveStatFilters())  preserveScroll(() => { filterByTraits(); updateURL(); });
         else                              preserveScroll(() => { allNFTIds = getSortedNFTIds(Object.keys(traitsData)); loadInitialNFTs(); updateURL(); });
@@ -1386,7 +1406,9 @@ function updateSelectedTraitsDisplay(forceUpdate = false) {
     }
 
     updateURL();
-    preserveScroll(() => filterByTraits());
+    if (isShowingListingOnly)     preserveScroll(() => filterListing());
+    else if (isShowingClonesOnly) preserveScroll(() => filterClones());
+    else                          preserveScroll(() => filterByTraits());
 }
 
 function clearFilters() {
@@ -1405,9 +1427,9 @@ function clearFilters() {
     updateAffinityButtonStates();
 
     document.querySelectorAll('.stat-control').forEach(control => {
-        const slider = control.querySelector('input[type="range"]');
+        const slider       = control.querySelector('input[type="range"]');
         const valueDisplay = control.querySelector('.stat-control-input-value');
-        const toggleInput = control.querySelector('.toggle-input');
+        const toggleInput  = control.querySelector('.toggle-input');
         if (slider) { slider.value = slider.min; if (valueDisplay) valueDisplay.textContent = slider.min; }
         if (toggleInput) toggleInput.checked = false;
     });
@@ -1437,60 +1459,53 @@ function getStatColorClass() {
 
 function displayNFT(id, showCloseButton = false) {
     const imageUrl = imagesData[id];
-    const traits = traitsData[id];
-    const stats = kamiStatsData[id];
+    const traits   = traitsData[id];
+    const stats    = kamiStatsData[id];
 
     if (!imageUrl || !traits) {
         console.warn(`NFT #${id} not found in data`);
         return null;
     }
 
-    const rarityData = nftRarityScores[id];
-    const rank = rarityData ? rarityData.rank : '?';
-    const score = rarityData ? rarityData.score.toFixed(4) : '?';
-    const isTied = rarityData ? rarityData.isTied : false;
+    const rarityData  = nftRarityScores[id];
+    const rank        = rarityData ? rarityData.rank : '?';
+    const score       = rarityData ? rarityData.score.toFixed(4) : '?';
+    const isTied      = rarityData ? rarityData.isTied : false;
 
-    const isNew = metadataInfo.kamiNewWindow && Object.prototype.hasOwnProperty.call(metadataInfo.kamiNewWindow, String(id));
-    const isClone = traitSignatures.cloneIds.has(id);
+    const isNew        = metadataInfo.kamiNewWindow && Object.prototype.hasOwnProperty.call(metadataInfo.kamiNewWindow, String(id));
+    const isClone      = traitSignatures.cloneIds.has(id);
     const isSacrificed = sacrificedNFTs.has(String(id));
-    const listingPrice = listingNFTs.get(String(id));
-    const isListing = listingPrice !== undefined;
+    const listingData  = listingNFTs.get(String(id));
+    const listingPrice = listingData?.price;
+    const isListing    = listingData !== undefined;
     const isNewListing = isListing && listingMetaInfo.listingNewWindow && String(id) in listingMetaInfo.listingNewWindow;
 
     const card = document.createElement('div');
     card.className = 'nft-card hover_wrapper';
     card.dataset.nftId = id;
 
-    let rankClass = 'rank-common';
     const totalNFTs = Object.keys(traitsData).length;
     const rankPercentile = (rank / totalNFTs) * 100;
-    if (rankPercentile <= 1)       rankClass = 'rank-legendary';
+    let rankClass = 'rank-common';
+    if      (rankPercentile <= 1)  rankClass = 'rank-legendary';
     else if (rankPercentile <= 5)  rankClass = 'rank-epic';
     else if (rankPercentile <= 15) rankClass = 'rank-rare';
     else if (rankPercentile <= 40) rankClass = 'rank-uncommon';
 
     const statColorClass = getStatColorClass();
-    const statValue = stats?.stats[currentSortOrder] || '';
-    const rankTooltip = isTied
-        ? `Rank: #${rank} (Tied) | Score: ${score}`
-        : `Rank: #${rank} | Score: ${score}`;
+    const statValue      = stats?.stats[currentSortOrder] || '';
+    const rankTooltip    = isTied ? `Rank: #${rank} (Tied) | Score: ${score}` : `Rank: #${rank} | Score: ${score}`;
 
-    const closeButtonHTML = showCloseButton
-        ? `<button class="close-btn" onclick="removeSelectedID('${id}')" title="Remove this Kamigotchi">×</button>` : '';
-    const newBadgeHTML = isNew
-        ? `<div class="new-badge" title="Recently Added!">NEW</div>` : '';
-    const cloneBadgeHTML = isClone
-        ? `<div class="clone-badge" title="This Kamigotchi has identical traits to others">CLONE</div>` : '';
-    const sacrificeBadgeHTML = isSacrificed
-        ? `<div class="sacrifice-badge" title="This Kamigotchi has been sacrificed">🕳️</div>` : '';
-    const listingBadgeHTML = isListing
-        ? `<div class="listing-badge"><img id="kamiswap_icon" src="https://app.kamigotchi.io/assets/marketplace-BqMKbOFC.png" style="border:none"></div>` : '';
-    const listingPriceHTML = isListing
-        ? `<div class="listing-price">Ξ${listingPrice}</div>` : '';
-    const newListingIconHTML = isNewListing
-        ? `<div class="new-listing-icon">New</div>` : '';
-    const statColorHTML = statColorClass
-        ? `<div class="stat-color-box ${statColorClass}" title="${statColorClass.charAt(0).toUpperCase() + statColorClass.slice(1)} Sort">${statValue}</div>` : '';
+    const closeButtonHTML    = showCloseButton ? `<button class="close-btn" onclick="removeSelectedID('${id}')" title="Remove this Kamigotchi">×</button>` : '';
+    const newBadgeHTML       = isNew        ? `<div class="new-badge" title="Recently Added!">NEW</div>` : '';
+    const cloneBadgeHTML     = isClone      ? `<div class="clone-badge" title="This Kamigotchi has identical traits to others">CLONE</div>` : '';
+    const sacrificeBadgeHTML = isSacrificed ? `<div class="sacrifice-badge" title="This Kamigotchi has been sacrificed">🕳️</div>` : '';
+    const listingBadgeHTML   = isListing    ? `<div class="listing-badge"><img id="kamiswap_icon" src="https://app.kamigotchi.io/assets/marketplace-BqMKbOFC.png" style="border:none"></div>` : '';
+    const listingPriceHTML   = isListing    ? `<div class="listing-price">Ξ${listingPrice}</div>` : '';
+    const newListingIconHTML = isNewListing ? `<div class="new-listing-icon">New</div>` : '';
+    const statColorHTML      = statColorClass
+        ? `<div class="stat-color-box ${statColorClass}" title="${statColorClass.charAt(0).toUpperCase() + statColorClass.slice(1)} Sort">${statValue}</div>`
+        : '';
 
     const statsHTML = stats ? `
         <div class="kami-stats">
@@ -1526,7 +1541,6 @@ function displayNFT(id, showCloseButton = false) {
             ${newListingIconHTML}
         </div>`;
 
-    // On mobile, stats render inside the details panel; on desktop they sit above the image block
     if (isMobile) {
         card.innerHTML = `
             ${closeButtonHTML}${newBadgeHTML}${cloneBadgeHTML}
@@ -1590,9 +1604,9 @@ function loadMoreNFTs() {
     if (isLoading) return;
     isLoading = true;
 
-    const resultsDiv = document.getElementById('results');
+    const resultsDiv   = document.getElementById('results');
     const idsToDisplay = isFiltering ? filteredNFTIds : allNFTIds;
-    const endIndex = Math.min(currentLoadIndex + LAZY_LOAD_COUNT, idsToDisplay.length);
+    const endIndex     = Math.min(currentLoadIndex + LAZY_LOAD_COUNT, idsToDisplay.length);
 
     requestAnimationFrame(() => {
         const fragment = document.createDocumentFragment();
@@ -1605,7 +1619,6 @@ function loadMoreNFTs() {
         isLoading = false;
         updateLoadingIndicator();
 
-        // Re-observe the new last card for infinite scroll triggering
         if (nftObserver) {
             const cards = resultsDiv.querySelectorAll('.nft-card');
             if (cards.length > 0) nftObserver.observe(cards[cards.length - 1]);
@@ -1675,10 +1688,23 @@ function updateSelectedIDsDisplay() {
     selectedIDsDiv.innerHTML = '';
     const cardsContainer = document.createElement('div');
     cardsContainer.className = 'selected-cards-grid';
-    getSortedNFTIds(Array.from(selectedIDs)).forEach(id => {
+
+    // Convert Set to Array for sorting
+    let idsArray = Array.from(selectedIDs);
+
+    // Check if we are in Listing mode and a sort order is active
+    // This ensures the selected grid mirrors the marketplace sort logic
+    if (isShowingListingOnly && currentListingSortOrder) {
+        idsArray = getSortedListingIds(idsArray);
+    } else {
+        idsArray = getSortedNFTIds(idsArray);
+    }
+
+    idsArray.forEach(id => {
         const card = displayNFT(id, true);
         if (card) cardsContainer.appendChild(card);
     });
+
     selectedIDsDiv.appendChild(cardsContainer);
     updateURL();
 }
@@ -1694,9 +1720,9 @@ function searchByID() {
         setTimeout(() => messageBox.style.display = 'none', 3000);
     };
 
-    if (!id) { showMessage('Please enter an NFT ID'); return; }
+    if (!id)                               { showMessage('Please enter an NFT ID'); return; }
     if (!imagesData[id] || !traitsData[id]) { showMessage(`Kamigotchi #${id} not found. Please check the ID and try again.`); return; }
-    if (selectedIDs.has(id)) { showMessage(`Kamigotchi #${id} is already added!`); return; }
+    if (selectedIDs.has(id))               { showMessage(`Kamigotchi #${id} is already added!`); return; }
 
     selectedIDs.add(id);
     updateSelectedIDsDisplay();
@@ -1731,9 +1757,7 @@ async function loadSacrificeData(v) {
             sacrificedNFTs = new Set(data.map(item => String(item.kami_index)));
             console.log(`🕳️ Loaded ${sacrificedNFTs.size} sacrifice records`);
         }
-    } catch (err) {
-        // Silent fail
-    }
+    } catch (err) {}
 }
 
 async function loadListingsData(v) {
@@ -1745,13 +1769,14 @@ async function loadListingsData(v) {
         const response = await fetch(finalUrl);
         if (response.ok) {
             const data = await response.json();
-            // Support both new structured format and legacy flat format
             const rawListings = (data && typeof data === 'object' && 'listings' in data) ? data.listings : data;
-            listingNFTs = new Map(Object.values(rawListings).map((item) =>
-                (item !== null && typeof item === 'object')
-                    ? [String(item.id), item.price]   // new structured format: rank-keyed, value is SimpleListing
-                    : [String(item), item]             // legacy flat format: id-keyed, value is price
-            ));
+            listingNFTs = new Map(Object.values(rawListings).map((item) => {
+                if (item !== null && typeof item === 'object') {
+                    return [String(item.id), { price: item.price, timestamp: item.rawTime ?? null }];
+                } else {
+                    return [String(item), { price: item, timestamp: null }];
+                }
+            }));
             listingMetaInfo = {
                 newListingId: (data?.newListingId ?? []).map(String),
                 listingNewWindow: data?.listingNewWindow ?? {},
@@ -1761,13 +1786,10 @@ async function loadListingsData(v) {
                 console.log(`✨ Found ${listingMetaInfo.newListingId.length} new listing(s): ${listingMetaInfo.newListingId.join(', ')}`);
             }
         }
-    } catch (err) {
-        // Silent fail — listing badges simply won't show if unavailable
-    }
+    } catch (err) {}
 }
 
 function getSignificantListingsHash(listingsData) {
-    // Exclude volatile-only changes; track the listing map AND listingNewWindow entries
     return JSON.stringify({
         listings: Object.fromEntries(listingNFTs),
         listingNewWindow: listingsData?.listingNewWindow ?? {},
@@ -1775,7 +1797,6 @@ function getSignificantListingsHash(listingsData) {
 }
 
 function getSignificantMetaHash(meta) {
-    // Exclude lastUpdate and extractionDuration — these change every run regardless
     return JSON.stringify({
         previousMaxId: meta.previousMaxId,
         newKamiIds:    meta.newKamiIds,
@@ -1786,11 +1807,10 @@ function getSignificantMetaHash(meta) {
 
 async function checkForUpdates() {
     try {
-        const v = Math.floor(Date.now() / (5 * 60 * 1000)); // aligns to 5-min windows
+        const v = Math.floor(Date.now() / (5 * 60 * 1000));
         const isLocal = window.location.hostname === 'localhost' || window.location.hostname.startsWith('192.168.');
         const baseUrl = isLocal ? 'https://data.kami.h80h.xyz' : '/api/data';
 
-        // Fetch both files in parallel
         const [listingsRes, metaRes] = await Promise.all([
             fetch(`${baseUrl}/kamiListings.json?v=${v}`),
             fetch(`${baseUrl}/kamiMeta.json?v=${v}`),
@@ -1800,14 +1820,12 @@ async function checkForUpdates() {
 
         if (listingsRes.ok) {
             const newListings = await listingsRes.json();
-
             const newHash = getSignificantListingsHash(newListings);
             if (cachedListingsHash && newHash !== cachedListingsHash) {
                 console.log('🛍️ Listings changed, refreshing all data...');
                 shouldRefresh = true;
             }
             cachedListingsHash = newHash;
-            // Also detect listingNewWindow updates independently
             const newListingMetaHash = JSON.stringify(newListings?.listingNewWindow ?? {});
             if (cachedListingsMetaHash && newListingMetaHash !== cachedListingsMetaHash) {
                 console.log('✨ Listing window changed, refreshing all data...');
@@ -1827,17 +1845,13 @@ async function checkForUpdates() {
         }
 
         if (shouldRefresh) await refreshData();
-
-    } catch (err) {
-        // silent fail
-    }
+    } catch (err) {}
 }
 
 function startAutoRefresh() {
     setInterval(checkForUpdates, 5 * 60 * 1000);
 }
 
-// Fetches kamiBundle.json, splits it into global data stores, then nulls the bundle for GC
 async function fetchAndSplitBundle(v) {
     const isLocal = window.location.hostname === 'localhost' || window.location.hostname.startsWith('192.168.');
     const finalUrl = isLocal
@@ -1853,20 +1867,19 @@ async function fetchAndSplitBundle(v) {
         throw new Error('Bundle is missing required sections (kamiImage / kamiTraits)');
     }
 
-    imagesData     = bundle.kamiImage;    bundle.kamiImage    = null;
-    traitsData     = bundle.kamiTraits;   bundle.kamiTraits   = null;
-    kamiStatsData  = bundle.kamiStats  || {};  bundle.kamiStats    = null;
-    metadataInfo   = bundle.kamiMetadata || { newKamiIds: [] }; bundle.kamiMetadata = null;
+    imagesData    = bundle.kamiImage;                        bundle.kamiImage    = null;
+    traitsData    = bundle.kamiTraits;                       bundle.kamiTraits   = null;
+    kamiStatsData = bundle.kamiStats  || {};                 bundle.kamiStats    = null;
+    metadataInfo  = bundle.kamiMetadata || { newKamiIds: [] }; bundle.kamiMetadata = null;
     bundle = null;
 }
 
-// Post-fetch data processing shared by loadData and refreshData
 function processLoadedData() {
-    affinityData       = extractAffinityData();
+    affinityData        = extractAffinityData();
     traitAffinityLookup = buildTraitAffinityLookup();
-    traitSignatures    = buildTraitSignatures();
-    traitCounts        = calculateTraitCounts();
-    nftRarityScores    = calculateRarityScores();
+    traitSignatures     = buildTraitSignatures();
+    traitCounts         = calculateTraitCounts();
+    nftRarityScores     = calculateRarityScores();
     console.log('✅ OpenRarity calculation complete!');
 }
 
@@ -1891,42 +1904,47 @@ async function loadData() {
 
         processLoadedData();
 
-        // Wire up all controls
         setupSortButtons();
         setupCloneFilterButton();
         setupListingFilterButton();
+        setupListingSortButtons();
         setupAffinityFilterToggle();
         setupMinMaxFilterToggle();
         setupAffinityFilters();
         createFilterControls();
 
-        // Restore URL state
         const initialFilterActive = loadStateFromURL();
 
         document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
-        document.querySelector(`.sort-btn[data-sort="${currentSortOrder}"]`)?.classList.add('active');
+        if (!currentListingSortOrder) {
+            document.querySelector(`.sort-btn[data-sort="${currentSortOrder}"]`)?.classList.add('active');
+        }
         document.getElementById('cloneFilterBtn')?.classList.toggle('active', isShowingClonesOnly);
         document.getElementById('listingFilterBtn')?.classList.toggle('active', isShowingListingOnly);
+
+        const listingSortSection = document.querySelector('.listing-sort-section');
+        if (listingSortSection) listingSortSection.style.display = isShowingListingOnly ? 'block' : 'none';
+        if (isShowingListingOnly && currentListingSortOrder) {
+            document.querySelector(`.listing-sort-btn[listing-data-sort="${currentListingSortOrder}"]`)?.classList.add('active');
+        }
 
         updateSelectedIDsDisplay();
         allNFTIds = getSortedNFTIds();
 
-        if (initialFilterActive)      filterByTraits();
-        else if (isShowingClonesOnly) filterClones();
+        if (initialFilterActive)       filterByTraits();
+        else if (isShowingClonesOnly)  filterClones();
         else if (isShowingListingOnly) filterListing();
         else                           loadInitialNFTs();
 
         updateURL(true);
 
-        // Update refresh button tooltip with last updated time
         const now = new Date();
         const label = `Last updated:\n${now.toLocaleDateString([], { month: 'short', day: 'numeric' })} ${now.toLocaleTimeString()}`;
         document.getElementById('refreshDataBtn')?.setAttribute('data-tooltip', label);
 
-        // Seed hashes and begin polling for changes every 5 min
-        cachedListingsHash = getSignificantListingsHash(listingMetaInfo);
+        cachedListingsHash     = getSignificantListingsHash(listingMetaInfo);
         cachedListingsMetaHash = JSON.stringify(listingMetaInfo.listingNewWindow);
-        cachedMetaHash = getSignificantMetaHash(metadataInfo);
+        cachedMetaHash         = getSignificantMetaHash(metadataInfo);
         startAutoRefresh();
 
     } catch (error) {
@@ -1946,20 +1964,20 @@ async function refreshData() {
     if (isRefreshing) return;
     isRefreshing = true;
 
-    const refreshBtn = document.getElementById('refreshDataBtn');
+    const refreshBtn   = document.getElementById('refreshDataBtn');
     const originalText = refreshBtn.innerHTML;
     refreshBtn.disabled = true;
 
     try {
         console.log('🔄 Refreshing data...');
 
-        // Snapshot current UI state before re-fetch
-        const currentFilters = getTraitStringFromState();
+        const currentFilters        = getTraitStringFromState();
         const currentAffinityString = getAffinityStringFromState();
-        const currentMinMaxString = getMinMaxStringFromState();
-        const currentSort = currentSortOrder;
-        const wasShowingClones = isShowingClonesOnly;
-        const wasShowingListing = isShowingListingOnly;
+        const currentMinMaxString   = getMinMaxStringFromState();
+        const currentSort           = currentSortOrder;
+        const currentListingSort    = currentListingSortOrder;
+        const wasShowingClones      = isShowingClonesOnly;
+        const wasShowingListing     = isShowingListingOnly;
 
         const v = Date.now();
         await Promise.all([
@@ -1978,22 +1996,19 @@ async function refreshData() {
 
         processLoadedData();
 
-        // Restore UI state
-        currentSortOrder = currentSort;
-        isShowingClonesOnly = wasShowingClones;
+        currentSortOrder     = currentSort;
+        currentListingSortOrder = currentListingSort;
+        isShowingClonesOnly  = wasShowingClones;
         isShowingListingOnly = wasShowingListing;
         allNFTIds = getSortedNFTIds();
 
         const filterControls = document.getElementById('filterControls');
-        // Snapshot which filter-group is currently visible so we can restore it after rebuild
         const visibleFilterGroup = document.querySelector('.filter-group[style*="display: block"], .filter-group[style*="display:block"]');
-        const visibleTraitType = visibleFilterGroup ? visibleFilterGroup.dataset.traitType : null;
-        // Snapshot panel visibility — we honour the user's collapsed/expanded state across refreshes
+        const visibleTraitType   = visibleFilterGroup ? visibleFilterGroup.dataset.traitType : null;
         const affinityWasVisible = document.querySelector('.affinity-filter-section')?.style.display === 'block';
         const minmaxWasVisible   = document.querySelector('.minmax-filter-section')?.style.display === 'block';
         filterControls.innerHTML = '';
         createFilterControls();
-        // Restore the previously visible filter-group and sync the dropdown
         if (visibleTraitType) {
             const restoredGroup = document.querySelector(`.filter-group[data-trait-type="${visibleTraitType}"]`);
             if (restoredGroup) restoredGroup.style.display = 'block';
@@ -2001,7 +2016,6 @@ async function refreshData() {
             if (dropdown) dropdown.value = visibleTraitType;
         }
 
-        // Restore trait filter checkboxes via URL trick
         if (currentFilters || currentAffinityString || currentMinMaxString) {
             const originalSearch = window.location.search;
             const params = new URLSearchParams();
@@ -2011,9 +2025,11 @@ async function refreshData() {
             history.replaceState(null, '', `?${params.toString()}`);
             loadStateFromURL({ restorePanels: false });
             history.replaceState(null, '', originalSearch);
+            currentListingSortOrder = currentListingSort;
+            isShowingClonesOnly     = wasShowingClones;
+            isShowingListingOnly    = wasShowingListing;
         }
 
-        // Re-apply panel visibility exactly as the user left it
         const affinitySection = document.querySelector('.affinity-filter-section');
         const affinityToggle  = document.getElementById('affinityFilterToggle');
         if (affinitySection) affinitySection.style.display = affinityWasVisible ? 'block' : 'none';
@@ -2027,9 +2043,16 @@ async function refreshData() {
         document.getElementById('cloneFilterBtn')?.classList.toggle('active', isShowingClonesOnly);
         document.getElementById('listingFilterBtn')?.classList.toggle('active', isShowingListingOnly);
 
+        const listingSortSectionRefresh = document.querySelector('.listing-sort-section');
+        if (listingSortSectionRefresh) listingSortSectionRefresh.style.display = isShowingListingOnly ? 'block' : 'none';
+        document.querySelectorAll('.listing-sort-btn').forEach(b => b.classList.remove('active'));
+        if (isShowingListingOnly && currentListingSortOrder) {
+            document.querySelector(`.listing-sort-btn[listing-data-sort="${currentListingSortOrder}"]`)?.classList.add('active');
+        }
+
         const hasAnyFilter = currentFilters || currentAffinityString || currentMinMaxString;
         preserveScroll(() => {
-            if (isShowingClonesOnly)       filterClones();
+            if (isShowingClonesOnly && !(isShowingListingOnly && currentListingSortOrder)) filterClones();
             else if (isShowingListingOnly) filterListing();
             else if (hasAnyFilter)         filterByTraits();
             else                           { isFiltering = false; loadInitialNFTs(); }
@@ -2037,14 +2060,12 @@ async function refreshData() {
 
         updateURL(true);
 
-        // Show checkmark feedback briefly
         refreshBtn.innerHTML = `<svg id="refreshComplete" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><mask id="SVGkzXYXbbR"><g fill="none" stroke="#fff" stroke-dasharray="24" stroke-dashoffset="24" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M2 13.5l4 4l10.75 -10.75"><animate fill="freeze" attributeName="stroke-dashoffset" dur="0.4s" values="24;0"/></path><path stroke="#000" stroke-width="6" d="M7.5 13.5l4 4l10.75 -10.75"><animate fill="freeze" attributeName="stroke-dashoffset" begin="0.4s" dur="0.4s" values="24;0"/></path><path d="M7.5 13.5l4 4l10.75 -10.75"><animate fill="freeze" attributeName="stroke-dashoffset" begin="0.4s" dur="0.4s" values="24;0"/></path></g></mask><rect width="24" height="24" fill="currentColor" mask="url(#SVGkzXYXbbR)"/></svg>`;
         setTimeout(() => {
             refreshBtn.innerHTML = originalText;
             refreshBtn.disabled = false;
             refreshBtn.style.opacity = '1';
             isRefreshing = false;
-            // Update tooltip after originalText is restored (restoring innerHTML resets the SVG title)
             const now = new Date();
             const label = `Last updated: ${now.toLocaleDateString([], { month: 'short', day: 'numeric' })} ${now.toLocaleTimeString()}`;
             document.getElementById('refreshDataBtn')?.setAttribute('data-tooltip', label);
@@ -2094,7 +2115,6 @@ function setupRefreshButton() {
 // INIT
 // ============================================================
 
-// Immediate event wiring (safe at parse time — elements exist in the HTML)
 document.getElementById('searchBtn').addEventListener('click', searchByID);
 document.getElementById('searchInput').addEventListener('keypress', (e) => { if (e.key === 'Enter') searchByID(); });
 document.getElementById('clearSearchBtn').addEventListener('click', clearAllSelectedIDs);
@@ -2106,14 +2126,12 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('popstate', handlePopState);
 
     document.addEventListener('click', (e) => {
-        // Close any open stats panel when clicking outside a card
         const openStats = document.querySelector('.kami-stats.is-active');
         if (openStats) {
             const parentCard = openStats.closest('.nft-card');
             if (parentCard && !parentCard.contains(e.target)) openStats.classList.remove('is-active');
         }
 
-        // Close open trait filter dropdown when clicking outside filter controls
         const filterControls = document.getElementById('filterControls');
         if (filterControls && !filterControls.contains(e.target)) {
             document.querySelectorAll('.filter-group').forEach(group => group.style.display = 'none');
@@ -2123,7 +2141,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-// Inject message-box styles and create the DOM element (replaces alert())
 if (!document.getElementById('enhanced-trait-styles')) {
     const styleTag = document.createElement('style');
     styleTag.id = 'enhanced-trait-styles';
@@ -2149,7 +2166,6 @@ if (!document.getElementById('enhanced-trait-styles')) {
     messageBox.id = 'messageBox';
     document.body.appendChild(messageBox);
 
-    // When .listing-badge is hovered, set sibling .listing-price opacity to 0.7
     document.addEventListener('mouseover', (e) => {
         if (e.target.closest('.listing-badge')) {
             const container = e.target.closest('.image-container');
@@ -2166,7 +2182,6 @@ if (!document.getElementById('enhanced-trait-styles')) {
     });
 }
 
-// Unregister any stale service workers
 if ('serviceWorker' in navigator) {
     navigator.serviceWorker.getRegistrations().then(registrations => {
         registrations.forEach(r => r.unregister());
