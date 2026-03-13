@@ -2233,14 +2233,14 @@ if (!document.getElementById('enhanced-trait-styles')) {
     document.body.appendChild(messageBox);
 
     document.addEventListener('mouseover', (e) => {
-        if (e.target.closest('.listing-badge')) {
+        if (e.target.closest('.listing-badge') || e.target.closest('.new-listing-icon')) {
             const container = e.target.closest('.image-container');
             const price = container?.querySelector('.listing-price');
             if (price) price.style.opacity = '0.7';
         }
     });
     document.addEventListener('mouseout', (e) => {
-        if (e.target.closest('.listing-badge')) {
+        if (e.target.closest('.listing-badge') || e.target.closest('.new-listing-icon')) {
             const container = e.target.closest('.image-container');
             const price = container?.querySelector('.listing-price');
             if (price) price.style.opacity = '';
