@@ -749,7 +749,7 @@ function appendCountHeader(resultsDiv, summaryText, filterSummaryHTML = '') {
     countDiv.className = 'count-header';
     countDiv.innerHTML = `
         <div id="count-summary" style="font-size: 14px;">${summaryText}</div>
-        <div class="note">** click the lil arrow on card for more info **</div>
+        <div class="note">** click the lil arrow on card for og stats and more info **</div>
         ${filterSummaryHTML}
         ${buildStatFilterSummaryHTML()}
     `;
@@ -1718,7 +1718,7 @@ function createCountHeader(count, title) {
     countDiv.className = 'count-header';
     countDiv.innerHTML = `
         <div style="font-size: 14px;">${title}: ${count}</div>
-        <div class="note">** click the lil arrow on card for more info**</div>
+        <div class="note">** click the lil arrow on card for og stats and more info **</div>
     `;
     return countDiv;
 }
