@@ -112,6 +112,52 @@ async function uploadMetaToR2(metaData) {
   }
 }
 
+async function uploadKamiInfoToR2(kamiInfoData) {
+  const filename = 'kamiInfo.json';
+  console.log(`\n📤 Uploading ${filename} to Cloudflare R2...`);
+  try {
+    const parallelUploads3 = new Upload({
+      client: r2Client,
+      params: {
+        Bucket: process.env.R2_BUCKET_NAME,
+        Key: filename,
+        Body: Readable.from(JSON.stringify(kamiInfoData)),
+        ContentType: 'application/json',
+        CacheControl: 'public, max-age=300',
+      },
+      queueSize: 1,
+      partSize: 1024 * 1024 * 5,
+    });
+    await parallelUploads3.done();
+    console.log(`   ✅ ${filename} uploaded successfully`);
+  } catch (error) {
+    throw new Error(`kamiInfo upload failed: ${error.message}`);
+  }
+}
+
+async function uploadKamiAccountsToR2(accountsData) {
+  const filename = 'kamiAccounts.json';
+  console.log(`\n📤 Uploading ${filename} to Cloudflare R2...`);
+  try {
+    const parallelUploads3 = new Upload({
+      client: r2Client,
+      params: {
+        Bucket: process.env.R2_BUCKET_NAME,
+        Key: filename,
+        Body: Readable.from(JSON.stringify(accountsData)),
+        ContentType: 'application/json',
+        CacheControl: 'public, max-age=300',
+      },
+      queueSize: 1,
+      partSize: 1024 * 1024 * 5,
+    });
+    await parallelUploads3.done();
+    console.log(`   ✅ ${filename} uploaded successfully`);
+  } catch (error) {
+    throw new Error(`kamiAccounts upload failed: ${error.message}`);
+  }
+}
+
 async function fetchPreviousMetadata() {
   try {
     console.log('📋 Fetching previous metadata from R2 bundle...');
@@ -166,7 +212,7 @@ async function runExtraction() {
       throw new Error(`Data load failed: received 0 items after all retries. The site may be down or the network API did not load.`);
     }
 
-    const { imageMap, traitsMap, listedSet } = await page.evaluate(() => {
+    const { imageMap, traitsMap, listedSet, kamiInfoMap, kamiAccountsMap } = await page.evaluate(() => {
       function extractDetailedTraits(kamiData) {
         const traitsToKeep = ["background", "body", "color", "face", "hand"];
         const detailedData = {};
@@ -191,16 +237,55 @@ async function runExtraction() {
         }
         return detailedData;
       }
-      const all = network.explorer.kamis.all({traits: true, stats: true});
-      const img = {};
-      const trtRaw = {};
-      const listed = new Set();
-      all.forEach(k => {
-        img[k.index] = k.image;
+
+      // Single combined pass: traits + stats + progress (merged, no repeated calls)
+      const allFull = network.explorer.kamis.all({ traits: true, stats: true, progress: true });
+
+      const img      = {};
+      const trtRaw   = {};
+      const listed   = new Set();
+      const kamiInfo = {};
+
+      const STAT_KEYS = ['harmony', 'health', 'power', 'violence'];
+
+      allFull.forEach(k => {
+        img[k.index]    = k.image;
         trtRaw[k.index] = k.traits;
         if (k.state === 'LISTED') listed.add(k.index);
+
+        // kamiInfo entry: name, level (k.progress.level), total stats (k.stats[s].total)
+        const statTotals = {};
+        if (k.stats) {
+          STAT_KEYS.forEach(s => {
+            if (k.stats[s] !== undefined) statTotals[s] = k.stats[s].total;
+          });
+        }
+        kamiInfo[k.index] = {
+          name:  k.name            ?? null,
+          level: k.progress?.level ?? null,
+          stats: statTotals,
+        };
       });
-      return { imageMap: img, traitsMap: extractDetailedTraits(trtRaw), listedSet: Array.from(listed) };
+
+      // Accounts: name, ownerAddress, and list of their kami indices
+      // { kamis: true } returns full KAMI objects; we extract only the index
+      const allAccounts = network.explorer.accounts.all({ kamis: true });
+      const accounts    = {};
+      allAccounts.forEach(acc => {
+        accounts[acc.index] = {
+          name:         acc.name         ?? null,
+          ownerAddress: acc.ownerAddress ?? null,
+          kamis:        Array.isArray(acc.kamis) ? acc.kamis.map(k => k.index) : [],
+        };
+      });
+
+      return {
+        imageMap:       img,
+        traitsMap:      extractDetailedTraits(trtRaw),
+        listedSet:      Array.from(listed),
+        kamiInfoMap:    kamiInfo,
+        kamiAccountsMap: accounts,
+      };
     });
     
     await browser.close();
@@ -270,6 +355,8 @@ async function runExtraction() {
     await Promise.all([
       uploadBundleToR2(bundle),
       uploadMetaToR2(bundle.kamiMetadata),
+      uploadKamiInfoToR2(kamiInfoMap),
+      uploadKamiAccountsToR2(kamiAccountsMap),
     ]);
     
     console.log('\n' + '='.repeat(60));

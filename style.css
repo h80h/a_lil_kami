@@ -32,14 +32,14 @@ body {
   max-width: 870px;
   margin: 0 auto;
   padding: 30px;
-  border-radius: 15px;
+  border-radius: 14px;
   opacity: 0;
   transition: opacity 0.3s ease;
 }
 
 h2 {
     color: #666;
-    margin-bottom: 15px;
+    margin-bottom: 14px;
     font-size: 14px;
 }
 
@@ -78,12 +78,6 @@ h2 {
   border-radius: 10px;
 }
 
-.selected-cards-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
-  gap: 10px;
-}
-
 /* Close button for selected cards */
 .close-btn {
   width: 14px;
@@ -101,7 +95,7 @@ h2 {
   align-items: center;
   justify-content: center;
   transition: all;
-  z-index: 11;
+  z-index: 21;
   line-height: 1;
   padding: 2px 0 0 0.3px;
 }
@@ -254,7 +248,8 @@ button {
 .sort-btn,
 .affinity-btn,
 #cloneFilterBtn,
-.listing-sort-btn {
+.listing-sort-btn,
+#clearBtn {
   flex: 1;
   margin-bottom: 10px;
 }
@@ -293,13 +288,13 @@ button {
 }
 
 #filterControls {
-    margin-bottom: 15px;
+    margin-bottom: 14px;
 }
 
 /* Dropdown Wrapper */
 .dropdown-wrapper {
   margin-bottom: 20px;
-  padding: 15px;
+  padding: 14px;
   background: #f0f4ff;
   border-radius: 8px;
   border: 2px solid #999;
@@ -342,14 +337,14 @@ button {
 
 /* Filter Groups Container */
 #filterGroupsContainer {
-  margin-top: 15px;
+  margin-top: 14px;
 }
 
 /* Selected Traits Display */
 .selected-traits-display {
   margin-top: 20px;
-  margin-bottom: 15px;
-  padding: 15px;
+  margin-bottom: 14px;
+  padding: 14px;
   background: #fff7e6;
   border-radius: 8px;
   border: 2px solid #ffa500;
@@ -401,7 +396,7 @@ button {
   font-weight: bold;
   font-size: 14px;
   margin: 10px 10px;
-  padding-bottom: 15px;
+  padding-bottom: 14px;
   border-bottom: 1px solid #ddd;
 }
 
@@ -500,7 +495,7 @@ button {
 .count-header {
   grid-column: 1 / -1;
   text-align: center;
-  padding: 15px;
+  padding: 14px;
   font-weight: bold;
   color: #667eea;
   background: #f0f4ff;
@@ -528,7 +523,7 @@ button {
 #results,
 .selected-cards-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(126px, 1fr));
   gap: 12px;
   margin-top: 20px;
 }
@@ -538,56 +533,103 @@ button {
   background: white;
   border: 2px solid #333;
   border-radius: 10px;
-  padding: 1px 8px 5px 8px;
+  padding: 1px 8px 0 8px;
   transition: transform 0.3s, box-shadow 0.3s;
   box-shadow: 0px 2px 2px rgba(0,0,0,0.2);
   overflow: hidden;
-  height: 242px;
+  height: 243px;
 }
+
+.nft-card-content {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    width: 100%;
+  }
 
 /* Rank and Stat Color Container */
 .rank-stat-container {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: center; /* This keeps the .stat-color-box centered */
   margin-bottom: 1px;
   position: relative;
+  height: 12px; /* Ensure height is maintained */
 }
 
 .rank-stat-container:has(.stat-color-box) {
   justify-content: center;
 }
 
-.rank-stat-container:has(.stat-color-box) .rank-badge {
+/* Keep rank-badge on the far left */
+.rank-stat-container .rank-badge {
   position: absolute;
   left: 0;
 }
 
 .rank-badge {
-  font-size: 9px;
   color: #937d1aff;
-  border-radius: 2px;
   width: 52px;
-  height: 12px;
-  padding: 1px 0 0 5px;
   background: rgba(255, 240, 31, 0.3);
-  border: 1px solid rgba(147, 125, 26, 0.3);
+  padding: 1px 0 0 5px;
 }
-
-/* Stat Color Box - Square indicator */
 .stat-color-box {
   width: 24px;
-  height: 12px;
-  border-radius: 2px;
-  border: 1px solid rgba(147, 125, 26, 0.3);
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 9px;
-  font-weight: normal;
   color: #fff;
-  padding: 1px 0 0 0;
+  padding: 1px 0;
+}
+
+.rank-badge,
+.stat-color-box {
+  border-radius: 2px;
+  border: 1px solid rgba(147, 125, 26, 0.3);
+  font-size: 9px;
+}
+
+.rank-badge,
+.stat-color-box,
+.new-badge,
+.clone-badge {
+  height: 12px;
+}
+
+.new-badge,
+.clone-badge {
+  background: linear-gradient(135deg, #e8a6ee 0%, #bc63d2 100%);
+  color: white;
+  padding: 2px 2px 2px 3px;
+  border-radius: 20px;
+  font-weight: bold;
+  font-size: 7px;
+  letter-spacing: 0.5px;
+  z-index: 10;
+  animation: newBadgePulse 2s ease-in-out infinite;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  /* Position new and clone badges on the far right */
+  position: absolute;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: -5px;
+}
+
+@keyframes newBadgeSparkle {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+.new-badge,
+.clone-badge {
+    animation: newBadgeSparkle 1.5s ease-in-out infinite;
 }
 
 .nft-card img {
@@ -596,7 +638,7 @@ button {
   object-fit: cover;
   border-radius: 5px;
   border: 2px solid #333;
-  margin-bottom: 5px;
+  /* margin-bottom: 5px; */
   color: transparent;
   font-size: 0;
 }
@@ -604,14 +646,8 @@ button {
 .nft-id {
   font-size: 9.9px;
   color: #667eea;
-  margin-bottom: 7px;
   font-weight: bold;
-}
-
-.trait {
-  margin: 3px 0;
-  color: #333;
-  font-size: 8px;
+  margin-top: 1px;
 }
 
 .no-results {
@@ -682,38 +718,6 @@ button {
     visibility: visible;
 }
 
-/* NEW Badge Styling */
-.new-badge,
-.clone-badge {
-    position: absolute;
-    top: 1px;
-    right: 3px;
-    background: linear-gradient(135deg, #e8a6ee 0%, #bc63d2 100%);
-    color: white;
-    padding: 2px 2px 2px 3px;
-    border-radius: 20px;
-    font-weight: bold;
-    font-size: 7px;
-    letter-spacing: 0.5px;
-    z-index: 10;
-    animation: newBadgePulse 2s ease-in-out infinite;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-}
-
-@keyframes newBadgeSparkle {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.8;
-  }
-}
-
-.new-badge,
-.clone-badge {
-    animation: newBadgeSparkle 1.5s ease-in-out infinite;
-}
-
 .trait-name-row {
     display: flex;
     align-items: center;
@@ -772,27 +776,39 @@ button {
 }
 
 .trait-stat.harmony,
-.stat-item.harmony,
 .stat-color-box.harmony {
   background: #9cbcd2;
 }
 
 .trait-stat.health,
-.stat-item.health,
 .stat-color-box.health {
   background: #d7bce8;
 }
 
 .trait-stat.power,
-.stat-item.power,
 .stat-color-box.power {
   background: #f9db6d;
 }
 
 .trait-stat.violence,
-.stat-item.violence,
 .stat-color-box.violence {
   background: #df829b;
+}
+
+.stat-item.harmony {
+  --btn-color: #9cbcd2;
+}
+
+.stat-item.health {
+  --btn-color: #d7bce8;
+}
+
+.stat-item.power {
+  --btn-color: #f9db6d;
+}
+
+.stat-item.violence {
+  --btn-color: #df829b;
 }
 
 .trait-stat.slots {
@@ -821,56 +837,181 @@ button {
 }
 
 .kami-stats {
-  border-radius: 8px;
+  border-radius: 4px;
   width: 100%;
   background: #fff;
-  border: 2px solid #999;
   position: absolute;
   opacity: 0;
   visibility: hidden;
   transition: opacity 0.3s, visibility 0.3s;
-  
-  padding: 7px 0px;
-  border-radius: 4px;
-  z-index: 10;
+  z-index: 11;
 
   bottom: 0%;
   left: 50%;
   transform: translate(-50%, 0);
+
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  box-sizing: border-box;
+  height: 76px;
+  padding: 0;
+  font-size: 10px;
+  font-weight: bold;
 }
 
-.hover_wrapper:hover .kami-stats,
-.hover_wrapper.is-active .kami-stats {
-  opacity: 0.9;
+.hover_wrapper.is-active .kami-stats,
+.hover_wrapper.is-active .kami-info,
+.hover_wrapper.is-active .kami-traits {
+  opacity: 1;
   visibility: visible;
+}
+
+/* Page cycle via arrow:
+   default (no class)  = kami-traits on top  (z-index 12)
+   swap-active         = kami-stats on top   (z-index 12)
+   swap-active-2       = kami-info on top    (z-index 12)
+*/
+.kami-traits { z-index: 12; }
+.kami-stats  { z-index: 11; }
+.kami-info   { z-index: 10; }
+
+.nft-card.swap-active   .kami-stats  { z-index: 12; }
+.nft-card.swap-active   .kami-traits { z-index: 10; }
+.nft-card.swap-active-2 .kami-info   { z-index: 12; }
+.nft-card.swap-active-2 .kami-traits { z-index: 10; }
+
+/* kami-traits: same position/size as kami-stats/kami-info */
+.kami-traits,
+.kami-info {
+  border-radius: 4px;
+  width: 100%;
+  background: #fff;
+  position: absolute;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s, visibility 0.3s;
+
+  bottom: 0%;
+  left: 50%;
+  transform: translate(-50%, 0);
+
+  box-sizing: border-box;
+  height: 76px;
+  font-size: 8px;
+  padding: 1px 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kami-traits .trait,
+.kami-info div {
+  margin-bottom: 2px;
+  color: #333;
+}
+
+/* Arrow control — no close button */
+.kami-overlay-controls {
+  position: absolute;
+  z-index: 20;
+  bottom: 0%;
+  left: 50%;
+  transform: translate(-50%, 0);
+  width: 100%;
+  box-sizing: border-box;
+  height: 76px;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s, visibility 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 4px 0 0;
+}
+
+.hover_wrapper.is-active .kami-overlay-controls {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.kami-overlay-arrow {
+  width: 13px;
+  height: 13px;
+  color: #888;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  flex-shrink: 0;
+  background: none;
+  font-size: 0;
+  margin-bottom: 8px;
+}
+
+.kami-overlay-arrow::before {
+  content: '';
+  display: block;
+  width: 13px;
+  height: 13px;
+  background-color: currentColor;
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2048' height='2048' viewBox='0 0 2048 2048'%3E%3Cpath fill='currentColor' d='M1029 256q-105 0-202 27t-183 77t-144 119t-119 145t-77 182t-28 203q0 105 27 202t77 183t119 144t145 119t182 77t203 28q105 0 202-27t183-77t144-119t119-145t77-182t28-203q0-105-27-202t-77-182t-120-145t-144-119t-182-77t-203-28m0-128q123 0 236 32t213 90t180 139t140 181t90 212t32 237q0 123-32 236t-90 213t-139 180t-181 140t-212 90t-237 32q-123 0-236-32t-213-90t-180-139t-140-181t-90-212t-32-237q0-123 32-236t90-213t139-180t181-140t212-90t237-32m-88 1357l-90-90l370-371l-370-371l90-90l461 461z'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2048' height='2048' viewBox='0 0 2048 2048'%3E%3Cpath fill='currentColor' d='M1029 256q-105 0-202 27t-183 77t-144 119t-119 145t-77 182t-28 203q0 105 27 202t77 183t119 144t145 119t182 77t203 28q105 0 202-27t183-77t144-119t119-145t77-182t28-203q0-105-27-202t-77-182t-120-145t-144-119t-182-77t-203-28m0-128q123 0 236 32t213 90t180 139t140 181t90 212t32 237q0 123-32 236t-90 213t-139 180t-181 140t-212 90t-237 32q-123 0-236-32t-213-90t-180-139t-140-181t-90-212t-32-237q0-123 32-236t90-213t139-180t181-140t212-90t237-32m-88 1357l-90-90l370-371l-370-371l90-90l461 461z'/%3E%3C/svg%3E");
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
 }
 
 .stat-row {
     display: flex;
-    gap: 8px;
+    margin: 0 14px;
+    justify-content: space-between;
 }
 
 .stat-row.one {
-    margin-bottom: 8px;
+    margin-bottom: 10px;
+    margin-top: 6px;
+}
+
+@property --stat-angle-1 {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: -75deg;
 }
 
 .stat-item {
-    flex: 1;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 4px;
-    padding: 3px 0px;
     border-radius: 15px;
-    font-size: 11px;
-    margin: 0px 10px;
-    height: 25px;
-    border: 2px solid #999;
+    height: 23px;
+    width: 35px;
+    position: relative;
+    cursor: default;
+    background: linear-gradient(
+        -75deg,
+        color-mix(in srgb, var(--btn-color) 60%, #BBB),
+        color-mix(in srgb, var(--btn-color) 60%, white),
+        color-mix(in srgb, var(--btn-color) 60%, #BBB)
+    );
+    box-shadow:
+        inset 0 0.125em 0.125em rgba(0, 0, 0, 0.05),
+        0 0 0.1em 0.25em inset rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(2px);
+    border: 1px solid #888;
 }
     
 .stat-value {
-    color: #333;
+    color: #555;
     text-align: center;
+    position: relative;
+    z-index: 2;
 }
 
 .image-container {
@@ -943,7 +1084,6 @@ button {
 
 .stat-control-input-value {
   font-size: 12px;
-  /* text-align: right; */
 }
 
 /* Container for the toggle */
@@ -1000,7 +1140,7 @@ button {
   
   background: linear-gradient(to bottom, #ffffff 0%, #bbbbbb 100%);
   border-radius: 2px;
-  transition: transform 0.15s ease-out; /* Faster snap for smaller size */
+  transition: transform 0.14s ease-out; /* Faster snap for smaller size */
   
   box-shadow: 0 1px 2px rgba(0,0,0,0.5);
   z-index: 2;
@@ -1053,17 +1193,76 @@ button {
 #online-count.visible {
   opacity: 1;
 }
+@media (max-width: 834px){
+  .nft-card img {
+    width: 123px;
+    height: 123px;
+  }
+  
+  .nft-id {
+    font-size: 8px;
+  }
 
+  .nft-card {
+    height: 234px;
+  }
 
+  .kami-traits,
+  .kami-stats,
+  .kami-info,
+  .kami-overlay-controls {
+    height: 78px;
+  }
+
+  .rank-badge {
+    width: 45px;
+    padding-left: 2px;
+  }
+}
 
 @media (max-width: 820px){
+  .nft-card img {
+    width: 117px;
+    height: 117px;
+  }
+
+  .nft-id {
+    font-size: 8.9px;
+  }
+
+  .nft-card {
+    height: 224px;
+  }
+
+  .kami-traits,
+  .kami-info {
+    font-size: 7.5px;
+  }
+
+  .kami-stats {
+    font-weight: unset;
+  }
+
+  .stat-row {
+    margin: 0 10px;
+  }
+
+  .kami-traits,
+  .kami-stats,
+  .kami-info,
+  .kami-overlay-controls {
+    height: 72px;
+  }
+}
+
+@media (max-width: 750px){
   .checkbox-label input[type="checkbox"] {
     width: 24px;
     height: 24px;
   }
 
   .trait-name {
-    font-size: 15px;
+    font-size: 14px;
   }
 
   .trait-count {
@@ -1075,7 +1274,7 @@ button {
   }
 
   .nft-id {
-    font-size: 9px;
+    font-size: 7.9px;
   }
 
   .nft-card img {
@@ -1083,16 +1282,25 @@ button {
     height: 120px;
   }
 
+  .nft-card {
+    height: 226px;
+    width: 141px;
+  }
+
   #results,
   .selected-cards-grid {
     gap: 20px;
   }
-}
 
-@media (max-width: 720px) {
-  #results,
-  .selected-cards-grid {
-    gap: 10px;
+  .kami-traits,
+  .kami-stats,
+  .kami-info,
+  .kami-overlay-controls {
+    height: 72px;
+  }
+
+  .nft-card-content {
+    gap: 1px;
   }
 }
 
@@ -1108,8 +1316,12 @@ button {
   }
 
   .nft-card {
-    padding: 3px 10px 8px 10px;
-    height: auto;
+    padding: 1px 10px 5px 10px;
+    height: 284px;
+    width: 185px;
+  }
+  .nft-id {
+    font-size: 10.9px;
   }
 
   .nft-card img {
@@ -1117,31 +1329,49 @@ button {
     height: 160px;
   }
 
-  .rank-stat-container {
-    margin-bottom: 3px;
-  }
-
-  .trait {
-    font-size: 9px;
-  }
-
-  .nft-card-content img,
-  .nft-id {
-    margin-bottom: 3px;
-  }
-
-  .new-badge,
-  .clone-badge {
-    top: 2px;
-  }
-
   .trait-name {
     font-size: 13px;
+  }
+
+  .kami-traits,
+  .kami-info {
+    padding: 1px 10px;
+    font-size: 10px;
+  }
+
+  .kami-stats {
+    padding: 1px 3px;
+    font-size: 11px;
+  }
+
+  .kami-traits,
+  .kami-stats,
+  .kami-info,
+  .kami-overlay-controls {
+    height: 85px;
+  }
+
+  .nft-card-content {
+    gap: 1.5px;
+  }
+
+  .stat-item {
+    height: 26px;
+    width: 40px;
+  }
+
+  .kami-overlay-arrow,
+  .kami-overlay-arrow::before {
+    width: 16px;
+    height: 16px;
+  }
+
+  .kami-overlay-arrow {
+    margin-bottom: 9px;
   }
 }
 
 @media (max-width: 390px) {
-  
   .loader {
     transform: translate(-50%, -50%) scale(0.35);
   }
@@ -1150,46 +1380,52 @@ button {
     display: flex;
     flex-direction: row;
     align-items: flex-start;
-    gap: 20px;
+    justify-content: flex-start;
+    gap: 10px;
     width: 100%;
   }
   
   .rank-badge {
-    font-size: 12px;
-    margin-bottom: 3px;
     border-radius: 2px;
     width: 66px;
-    height: 16px;
   }
 
   .stat-color-box {
     width: 32px;
+  }
+
+  .rank-badge,
+  .stat-color-box {
+    font-size: 12px;
+  }
+
+  .rank-badge,
+  .stat-color-box,
+  .new-badge,
+  .clone-badge {
+    height: 16px;
+  }
+
+  .new-badge,
+  .clone-badge {
+    font-size: 9px;
+  }
+
+  .rank-stat-container {
+    margin-bottom: 2px;
+    margin-top: -3px;
     height: 16px;
   }
 
   .nft-card-content img {
     width: 160px;
     height: 160px;
-    margin-bottom: 0;
-  }
-   
-  .nft-details {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    padding-top: 1px;
-  }
-
-  .trait {
-    font-size: 11px;
-    margin: 2px 0;
-    font-weight: bold;
   }
   
   .nft-id {
     font-size: 13px;
-    margin-bottom: 5px;
   }
+
   .scroll-to-top {
     width: 45px;
     height: 45px;
@@ -1204,11 +1440,13 @@ button {
 
   #results,
   .selected-cards-grid {
-    gap: 15px;
+    gap: 14px;
   }
 
   .nft-card {
-    padding: 3px 10px 10px 10px;
+    padding: 5px 10px;
+    height: 200px;
+    width: auto;
   }
 
   #results,
@@ -1216,23 +1454,58 @@ button {
    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
   }
 
-  .new-badge,
-  .clone-badge {
-    font-size: 10px;
-    top: 3px;
-    right: 3px;
-  }
-
   #searchInput {
     width: 130px;
   }
 
+  .kami-stats,
+  .kami-info,
+  .kami-traits,
+  .kami-overlay-controls {
+    height: 125px;
+    left: 170px;
+    right: 10px;
+    width: auto;
+    transform: none;
+    bottom: auto;
+    top: 60%;
+    transform: translateY(-50%);
+    margin-top: -1px;
+  }
+
+  .kami-info,
+  .kami-traits {
+    font-size: 12px;
+  }
+
   .kami-stats {
-    padding: 8px 0px;
+    font-size: 14px;
+    padding: 1px 10px;
+  }
+
+  .stat-row {
+    margin: 0;
   }
 
   .stat-row.one {
-    margin-bottom: 10px;
+    margin-bottom: 30px;
+    margin-top: 3px;
+  }
+
+  .stat-item {
+    height: 32px;
+    width: 50px;
+  }
+
+  .kami-overlay-arrow,
+  .kami-overlay-arrow::before {
+    width: 18px;
+    height: 18px;
+  }
+
+  .kami-overlay-arrow {
+    margin-bottom: 25px;
+    margin-right: -10px;
   }
 
   #refreshDataBtn[data-tooltip]::after {
@@ -1241,14 +1514,9 @@ button {
   }
 }
 
-@media (max-width: 326px) {
-  .trait {
-    font-size: 9px;
-  }
-  
+@media (max-width: 326px) {  
   .nft-id {
-    font-size: 12px;
-    margin-bottom: 3px;
+    font-size: 11px;
   }
 
   .nft-card-content img {
@@ -1256,15 +1524,36 @@ button {
     height: 130px;
   }
 
+  .nft-card-content {
+    gap: 8px;
+  }
+
   .rank-badge {
-    font-size: 10px;
     width: 58px;
-    margin-bottom: 1px;
-    height: 14px;
   }
 
   .stat-color-box {
     width: 28px;
+  }
+
+  .rank-badge,
+  .stat-color-box {
+    font-size: 10px;
+  }
+
+  .rank-badge,
+  .stat-color-box,
+  .new-badge,
+  .clone-badge {
+    height: 14px;
+  }
+
+  .new-badge,
+  .clone-badge {
+    font-size: 8px;
+  }
+
+  .rank-stat-container {
     height: 14px;
   }
 
@@ -1272,18 +1561,51 @@ button {
     max-width: 300px;
   }
 
-  .nft-card-content {
-    gap: 8px;
-  }
-
-  .new-badge,
-  .clone-badge {
-    font-size: 8px;
-    top: 2px;
-  }
-
   .nft-card {
-    padding: 2px 9px 9px 9px;
+    height: 165px;
+    padding: 5px 9px;
+  }
+
+  .kami-stats,
+  .kami-info,
+  .kami-traits,
+  .kami-overlay-controls {
+    height: 100px;
+    left: 146px;
+    right: 9px;
+    bottom: auto;
+    top: 60%;
+    transform: translateY(-50%);
+  }
+
+  .kami-info,
+  .kami-traits {
+    font-size: 9.9px;
+    padding: 1px 2px;
+  }
+  
+  .kami-stats {
+    font-size: 11px;
+    padding: 1px 2px;
+  }
+
+  .stat-item {
+    height: 26px;
+    width: 40px;
+  }
+
+  .stat-row.one {
+    margin-top: 3px;
+  }
+
+  .kami-overlay-arrow,
+  .kami-overlay-arrow::before {
+    width: 16px;
+    height: 16px;
+  }
+
+  .kami-overlay-arrow {
+    margin-bottom: 12px;
   }
 }
 
@@ -1292,52 +1614,107 @@ button {
     max-width: 250px;
   }
 
-  .trait {
+  /* .trait {
     font-size: 7px;
     margin: 1px 0;
-  }
+  } */
   
   .nft-id {
     font-size: 9px;
   }
 
   .nft-card img {
-    width: 110px;
-    height: 110px;
+    width: 108px;
+    height: 108px;
   }
 
   #searchInput {
     width: 70px;
   }
 
-  .nft-id {
-    margin-bottom: 3px;
-  }
-
   .rank-badge {
-    font-size: 8px;
     width: 48px;
-    height: 11px;
   }
 
   .stat-color-box {
     width: 25px;
-    height: 11px;
   }
 
-  .nft-card {
-    padding: 2px 7px 7px 7px;
+  .rank-badge,
+  .stat-color-box {
+    font-size: 8.5px;
+    height: 15px;
   }
 
-  .scroll-to-top {
-    right: 5px;
+  .rank-badge,
+  .stat-color-box,
+  .new-badge,
+  .clone-badge {
+    height: 13px;
   }
 
   .new-badge,
   .clone-badge {
-    font-size: 6px;
-    top: 2px;
-    right: 3px;
+    font-size: 6.5px;
+  }
+
+  .rank-stat-container {
+    height: 13x;
+  }
+
+  .nft-card {
+    height: 142px;
+    padding: 4px 8px;
+  }
+
+  .nft-card-content {
+    gap: 5px;
+  }
+
+  .kami-stats,
+  .kami-info,
+  .kami-traits,
+  .kami-overlay-controls {
+    height: 90px;
+    left: 120px;
+    right: 8px;
+    bottom: auto;
+    top: 60%;
+    transform: translateY(-50%);
+    margin-top: 2px;
+  }
+
+  .kami-info,
+  .kami-traits {
+    font-size: 8px;
+  }
+  
+  .kami-stats {
+    font-size: 10px;
+  }
+
+  .stat-item {
+    height: 23px;
+    width: 36px;
+  }
+
+  .stat-row.one {
+    margin-top: 3px;
+    margin-bottom: 15px;
+  }
+
+  .kami-overlay-arrow,
+  .kami-overlay-arrow::before {
+    width: 14px;
+    height: 14px;
+  }
+
+  .kami-overlay-arrow {
+    margin-bottom: 20px;
+  }
+
+  .scroll-to-top {
+    right: 5px;
   }
 }
 

@@ -161,6 +161,9 @@ async function updateLiveStatus() {
 let imagesData = {};
 let traitsData = {};
 let kamiStatsData = {};
+let kamiInfoData = {};     // { [kamiIndex]: { name, level, stats: { harmony, health, power, violence } } }
+let kamiAccountsData = {}; // { [accountIndex]: { name, ownerAddress, kamis: [indices] } }
+let kamiToAccount = {};    // { [kamiIndex]: { accountIndex, accountName } }  — built after load
 let affinityData = {};
 let metadataInfo = {};
 let sacrificedNFTs = new Set();
@@ -746,7 +749,7 @@ function appendCountHeader(resultsDiv, summaryText, filterSummaryHTML = '') {
     countDiv.className = 'count-header';
     countDiv.innerHTML = `
         <div id="count-summary" style="font-size: 14px;">${summaryText}</div>
-        <div class="note">** dear mobile user, click card to show og stats **</div>
+        <div class="note">** click the lil arrow on card for more info **</div>
         ${filterSummaryHTML}
         ${buildStatFilterSummaryHTML()}
     `;
@@ -1457,6 +1460,18 @@ function getStatColorClass() {
     return statSorts.includes(currentSortOrder) ? currentSortOrder : '';
 }
 
+// Global overlay page state: 0 = traits, 1 = stats, 2 = info
+let kamiOverlayPage = 0;
+
+function applyKamiPage(page) {
+    kamiOverlayPage = page;
+    document.querySelectorAll('.nft-card').forEach(c => {
+        c.classList.remove('swap-active', 'swap-active-2');
+        if (page === 1) c.classList.add('swap-active');
+        else if (page === 2) c.classList.add('swap-active-2');
+    });
+}
+
 function displayNFT(id, showCloseButton = false) {
     const imageUrl = imagesData[id];
     const traits   = traitsData[id];
@@ -1507,7 +1522,14 @@ function displayNFT(id, showCloseButton = false) {
         ? `<div class="stat-color-box ${statColorClass}" title="${statColorClass.charAt(0).toUpperCase() + statColorClass.slice(1)} Sort">${statValue}</div>`
         : '';
 
-    const statsHTML = stats ? `
+    const traitsHTML = Object.entries(traits)
+        .map(([key, traitData]) => `
+            <div class="trait">
+                <p>${key.charAt(0).toUpperCase() + key.slice(1)}: ${getTraitName(traitData)}</p>
+            </div>`)
+        .join('');
+
+    const kamiStatsHTML = stats ? `
         <div class="kami-stats">
             <div class="stat-row one">
                 <div class="stat-item health"><div class="stat-value">${stats.stats.health}</div></div>
@@ -1519,17 +1541,41 @@ function displayNFT(id, showCloseButton = false) {
             </div>
         </div>` : '';
 
-    const traitsHTML = Object.entries(traits)
-        .map(([key, traitData]) => `
-            <div class="trait">
-                <p>${key.charAt(0).toUpperCase() + key.slice(1)}: ${getTraitName(traitData)}</p>
-            </div>`)
-        .join('');
+    const _kamiInfo    = kamiInfoData[id]    || {};
+    const _kamiAccount = kamiToAccount[id]   || {};
+    const _kamiName    = _kamiInfo.name      || `Kamigotchi ${id}`;
+    const _ownerName   = _kamiAccount.accountName  || '—';
+    const _accountIdx  = _kamiAccount.accountIndex != null ? `#${_kamiAccount.accountIndex}` : '—';
+    const _level       = _kamiInfo.level     != null ? _kamiInfo.level : '—';
+    const _s           = _kamiInfo.stats     || {};
+    const _hp          = _s.health   != null ? _s.health   : '—';
+    const _pw          = _s.power    != null ? _s.power    : '—';
+    const _vl          = _s.violence != null ? _s.violence : '—';
+    const _hm          = _s.harmony  != null ? _s.harmony  : '—';
+
+    const kamiInfoHTML = `
+        <div class="kami-info">
+            <div>${_kamiName}</div><div>Owner: ${_ownerName}</div><div>(Id: ${_accountIdx})</div><div>Level: ${_level}</div><div class="last">stats: ${_hp}/${_pw}/${_vl}/${_hm}</div>
+        </div>`;
+
+    const kamiTraitsHTML = `
+        <div class="kami-traits">
+            ${traitsHTML}
+        </div>`;
+
+    const kamiOverlayControlsHTML = `
+        <div class="kami-overlay-controls">
+            <button class="kami-overlay-arrow" title="Switch page"></button>
+        </div>`;
+    
+
 
     const rankBadge = `
         <div class="rank-stat-container">
             <div class="rank-badge ${rankClass}" title="${rankTooltip}">${rank}</div>
             ${statColorHTML}
+            ${newBadgeHTML}
+            ${cloneBadgeHTML}
         </div>`;
 
     const imageBlock = `
@@ -1543,34 +1589,40 @@ function displayNFT(id, showCloseButton = false) {
 
     if (isMobile) {
         card.innerHTML = `
-            ${closeButtonHTML}${newBadgeHTML}${cloneBadgeHTML}
+            ${closeButtonHTML}
             ${rankBadge}
+            ${kamiTraitsHTML}
+            ${kamiInfoHTML}
+            ${kamiStatsHTML}
+            ${kamiOverlayControlsHTML}
             <div class="nft-card-content">
                 ${imageBlock}
-                <div class="nft-details hover_wrapper">
-                    <div class="nft-id">Kamigotchi ${id}</div>
-                    ${traitsHTML}
-                    ${statsHTML}
-                </div>
+                <div class="nft-id">Kamigotchi ${id}</div>
             </div>`;
     } else {
         card.innerHTML = `
-            ${closeButtonHTML}${newBadgeHTML}${cloneBadgeHTML}
+            ${closeButtonHTML}
             ${rankBadge}
-            ${statsHTML}
+            ${kamiTraitsHTML}
+            ${kamiInfoHTML}
+            ${kamiStatsHTML}
+            ${kamiOverlayControlsHTML}
             <div class="nft-card-content">
                 ${imageBlock}
-                <div class="nft-details hover_wrapper">
-                    <div class="nft-id">Kamigotchi ${id}</div>
-                    ${traitsHTML}
-                </div>
+                <div class="nft-id">Kamigotchi ${id}</div>
             </div>`;
     }
 
-    card.addEventListener('click', (event) => {
-        event.stopPropagation();
-        card.querySelector('.kami-stats')?.classList.toggle('is-active');
+    card.querySelector('.kami-overlay-arrow').addEventListener('click', (e) => {
+        e.stopPropagation();
+        // Cycle all cards together: traits(0) → stats(1) → info(2) → traits ...
+        applyKamiPage((kamiOverlayPage + 1) % 3);
     });
+
+    // kami-traits always visible by default; sync to current global page
+    card.classList.add('is-active');
+    if (kamiOverlayPage === 1) card.classList.add('swap-active');
+    else if (kamiOverlayPage === 2) card.classList.add('swap-active-2');
 
     return card;
 }
@@ -1666,7 +1718,7 @@ function createCountHeader(count, title) {
     countDiv.className = 'count-header';
     countDiv.innerHTML = `
         <div style="font-size: 14px;">${title}: ${count}</div>
-        <div class="note">** dear mobile user, click card to show og stats **</div>
+        <div class="note">** click the lil arrow on card for more info**</div>
     `;
     return countDiv;
 }
@@ -1789,6 +1841,26 @@ async function loadListingsData(v) {
     } catch (err) {}
 }
 
+async function loadKamiInfoData(v) {
+    try {
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname.startsWith('192.168.');
+        const [infoRes, accountsRes] = await Promise.all([
+            fetch(isLocal ? `https://data.kami.h80h.xyz/kamiInfo.json?v=${v}` : `/api/data/kamiInfo.json?v=${v}`),
+            fetch(isLocal ? `https://data.kami.h80h.xyz/kamiAccounts.json?v=${v}` : `/api/data/kamiAccounts.json?v=${v}`),
+        ]);
+        if (infoRes.ok)     kamiInfoData     = await infoRes.json();
+        if (accountsRes.ok) kamiAccountsData = await accountsRes.json();
+        // Build reverse lookup: kamiIndex → { accountIndex, accountName }
+        kamiToAccount = {};
+        Object.entries(kamiAccountsData).forEach(([accountIndex, acc]) => {
+            (acc.kamis || []).forEach(kamiIndex => {
+                kamiToAccount[kamiIndex] = { accountIndex, accountName: acc.name };
+            });
+        });
+        console.log(`📖 Loaded info for ${Object.keys(kamiInfoData).length} Kamigotchi, ${Object.keys(kamiAccountsData).length} accounts`);
+    } catch (err) {}
+}
+
 function getSignificantListingsHash(listingsData) {
     return JSON.stringify({
         listings: Object.fromEntries(listingNFTs),
@@ -1892,11 +1964,8 @@ async function loadData() {
             fetchAndSplitBundle(v),
             loadSacrificeData(v),
             loadListingsData(v),
+            loadKamiInfoData(v),
         ]);
-
-        if (Object.keys(kamiStatsData).length > 0) {
-            console.log(`✅ Loaded stats data for ${Object.keys(kamiStatsData).length} Kamigotchi`);
-        }
         if (metadataInfo.newKamiIds?.length > 0) {
             console.log(`✨ Found ${metadataInfo.newKamiIds.length} new Kamigotchi!`);
             console.log(`   New IDs: ${metadataInfo.newKamiIds.join(', ')}`);
@@ -1984,6 +2053,7 @@ async function refreshData() {
             fetchAndSplitBundle(v),
             loadSacrificeData(v),
             loadListingsData(v),
+            loadKamiInfoData(v),
         ]);
 
         if (Object.keys(kamiStatsData).length > 0) {
@@ -2126,11 +2196,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('popstate', handlePopState);
 
     document.addEventListener('click', (e) => {
-        const openStats = document.querySelector('.kami-stats.is-active');
-        if (openStats) {
-            const parentCard = openStats.closest('.nft-card');
-            if (parentCard && !parentCard.contains(e.target)) openStats.classList.remove('is-active');
-        }
+        // Cards are dismissed only via their close button, not outside clicks
 
         const filterControls = document.getElementById('filterControls');
         if (filterControls && !filterControls.contains(e.target)) {
