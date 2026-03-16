@@ -17,7 +17,7 @@ const r2Client = new S3Client({
 
 
 async function uploadBundleToR2(bundleData) {
-  const filename = 'kamibundle-test.json';
+  const filename = 'kamiBundle.json';
   console.log(`\n📤 Uploading ${filename} to Cloudflare R2 via Managed Streaming...`);
   
   const stream = Readable.from(JSON.stringify(bundleData));
@@ -123,7 +123,7 @@ async function fetchPreviousMetadata() {
     console.log('📋 Fetching previous metadata from R2 bundle...');
     const command = new GetObjectCommand({
       Bucket: process.env.R2_BUCKET_NAME,
-      Key: 'kamibundle-test.json',
+      Key: 'kamiBundle.json',
     });
     const response = await r2Client.send(command);
     const body = await response.Body.transformToString();
