@@ -161,12 +161,14 @@ async function updateLiveStatus() {
 let imagesData = {};
 let traitsData = {};
 let kamiStatsData = {};
+let kamiTraitIndexData = {}; // { [entityId]: { name, rarity, affinity?, stats? } } — the global trait catalogue
+let traitNameToIndex = {};   // { [traitName]: entityId } — reverse lookup built after load
 let kamiInfoData = {};     // { [kamiIndex]: { name, level, stats: { harmony, health, power, violence } } }
 let kamiAccountsData = {}; // { [accountIndex]: { name, ownerAddress, kamis: [indices] } }
 let kamiToAccount = {};    // { [kamiIndex]: { accountIndex, accountName } }  — built after load
 let affinityData = {};
 let metadataInfo = {};
-let sacrificedNFTs = new Set();
+let sacrificedNFTs = new Map(); // kami_index (string) → revealed_at_unix (number)
 let listingNFTs = new Map();
 let listingMetaInfo = { newListingId: [], listingNewWindow: {} };
 
@@ -225,8 +227,8 @@ function getTraitStringFromState() {
         let isCoveredByAffinity = false;
         if (type === 'body' || type === 'hand') {
             const affinitySet = type === 'body' ? selectedBodyAffinities : selectedHandAffinities;
-            const traitData = Object.values(traitsData).find(nft => nft[type]?.name === value)?.[type];
-            if (traitData && affinitySet.has(traitData.affinity)) isCoveredByAffinity = true;
+            const entry = traitNameToIndex[value];
+            if (entry && affinitySet.has(entry.affinity)) isCoveredByAffinity = true;
         }
 
         if (!isCoveredByAffinity) {
@@ -325,10 +327,13 @@ function loadStateFromURL({ restorePanels = true } = {}) {
                     else if (type === 'hand') selectedHandAffinities.add(affinityValue);
 
                     Object.values(traitsData).forEach(nft => {
-                        const trait = nft[type];
-                        if (trait && typeof trait === 'object' && trait.affinity === affinityValue) {
-                            const cb = document.querySelector(`.trait-checkbox[data-trait-type="${type}"][data-trait-value="${trait.name}"]`);
-                            if (cb) cb.checked = true;
+                        const traitName = nft[type]; // now a plain string
+                        if (traitName) {
+                            const entry = traitNameToIndex[traitName];
+                            if (entry && entry.affinity === affinityValue) {
+                                const cb = document.querySelector(`.trait-checkbox[data-trait-type="${type}"][data-trait-value="${traitName}"]`);
+                                if (cb) cb.checked = true;
+                            }
                         }
                     });
                 });
@@ -519,12 +524,14 @@ function calculateRarityScores() {
 }
 
 function buildTraitAffinityLookup() {
+    // body/hand slot → { traitName: affinity } — sourced from kamiTraitIndex via name lookup
     const lookup = { body: {}, hand: {} };
     Object.values(traitsData).forEach(nft => {
         ['body', 'hand'].forEach(type => {
-            const trait = nft[type];
-            if (trait && typeof trait === 'object' && trait.name && trait.affinity) {
-                lookup[type][trait.name] = trait.affinity;
+            const traitName = nft[type]; // now a plain string
+            if (traitName) {
+                const entry = traitNameToIndex[traitName];
+                if (entry && entry.affinity) lookup[type][traitName] = entry.affinity;
             }
         });
     });
@@ -534,9 +541,11 @@ function buildTraitAffinityLookup() {
 function extractAffinityData() {
     const affinities = {};
     Object.entries(traitsData).forEach(([id, traits]) => {
+        const bodyEntry = traits.body ? traitNameToIndex[traits.body] : null;
+        const handEntry = traits.hand ? traitNameToIndex[traits.hand] : null;
         affinities[id] = {
-            body: (traits.body && typeof traits.body === 'object' && traits.body.affinity) ? traits.body.affinity : 'NORMAL',
-            hand: (traits.hand && typeof traits.hand === 'object' && traits.hand.affinity) ? traits.hand.affinity : 'NORMAL',
+            body: bodyEntry?.affinity || 'NORMAL',
+            hand: handEntry?.affinity || 'NORMAL',
         };
     });
     return affinities;
@@ -1043,10 +1052,11 @@ function createFilterControls() {
             if (!allTraits[traitType]) { allTraits[traitType] = new Set(); traitDetails[traitType] = {}; }
             const traitName = getTraitName(traitData);
             allTraits[traitType].add(traitName);
-            if (typeof traitData === 'object' && traitData.name && !traitDetails[traitType][traitName]) {
+            if (!traitDetails[traitType][traitName]) {
+                const indexEntry = traitNameToIndex[traitName] || {};
                 traitDetails[traitType][traitName] = {
-                    affinity: traitData.affinity || null,
-                    stats: traitData.stats || {},
+                    affinity: indexEntry.affinity || null,
+                    stats: indexEntry.stats || {},
                 };
             }
         });
@@ -1490,6 +1500,10 @@ function displayNFT(id, showCloseButton = false) {
     const isNew        = metadataInfo.kamiNewWindow && Object.prototype.hasOwnProperty.call(metadataInfo.kamiNewWindow, String(id));
     const isClone      = traitSignatures.cloneIds.has(id);
     const isSacrificed = sacrificedNFTs.has(String(id));
+    const sacrificeUnix = isSacrificed ? sacrificedNFTs.get(String(id)) : null;
+    const ripDateHTML   = isSacrificed && sacrificeUnix
+        ? `<div class="last">r.i.p: ${new Date(sacrificeUnix * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</div>`
+        : '';
     const listingData  = listingNFTs.get(String(id));
     const listingPrice = listingData?.price;
     const isListing    = listingData !== undefined;
@@ -1555,7 +1569,7 @@ function displayNFT(id, showCloseButton = false) {
 
     const kamiInfoHTML = `
         <div class="kami-info">
-            <div>${_kamiName}</div><div>Owner: ${_ownerName}</div><div>(Id: ${_accountIdx})</div><div>Level: ${_level}</div><div class="last">stats: ${_hp}/${_pw}/${_vl}/${_hm}</div>
+            <div>${_kamiName}</div><div>Owner: ${_ownerName}</div><div>(Id: ${_accountIdx})</div><div>Level: ${_level}</div><div${isSacrificed ? '' : ' class="last"'}>stats: ${_hp}/${_pw}/${_vl}/${_hm}</div>${ripDateHTML}
         </div>`;
 
     const kamiTraitsHTML = `
@@ -1806,7 +1820,7 @@ async function loadSacrificeData(v) {
         const response = await fetch(`/api/sacrifices?v=${v}`);
         if (response.ok) {
             const data = await response.json();
-            sacrificedNFTs = new Set(data.map(item => String(item.kami_index)));
+            sacrificedNFTs = new Map(data.map(item => [String(item.kami_index), item.revealed_at_unix]));
             console.log(`🕳️ Loaded ${sacrificedNFTs.size} sacrifice records`);
         }
     } catch (err) {}
@@ -1939,14 +1953,45 @@ async function fetchAndSplitBundle(v) {
         throw new Error('Bundle is missing required sections (kamiImage / kamiTraits)');
     }
 
-    imagesData    = bundle.kamiImage;                        bundle.kamiImage    = null;
-    traitsData    = bundle.kamiTraits;                       bundle.kamiTraits   = null;
-    kamiStatsData = bundle.kamiStats  || {};                 bundle.kamiStats    = null;
-    metadataInfo  = bundle.kamiMetadata || { newKamiIds: [] }; bundle.kamiMetadata = null;
+    imagesData        = bundle.kamiImage;                          bundle.kamiImage      = null;
+    traitsData        = bundle.kamiTraits;                         bundle.kamiTraits     = null;
+    kamiTraitIndexData = bundle.kamiTraitIndex || {};              bundle.kamiTraitIndex = null;
+    metadataInfo      = bundle.kamiMetadata || { newKamiIds: [] }; bundle.kamiMetadata   = null;
     bundle = null;
 }
 
+const BASE_STATS = { harmony: 10, health: 50, power: 10, violence: 10, slots: 0 };
+
+function buildTraitNameToIndex() {
+    // Build reverse map: traitName → entity entry from kamiTraitIndexData
+    const lookup = {};
+    Object.values(kamiTraitIndexData).forEach(entry => {
+        lookup[entry.name] = entry;
+    });
+    return lookup;
+}
+
+function calculateKamiStats() {
+    const result = {};
+    Object.entries(traitsData).forEach(([kamiId, traits]) => {
+        const stats = { ...BASE_STATS };
+        Object.values(traits).forEach(traitName => {
+            // traitsData[kamiId][slot] is now a plain name string
+            const entry = traitNameToIndex[traitName];
+            if (entry && entry.stats) {
+                Object.entries(entry.stats).forEach(([statName, value]) => {
+                    if (Object.prototype.hasOwnProperty.call(stats, statName)) stats[statName] += value;
+                });
+            }
+        });
+        result[kamiId] = { stats };
+    });
+    return result;
+}
+
 function processLoadedData() {
+    traitNameToIndex    = buildTraitNameToIndex();
+    kamiStatsData       = calculateKamiStats();
     affinityData        = extractAffinityData();
     traitAffinityLookup = buildTraitAffinityLookup();
     traitSignatures     = buildTraitSignatures();
@@ -2056,9 +2101,7 @@ async function refreshData() {
             loadKamiInfoData(v),
         ]);
 
-        if (Object.keys(kamiStatsData).length > 0) {
-            console.log(`✅ Re-loaded stats data for ${Object.keys(kamiStatsData).length} Kamigotchi`);
-        }
+
         if (metadataInfo.newKamiIds?.length > 0) {
             console.log(`✨ Found ${metadataInfo.newKamiIds.length} new Kamigotchi!`);
             console.log(`   New IDs: ${metadataInfo.newKamiIds.join(', ')}`);

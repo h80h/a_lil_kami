@@ -38,9 +38,9 @@ body {
 }
 
 h2 {
-    color: #666;
-    margin-bottom: 14px;
-    font-size: 14px;
+  color: #666;
+  margin-bottom: 14px;
+  font-size: 14px;
 }
 
 .search-section,
@@ -538,6 +538,10 @@ button {
   box-shadow: 0px 2px 2px rgba(0,0,0,0.2);
   overflow: hidden;
   height: 243px;
+  cursor: help;
+  user-select: none;
+  -webkit-user-select: none;
+  width: 100%;
 }
 
 .nft-card-content {
@@ -827,15 +831,6 @@ button {
     align-items: flex-start !important;
 }
 
-.hover_wrapper {
-  position: relative;
-  display: inline-block;
-  cursor: help;
-  user-select: none;
-  -webkit-user-select: none;
-  width: 100%
-}
-
 .kami-stats {
   border-radius: 4px;
   width: 100%;
@@ -860,9 +855,9 @@ button {
   font-weight: bold;
 }
 
-.hover_wrapper.is-active .kami-stats,
-.hover_wrapper.is-active .kami-info,
-.hover_wrapper.is-active .kami-traits {
+.nft-card.is-active .kami-stats,
+.nft-card.is-active .kami-info,
+.nft-card.is-active .kami-traits {
   opacity: 1;
   visibility: visible;
 }
@@ -904,10 +899,9 @@ button {
   text-overflow: ellipsis;
 }
 
-.kami-traits .trait,
+.kami-traits div,
 .kami-info div {
-  margin-bottom: 2px;
-  color: #333;
+  margin-bottom: 3px;
 }
 
 /* Arrow control — no close button */
@@ -930,7 +924,7 @@ button {
   padding: 0 4px 0 0;
 }
 
-.hover_wrapper.is-active .kami-overlay-controls {
+.nft-card.is-active .kami-overlay-controls {
   opacity: 1;
   visibility: visible;
   pointer-events: auto;
@@ -1194,6 +1188,11 @@ button {
   opacity: 1;
 }
 @media (max-width: 834px){
+  .kami-traits div,
+  .kami-info div {
+    margin-bottom: 2px;
+  }
+
   .nft-card img {
     width: 123px;
     height: 123px;
@@ -1372,6 +1371,11 @@ button {
 }
 
 @media (max-width: 390px) {
+  .kami-traits div,
+  .kami-info div {
+    margin-bottom: 3px;
+  }
+
   .loader {
     transform: translate(-50%, -50%) scale(0.35);
   }
@@ -1462,7 +1466,7 @@ button {
   .kami-info,
   .kami-traits,
   .kami-overlay-controls {
-    height: 125px;
+    height: 127px;
     left: 170px;
     right: 10px;
     width: auto;
@@ -1475,7 +1479,7 @@ button {
 
   .kami-info,
   .kami-traits {
-    font-size: 12px;
+    font-size: 11px;
   }
 
   .kami-stats {
@@ -1514,7 +1518,7 @@ button {
   }
 }
 
-@media (max-width: 326px) {  
+@media (max-width: 326px) {
   .nft-id {
     font-size: 11px;
   }
@@ -1580,7 +1584,7 @@ button {
 
   .kami-info,
   .kami-traits {
-    font-size: 9.9px;
+    font-size: 9px;
     padding: 1px 2px;
   }
   
@@ -1613,11 +1617,6 @@ button {
   .container {
     max-width: 250px;
   }
-
-  /* .trait {
-    font-size: 7px;
-    margin: 1px 0;
-  } */
   
   .nft-id {
     font-size: 9px;
@@ -1686,9 +1685,14 @@ button {
 
   .kami-info,
   .kami-traits {
-    font-size: 8px;
+    font-size: 7.5px;
   }
   
+  .kami-traits div,
+  .kami-info div {
+    margin-bottom: 2px;
+  }
+
   .kami-stats {
     font-size: 10px;
   }

@@ -4,13 +4,6 @@ const { Upload } = require("@aws-sdk/lib-storage");
 const { Readable } = require('stream');
 const fs = require('fs').promises;
 
-const BASE_STATS = {
-  harmony: 10,
-  health: 50,
-  power: 10,
-  violence: 10,
-  slots: 0
-};
 
 // Initialize Cloudflare R2 client
 const r2Client = new S3Client({
@@ -22,42 +15,9 @@ const r2Client = new S3Client({
   },
 });
 
-async function calculateKamiStats(traitsData) {
-  console.log('\n📊 Calculating Kamigotchi stats...');
-  const kamiStats = {};
-  const statRankings = { harmony: [], health: [], power: [], violence: [], slots: [] };
-  
-  Object.entries(traitsData).forEach(([kamiId, traits]) => {
-    const stats = { ...BASE_STATS };
-    const traitBonuses = { harmony: [], health: [], power: [], violence: [], slots: [] };
-    
-    Object.entries(traits).forEach(([traitType, traitData]) => {
-      if (traitData.stats) {
-        Object.entries(traitData.stats).forEach(([statName, value]) => {
-          if (stats.hasOwnProperty(statName)) {
-            stats[statName] += value;
-            traitBonuses[statName].push({ trait: traitType, name: traitData.name, bonus: value });
-          }
-        });
-      }
-    });
-    
-    kamiStats[kamiId] = { id: parseInt(kamiId), stats: stats, bonuses: traitBonuses };
-    statRankings.harmony.push({ id: kamiId, value: stats.harmony });
-    statRankings.health.push({ id: kamiId, value: stats.health });
-    statRankings.power.push({ id: kamiId, value: stats.power });
-    statRankings.violence.push({ id: kamiId, value: stats.violence });
-    statRankings.slots.push({ id: kamiId, value: stats.slots });
-  });
-  
-  Object.keys(statRankings).forEach(statType => statRankings[statType].sort((a, b) => b.value - a.value));
-  
-  console.log(`   Total Kamigotchi: ${Object.keys(kamiStats).length}`);
-  return { kamiStats, statRankings };
-}
 
 async function uploadBundleToR2(bundleData) {
-  const filename = 'kamiBundle.json';
+  const filename = 'kamibundle-test.json';
   console.log(`\n📤 Uploading ${filename} to Cloudflare R2 via Managed Streaming...`);
   
   const stream = Readable.from(JSON.stringify(bundleData));
@@ -163,7 +123,7 @@ async function fetchPreviousMetadata() {
     console.log('📋 Fetching previous metadata from R2 bundle...');
     const command = new GetObjectCommand({
       Bucket: process.env.R2_BUCKET_NAME,
-      Key: 'kamiBundle.json',
+      Key: 'kamibundle-test.json',
     });
     const response = await r2Client.send(command);
     const body = await response.Body.transformToString();
@@ -212,8 +172,10 @@ async function runExtraction() {
       throw new Error(`Data load failed: received 0 items after all retries. The site may be down or the network API did not load.`);
     }
 
-    const { imageMap, traitsMap, listedSet, kamiInfoMap, kamiAccountsMap } = await page.evaluate(() => {
-      function extractDetailedTraits(kamiData) {
+    const { imageMap, traitsMap, traitIndexMap, listedSet, kamiInfoMap, kamiAccountsMap } = await page.evaluate(() => {
+      function extractSlimTraits(kamiData) {
+        // kamiTraits: each kami maps trait slot → trait name string only
+        // affinity stays on body/hand for the filter UI to use via kamiTraitIndex lookup
         const traitsToKeep = ["background", "body", "color", "face", "hand"];
         const detailedData = {};
         for (const kamiId in kamiData) {
@@ -221,16 +183,7 @@ async function runExtraction() {
           const detailedEntry = {};
           traitsToKeep.forEach(traitKey => {
             if (kamiEntry[traitKey]) {
-              const trait = kamiEntry[traitKey];
-              detailedEntry[traitKey] = { name: trait.name };
-              if ((traitKey === 'body' || traitKey === 'hand') && trait.affinity) detailedEntry[traitKey].affinity = trait.affinity;
-              if (trait.stats) {
-                const stats = {};
-                ['harmony', 'health', 'power', 'violence', 'slots'].forEach(s => {
-                  if (trait.stats[s] && trait.stats[s].base !== 0) stats[s] = trait.stats[s].base;
-                });
-                if (Object.keys(stats).length > 0) detailedEntry[traitKey].stats = stats;
-              }
+              detailedEntry[traitKey] = kamiEntry[traitKey].name;
             }
           });
           detailedData[kamiId] = detailedEntry;
@@ -267,6 +220,23 @@ async function runExtraction() {
         };
       });
 
+      // Trait index: entity id → { name, rarity, affinity?, stats: {only nonzero base values} }
+      // Keyed by entity id so script.js can look up stats/affinity by trait name via a name→entity reverse map
+      const allTraitEntities = network.explorer.traits.all();
+      const traitIndex = {};
+      allTraitEntities.forEach((t, i) => {
+        const entry = { name: t.name, rarity: t.rarity };
+        if (t.affinity) entry.affinity = t.affinity;
+        if (t.stats) {
+          const stats = {};
+          ['harmony', 'health', 'power', 'violence', 'slots'].forEach(s => {
+            if (t.stats[s] && t.stats[s].base !== 0) stats[s] = t.stats[s].base;
+          });
+          if (Object.keys(stats).length > 0) entry.stats = stats;
+        }
+        traitIndex[i + 1] = entry;
+      });
+
       // Accounts: name, ownerAddress, and list of their kami indices
       // { kamis: true } returns full KAMI objects; we extract only the index
       const allAccounts = network.explorer.accounts.all({ kamis: true });
@@ -280,18 +250,17 @@ async function runExtraction() {
       });
 
       return {
-        imageMap:       img,
-        traitsMap:      extractDetailedTraits(trtRaw),
-        listedSet:      Array.from(listed),
-        kamiInfoMap:    kamiInfo,
+        imageMap:        img,
+        traitsMap:       extractSlimTraits(trtRaw),
+        traitIndexMap:   traitIndex,
+        listedSet:       Array.from(listed),
+        kamiInfoMap:     kamiInfo,
         kamiAccountsMap: accounts,
       };
     });
     
     await browser.close();
-    
-    const { kamiStats, statRankings } = await calculateKamiStats(traitsMap);
-    
+
     // --- RESTORED DETECTION LOGIC START ---
     console.log('\n📋 Checking for new Kamigotchi...');
     const previousMetadata = await fetchPreviousMetadata();
@@ -339,8 +308,7 @@ async function runExtraction() {
     const bundle = {
       kamiImage: imageMap,
       kamiTraits: traitsMap,
-      kamiStats: kamiStats,
-      kamiRankings: statRankings,
+      kamiTraitIndex: traitIndexMap,
       kamiListed: listedSet,
       kamiMetadata: {
         lastUpdate: new Date().toISOString(),
