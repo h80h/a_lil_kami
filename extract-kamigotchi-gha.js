@@ -188,8 +188,9 @@ async function runExtraction() {
       const accounts    = {};
       allAccounts.forEach(acc => {
         accounts[acc.index] = {
-          name:  acc.name ?? null,
-          kamis: Array.isArray(acc.kamis) ? acc.kamis.map(k => k.index) : [],
+          name:   acc.name   ?? null,
+          id:    acc.id ? BigInt(acc.id).toString() : null,
+          kamis:  Array.isArray(acc.kamis) ? acc.kamis.map(k => k.index) : [],
         };
       });
 
