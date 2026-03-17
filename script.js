@@ -1995,7 +1995,8 @@ async function loadData() {
             loadSacrificeData(v),
             loadListingsData(v),
         ]);
-        loadKamiInfoData(v);
+        await loadKamiInfoData(v);
+
         if (metadataInfo.newKamiIds?.length > 0) {
             console.log(`✨ Found ${metadataInfo.newKamiIds.length} new Kamigotchi!`);
             console.log(`   New IDs: ${metadataInfo.newKamiIds.join(', ')}`);
@@ -2088,8 +2089,9 @@ async function refreshData() {
             fetchAndSplitBundle(v),
             loadSacrificeData(v),
             loadListingsData(v),
-            loadKamiInfoData(v),
         ]);
+
+        await loadKamiInfoData(v);
 
         if (metadataInfo.newKamiIds?.length > 0) {
             console.log(`✨ Found ${metadataInfo.newKamiIds.length} new Kamigotchi!`);
