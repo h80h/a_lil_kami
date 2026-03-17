@@ -1,7 +1,6 @@
 // BOT ARMOR — throttle duplicate requests to the database
 let lastRequestTime = 0;
 
-
 // ============================================================
 // UMAMI ENGAGEMENT TRACKER
 // ============================================================
@@ -152,7 +151,6 @@ async function updateLiveStatus() {
         console.error('%c[!] Live Sync Interrupted.', 'color: #ef4444;');
     }
 }
-
 
 // ============================================================
 // GLOBAL STATE
@@ -616,42 +614,26 @@ function getSortedNFTIds(idsToSort) {
 }
 
 function getSortedListingIds(ids) {
-    // If no ids provided, return empty array immediately
     if (!ids || ids.length === 0) return [];
 
-    // Use the array directly instead of spreading [...ids] 
-    // since we pass a new array from updateSelectedIDsDisplay
     return ids.sort((a, b) => {
         const itemA = listingNFTs.get(String(a));
         const itemB = listingNFTs.get(String(b));
 
-        // Sorting by Price
         if (currentListingSortOrder === 'price') {
             const priceA = itemA?.price ?? Infinity;
             const priceB = itemB?.price ?? Infinity;
-            
             if (priceA !== priceB) return priceA - priceB;
-            
-            // Secondary sort: Most recent if prices are tied
-            const tsA = Number(itemA?.timestamp ?? 0);
-            const tsB = Number(itemB?.timestamp ?? 0);
-            return tsB - tsA;
-        } 
-        
-        // Sorting by Recent
+            return Number(itemB?.timestamp ?? 0) - Number(itemA?.timestamp ?? 0);
+        }
+
         if (currentListingSortOrder === 'recent') {
             const tsA = Number(itemA?.timestamp ?? 0);
             const tsB = Number(itemB?.timestamp ?? 0);
-            
             if (tsA !== tsB) return tsB - tsA;
-            
-            // Secondary sort: Cheaper if timestamps are tied
-            const priceA = itemA?.price ?? Infinity;
-            const priceB = itemB?.price ?? Infinity;
-            return priceA - priceB;
+            return (itemA?.price ?? Infinity) - (itemB?.price ?? Infinity);
         }
 
-        // Default: Sort by ID descending
         return Number(b) - Number(a);
     });
 }
@@ -1601,8 +1583,6 @@ function displayNFT(id, showCloseButton = false) {
         </div>`;
 
     const kamiOverlaySlotHTML = `<div class="kami-overlay-slot">${getOverlaySlotHTML(id, kamiOverlayPage)}</div>`;
-    
-
 
     const rankBadge = `
         <div class="rank-stat-container">
@@ -1769,11 +1749,8 @@ function updateSelectedIDsDisplay() {
     const cardsContainer = document.createElement('div');
     cardsContainer.className = 'selected-cards-grid';
 
-    // Convert Set to Array for sorting
     let idsArray = Array.from(selectedIDs);
 
-    // Check if we are in Listing mode and a sort order is active
-    // This ensures the selected grid mirrors the marketplace sort logic
     if (isShowingListingOnly && currentListingSortOrder) {
         idsArray = getSortedListingIds(idsArray);
     } else {
@@ -2113,7 +2090,6 @@ async function refreshData() {
             loadListingsData(v),
             loadKamiInfoData(v),
         ]);
-
 
         if (metadataInfo.newKamiIds?.length > 0) {
             console.log(`✨ Found ${metadataInfo.newKamiIds.length} new Kamigotchi!`);

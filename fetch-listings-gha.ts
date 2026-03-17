@@ -149,8 +149,6 @@ async function main() {
 
       const newListingId = Object.keys(byId).filter(id => {
         const prevTime = prevIdTimeMap.get(id);
-        
-        // Cast both sides to String to ensure the comparison is type-safe
         return prevTime === undefined || String(prevTime) !== String(byId[id].rawTime);
       });
 
