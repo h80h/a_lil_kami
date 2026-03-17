@@ -11,8 +11,6 @@ export default async function handler(req, res) {
   const allowedOriginsStr = process.env.ALLOWED_ORIGINS || "https://kami.h80h.xyz";
   const allowedOrigins = allowedOriginsStr.split(',').map(o => o.trim());
 
-  // Determine the safe origin to return
-  // If the requester is in our list, use their origin. Otherwise, use our main domain.
   const safeOrigin = (origin && allowedOrigins.includes(origin)) ? origin : "https://kami.h80h.xyz";
 
   res.setHeader('Access-Control-Allow-Origin', safeOrigin);

@@ -11,7 +11,6 @@ export default async function handler(req, res) {
 
   const isAllowed = !origin || allowedOrigins.includes(origin);
 
-  // Set Dynamic CORS
   if (origin && allowedOrigins.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
   } else {
@@ -21,9 +20,7 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Vary', 'Origin');
 
-  // --- CACHING LAYER ---
-  // Cache for 60 seconds on the user's browser, 
-  // and 5 minutes on Vercel's Edge network.
+  // Cache 60s on browser, 5 minutes on Vercel's edge.
   res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=60');
 
   if (req.method === 'OPTIONS') return res.status(200).end();

@@ -1470,6 +1470,10 @@ button {
     margin-top: -1px;
   }
 
+  .kami-overlay-slot {
+    top: 93%;
+  }
+
   .kami-info,
   .kami-traits {
     font-size: 11px;
@@ -1576,6 +1580,10 @@ button {
     transform: translateY(-50%);
   }
 
+  .kami-overlay-slot {
+    top: 92%;
+  }
+
   .kami-info,
   .kami-traits {
     font-size: 9px;
@@ -1676,6 +1684,10 @@ button {
     top: 60%;
     transform: translateY(-50%);
     margin-top: 2px;
+  }
+
+  .kami-overlay-slot {
+    top: 92%;
   }
 
   .kami-info,
