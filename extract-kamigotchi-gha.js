@@ -172,7 +172,7 @@ async function runExtraction() {
       throw new Error(`Data load failed: received 0 items after all retries. The site may be down or the network API did not load.`);
     }
 
-    const { imageMap, traitsMap, traitIndexMap, listedSet, kamiInfoMap, kamiAccountsMap } = await page.evaluate(() => {
+    const { imageMap, traitsMap, traitIndexMap, kamiInfoMap, kamiAccountsMap } = await page.evaluate(() => {
       function extractSlimTraits(kamiData) {
         // kamiTraits: each kami maps trait slot → trait name string only
         // affinity stays on body/hand for the filter UI to use via kamiTraitIndex lookup
@@ -199,24 +199,18 @@ async function runExtraction() {
       const listed   = new Set();
       const kamiInfo = {};
 
-      const STAT_KEYS = ['harmony', 'health', 'power', 'violence'];
+      // stats array order: [harmony, health, power, violence]
+      const STAT_KEYS = ['health', 'power', 'violence', 'harmony'];
 
       allFull.forEach(k => {
         img[k.index]    = k.image;
         trtRaw[k.index] = k.traits;
-        if (k.state === 'LISTED') listed.add(k.index);
 
-        // kamiInfo entry: name, level (k.progress.level), total stats (k.stats[s].total)
-        const statTotals = {};
-        if (k.stats) {
-          STAT_KEYS.forEach(s => {
-            if (k.stats[s] !== undefined) statTotals[s] = k.stats[s].total;
-          });
-        }
+        // kamiInfo entry: name, level (k.progress.level), stats as compact array [harmony, health, power, violence]
         kamiInfo[k.index] = {
           name:  k.name            ?? null,
           level: k.progress?.level ?? null,
-          stats: statTotals,
+          stats: k.stats ? STAT_KEYS.map(s => k.stats[s]?.total ?? null) : null,
         };
       });
 
@@ -237,15 +231,14 @@ async function runExtraction() {
         traitIndex[i + 1] = entry;
       });
 
-      // Accounts: name, ownerAddress, and list of their kami indices
+      // Accounts: name and list of their kami indices
       // { kamis: true } returns full KAMI objects; we extract only the index
       const allAccounts = network.explorer.accounts.all({ kamis: true });
       const accounts    = {};
       allAccounts.forEach(acc => {
         accounts[acc.index] = {
-          name:         acc.name         ?? null,
-          ownerAddress: acc.ownerAddress ?? null,
-          kamis:        Array.isArray(acc.kamis) ? acc.kamis.map(k => k.index) : [],
+          name:  acc.name ?? null,
+          kamis: Array.isArray(acc.kamis) ? acc.kamis.map(k => k.index) : [],
         };
       });
 
@@ -253,7 +246,6 @@ async function runExtraction() {
         imageMap:        img,
         traitsMap:       extractSlimTraits(trtRaw),
         traitIndexMap:   traitIndex,
-        listedSet:       Array.from(listed),
         kamiInfoMap:     kamiInfo,
         kamiAccountsMap: accounts,
       };
@@ -309,7 +301,8 @@ async function runExtraction() {
       kamiImage: imageMap,
       kamiTraits: traitsMap,
       kamiTraitIndex: traitIndexMap,
-      kamiListed: listedSet,
+      kamiInfo: kamiInfoMap,
+      kamiAccounts: kamiAccountsMap,
       kamiMetadata: {
         lastUpdate: new Date().toISOString(),
         previousMaxId: currentMaxId,
@@ -323,12 +316,10 @@ async function runExtraction() {
     await Promise.all([
       uploadBundleToR2(bundle),
       uploadMetaToR2(bundle.kamiMetadata),
-      uploadKamiInfoToR2(kamiInfoMap),
-      uploadKamiAccountsToR2(kamiAccountsMap),
     ]);
     
     console.log('\n' + '='.repeat(60));
-    console.log(`✅ COMPLETE: ${bundle.kamiMetadata.totalCount} items | ${listedSet.length} listed | ${bundle.kamiMetadata.extractionDuration}s`);
+    console.log(`✅ COMPLETE: ${bundle.kamiMetadata.totalCount} items | ${bundle.kamiMetadata.extractionDuration}s`);
     console.log('='.repeat(60));
     
   } catch (error) {

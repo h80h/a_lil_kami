@@ -58,7 +58,6 @@ async function fetchAllListings() {
 interface SimpleListing {
   id: number;
   price: number;
-  seller: string;
   time: string;
   rawTime: string;
 }
@@ -132,27 +131,15 @@ async function main() {
     if (response.Listings.length > 0) {
       // Build a map keyed by KamiIndex for newListingId / listingNewWindow tracking
       const byId: Record<string, SimpleListing> = {};
-      response.Listings.forEach((listing: { KamiIndex: string; Price: string; SellerAccountID: string; Timestamp: string }) => {
-        const sellerHex = "0x" + BigInt(listing.SellerAccountID).toString(16).padStart(40, "0");
-
+      response.Listings.forEach((listing: { KamiIndex: string; Price: string; Timestamp: string }) => {
         // Convert raw timestamp to "Mar 8, 2026, 12:34:49 AM"
         const ts = Number(listing.Timestamp);
         const date = new Date(ts < 10000000000 ? ts * 1000 : ts);
-        const formattedTime = date.toLocaleString("en-US", {
-          month: "short",
-          day: "numeric",
-          year: "numeric",
-          hour: "numeric",
-          minute: "2-digit",
-          second: "2-digit",
-          hour12: true
-        });
 
         byId[listing.KamiIndex] = {
           id: Number(listing.KamiIndex),
           price: Number(BigInt(listing.Price)) / 1e18,
-          seller: sellerHex,
-          time: formattedTime,       // The UI-friendly string
+          time: date.toISOString(),       // The UI-friendly string
           rawTime: listing.Timestamp // The raw string for the filter logic
         };
       });

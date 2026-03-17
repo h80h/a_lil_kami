@@ -1561,15 +1561,17 @@ function displayNFT(id, showCloseButton = false) {
     const _ownerName   = _kamiAccount.accountName  || '—';
     const _accountIdx  = _kamiAccount.accountIndex != null ? `#${_kamiAccount.accountIndex}` : '—';
     const _level       = _kamiInfo.level     != null ? _kamiInfo.level : '—';
-    const _s           = _kamiInfo.stats     || {};
-    const _hp          = _s.health   != null ? _s.health   : '—';
-    const _pw          = _s.power    != null ? _s.power    : '—';
-    const _vl          = _s.violence != null ? _s.violence : '—';
-    const _hm          = _s.harmony  != null ? _s.harmony  : '—';
+    const _s = _kamiInfo.stats || [];
+    const _hea = _s[0];  // health
+    const _pow = _s[1];  // power
+    const _vio = _s[2];  // violence
+    const _har = _s[3];  // harmony
+
+
 
     const kamiInfoHTML = `
         <div class="kami-info">
-            <div>${_kamiName}</div><div>Owner: ${_ownerName}</div><div>(Id: ${_accountIdx})</div><div>Level: ${_level}</div><div${isSacrificed ? '' : ' class="last"'}>stats: ${_hp}/${_pw}/${_vl}/${_hm}</div>${ripDateHTML}
+            <div>${_kamiName}</div><div>Owner: ${_ownerName}</div><div>(Id: ${_accountIdx})</div><div>Level: ${_level}</div><div${isSacrificed ? '' : ' class="last"'}>stats: ${_hea}/${_pow}/${_vio}/${_har}</div>${ripDateHTML}
         </div>`;
 
     const kamiTraitsHTML = `
@@ -1857,13 +1859,7 @@ async function loadListingsData(v) {
 
 async function loadKamiInfoData(v) {
     try {
-        const isLocal = window.location.hostname === 'localhost' || window.location.hostname.startsWith('192.168.');
-        const [infoRes, accountsRes] = await Promise.all([
-            fetch(isLocal ? `https://data.kami.h80h.xyz/kamiInfo.json?v=${v}` : `/api/data/kamiInfo.json?v=${v}`),
-            fetch(isLocal ? `https://data.kami.h80h.xyz/kamiAccounts.json?v=${v}` : `/api/data/kamiAccounts.json?v=${v}`),
-        ]);
-        if (infoRes.ok)     kamiInfoData     = await infoRes.json();
-        if (accountsRes.ok) kamiAccountsData = await accountsRes.json();
+        // kamiInfoData and kamiAccountsData are already populated from kamiBundle.json
         // Build reverse lookup: kamiIndex → { accountIndex, accountName }
         kamiToAccount = {};
         Object.entries(kamiAccountsData).forEach(([accountIndex, acc]) => {
@@ -1957,6 +1953,8 @@ async function fetchAndSplitBundle(v) {
     traitsData        = bundle.kamiTraits;                         bundle.kamiTraits     = null;
     kamiTraitIndexData = bundle.kamiTraitIndex || {};              bundle.kamiTraitIndex = null;
     metadataInfo      = bundle.kamiMetadata || { newKamiIds: [] }; bundle.kamiMetadata   = null;
+    kamiInfoData      = bundle.kamiInfo     || {};                 bundle.kamiInfo       = null;
+    kamiAccountsData  = bundle.kamiAccounts || {};                 bundle.kamiAccounts   = null;
     bundle = null;
 }
 
@@ -2009,8 +2007,8 @@ async function loadData() {
             fetchAndSplitBundle(v),
             loadSacrificeData(v),
             loadListingsData(v),
-            loadKamiInfoData(v),
         ]);
+        loadKamiInfoData(v);
         if (metadataInfo.newKamiIds?.length > 0) {
             console.log(`✨ Found ${metadataInfo.newKamiIds.length} new Kamigotchi!`);
             console.log(`   New IDs: ${metadataInfo.newKamiIds.join(', ')}`);
