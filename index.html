@@ -44,11 +44,19 @@
           <svg id="refreshDataBtn_svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 30"><path d="M2 12C2 16.97 6.03 21 11 21C13.39 21 15.68 20.06 17.4 18.4L15.9 16.9C14.63 18.25 12.86 19 11 19C4.76 19 1.64 11.46 6.05 7.05C10.46 2.64 18 5.77 18 12H15L19 16H19.1L23 12H20C20 7.03 15.97 3 11 3C6.03 3 2 7.03 2 12Z" /></svg>
         </div>
       </div>
-      <div class="online-indicator-container">
-        <span id="pulse-dot"></span>
-        <span class="online-text">
-          <span id="online-count">0</span> OnLine
-        </span>
+      <div class="some-info">
+        <div class="online-indicator-container">
+          <span id="pulse-dot"></span>
+          <span class="online-text">
+            <span id="online-count">0</span> OnLine
+          </span>
+        </div>
+        <div class="mint-price-text">
+            <span id="mint-price"></span> musu
+        </div>
+        <div class="reroll-price-text">
+            <span id="reroll-price"></span> onyx
+        </div>
       </div>
     </div>
 
@@ -61,11 +69,13 @@
       
       <!-- Selected Traits Display -->
       <div id="selectedTraitsDisplay" class="selected-traits-display" style="display: none;"></div>
-      <button id="clearBtn">CLEAR</button>
-      <button id="affinityFilterToggle">Affinity</button>
-      <button id="minmaxFilterToggle">min-MAX</button>
-      <button id="listingFilterBtn">Listing</button>
-    </div>
+        <div class="advanced-filter-buttons">
+          <button id="clearBtn">CLEAR</button>
+          <button id="affinityFilterToggle">Affinity</button>
+          <button id="minmaxFilterToggle">min-MAX</button>
+          <button id="listingFilterBtn">Listing</button>
+        </div>
+      </div>
 
     <div class="sort-section">
       <div class="sort-label">Sort Order:</div>

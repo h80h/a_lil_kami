@@ -1880,8 +1880,6 @@ function getSignificantListingsHash(listingsData) {
 
 function getSignificantMetaHash(meta) {
     return JSON.stringify({
-        previousMaxId: meta.previousMaxId,
-        newKamiIds:    meta.newKamiIds,
         kamiNewWindow: meta.kamiNewWindow,
         totalCount:    meta.totalCount,
     });
@@ -2014,6 +2012,11 @@ async function loadData() {
             console.log(`   New IDs: ${metadataInfo.newKamiIds.join(', ')}`);
         }
 
+        const mintPriceEl   = document.getElementById('mint-price');
+        const rerollPriceEl = document.getElementById('reroll-price');
+        if (mintPriceEl   && metadataInfo.mintPrice   != null) mintPriceEl.textContent   = metadataInfo.mintPrice.toLocaleString();
+        if (rerollPriceEl && metadataInfo.rerollPrice != null) rerollPriceEl.textContent = metadataInfo.rerollPrice.toLocaleString();
+
         processLoadedData();
 
         setupSortButtons();
@@ -2104,6 +2107,11 @@ async function refreshData() {
             console.log(`✨ Found ${metadataInfo.newKamiIds.length} new Kamigotchi!`);
             console.log(`   New IDs: ${metadataInfo.newKamiIds.join(', ')}`);
         }
+
+        const mintPriceEl   = document.getElementById('mint-price');
+        const rerollPriceEl = document.getElementById('reroll-price');
+        if (mintPriceEl   && metadataInfo.mintPrice   != null) mintPriceEl.textContent   = metadataInfo.mintPrice.toLocaleString();
+        if (rerollPriceEl && metadataInfo.rerollPrice != null) rerollPriceEl.textContent = metadataInfo.rerollPrice.toLocaleString();
 
         processLoadedData();
 
@@ -2234,6 +2242,18 @@ document.getElementById('clearBtn').addEventListener('click', clearFilters);
 document.addEventListener('DOMContentLoaded', () => {
     setupScrollToTop();
     setupRefreshButton();
+
+    document.querySelectorAll('.mint-price-text, .reroll-price-text').forEach(el => {
+        el.addEventListener('click', () => {
+            el.style.webkitTextFillColor = '#333';
+            el.style.color = '#333';
+            setTimeout(() => {
+                el.style.webkitTextFillColor = '#bbeebb';
+                el.style.color = '#bbeebb';
+            }, 2000);
+        });
+    });
+
     window.addEventListener('popstate', handlePopState);
 
     document.addEventListener('click', (e) => {

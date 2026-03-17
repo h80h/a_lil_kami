@@ -239,6 +239,8 @@ button {
   text-shadow: #eeeeee 0 -1px 4px, rgb(42, 135, 166) 0 1px 1px;
 }
 
+.some-info,
+.advanced-filter-buttons,
 .sort-buttons,
 .affinity-filter-buttons,
 .listing-sort-buttons {
@@ -1164,7 +1166,9 @@ button {
   20% { opacity: 0.5; }
 }
 
-.online-text {
+.online-text,
+.mint-price-text,
+.reroll-price-text {
   font-weight: 500;
   letter-spacing: 0.5px;
   font-size: 9px;
@@ -1172,9 +1176,27 @@ button {
   font-family: 'dogica_pixelregular', monospace;
 }
 
+.mint-price-text,
+.reroll-price-text {
+  color: #bbeebb; /* same as background = invisible */
+  /* -webkit-text-fill-color: #bbeebb;
+  user-select: text;
+  -webkit-user-select: text; */
+}
+
+/* .mint-price-text::selection,
+.reroll-price-text::selection,
+.mint-price-text *::selection,
+.reroll-price-text *::selection {
+  color: #333;
+  -webkit-text-fill-color: #333;
+  background-color: rgba(147, 187, 191, 0.5);
+} */
+
 .online-indicator-container {
-  margin-left: 2px;
-  margin-top: 2px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 /* Start the count at 0 opacity */
@@ -1187,6 +1209,15 @@ button {
 #online-count.visible {
   opacity: 1;
 }
+
+.some-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: 2px;
+  margin-top: 10px;
+}
+
 @media (max-width: 834px){
   .kami-traits div,
   .kami-info div {

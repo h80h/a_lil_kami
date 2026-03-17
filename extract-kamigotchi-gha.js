@@ -172,7 +172,7 @@ async function runExtraction() {
       throw new Error(`Data load failed: received 0 items after all retries. The site may be down or the network API did not load.`);
     }
 
-    const { imageMap, traitsMap, traitIndexMap, kamiInfoMap, kamiAccountsMap } = await page.evaluate(() => {
+    const { imageMap, traitsMap, traitIndexMap, kamiInfoMap, kamiAccountsMap, prices } = await page.evaluate(() => {
       function extractSlimTraits(kamiData) {
         // kamiTraits: each kami maps trait slot → trait name string only
         // affinity stays on body/hand for the filter UI to use via kamiTraitIndex lookup
@@ -242,12 +242,25 @@ async function runExtraction() {
         };
       });
 
+      const prices = (() => {
+        try {
+          const raw = network.explorer.auctions.getPrices();
+          const gacha  = raw.find(p => p.name === 'Gacha Ticket');
+          const reroll = raw.find(p => p.name === 'Reroll Ticket');
+          return {
+            mintPrice:   gacha?.price  ?? null,
+            rerollPrice: reroll?.price ?? null,
+          };
+        } catch { return { mintPrice: null, rerollPrice: null }; }
+      })();
+
       return {
         imageMap:        img,
         traitsMap:       extractSlimTraits(trtRaw),
         traitIndexMap:   traitIndex,
         kamiInfoMap:     kamiInfo,
         kamiAccountsMap: accounts,
+        prices,
       };
     });
     
@@ -306,16 +319,24 @@ async function runExtraction() {
       kamiMetadata: {
         lastUpdate: new Date().toISOString(),
         previousMaxId: currentMaxId,
-        newKamiIds: newKamiIds.sort((a, b) => a - b),   // IDs first seen THIS run
-        kamiNewWindow: updatedWindow,                     // Persistent countdown map { id: remainingRuns }
+        newKamiIds: newKamiIds.sort((a, b) => a - b),
+        kamiNewWindow: updatedWindow,
         totalCount: allIds.length,
-        extractionDuration: Math.round((Date.now() - startTime) / 1000)
+        extractionDuration: Math.round((Date.now() - startTime) / 1000),
+        mintPrice:   prices.mintPrice,
+        rerollPrice: prices.rerollPrice,
       }
     };
     
+    const slimMeta = {
+      lastUpdate:    bundle.kamiMetadata.lastUpdate,
+      kamiNewWindow: bundle.kamiMetadata.kamiNewWindow,
+      totalCount:    bundle.kamiMetadata.totalCount,
+    };
+
     await Promise.all([
       uploadBundleToR2(bundle),
-      uploadMetaToR2(bundle.kamiMetadata),
+      uploadMetaToR2(slimMeta),
     ]);
     
     console.log('\n' + '='.repeat(60));
