@@ -161,10 +161,10 @@ async function updateLiveStatus() {
 let imagesData = {};
 let traitsData = {};
 let kamiStatsData = {};
-let kamiTraitIndexData = {}; // { [entityId]: { name, rarity, affinity?, stats? } } — the global trait catalogue
-let traitNameToIndex = {};   // { [traitName]: entityId } — reverse lookup built after load
-let kamiInfoData = {};     // { [kamiIndex]: { name, level, stats: { harmony, health, power, violence } } }
-let kamiAccountsData = {}; // { [accountIndex]: { name, ownerAddress, kamis: [indices] } }
+let kamiTraitIndexData = {};
+let traitNameToIndex = {};
+let kamiInfoData = {};
+let kamiAccountsData = {};
 let kamiToAccount = {};    // { [kamiIndex]: { accountIndex, accountName } }  — built after load
 let affinityData = {};
 let metadataInfo = {};
@@ -1475,11 +1475,63 @@ let kamiOverlayPage = 0;
 
 function applyKamiPage(page) {
     kamiOverlayPage = page;
-    document.querySelectorAll('.nft-card').forEach(c => {
-        c.classList.remove('swap-active', 'swap-active-2');
-        if (page === 1) c.classList.add('swap-active');
-        else if (page === 2) c.classList.add('swap-active-2');
-    });
+    const cards = Array.from(document.querySelectorAll('.nft-card'));
+    const BATCH = 20;
+    let i = 0;
+    function nextBatch() {
+        const end = Math.min(i + BATCH, cards.length);
+        for (; i < end; i++) {
+            const slot = cards[i].querySelector('.kami-overlay-slot');
+            if (slot) slot.innerHTML = getOverlaySlotHTML(cards[i].dataset.nftId, page);
+        }
+        if (i < cards.length) requestAnimationFrame(nextBatch);
+    }
+    requestAnimationFrame(nextBatch);
+}
+function getOverlaySlotHTML(id, page) {
+    if (page === 1) {
+        const stats = kamiStatsData[id];
+        if (!stats) return '';
+        return `
+        <div class="kami-stats">
+            <div class="stat-row one">
+                <div class="stat-item health"><div class="stat-value">${stats.stats.health}</div></div>
+                <div class="stat-item power"><div class="stat-value">${stats.stats.power}</div></div>
+            </div>
+            <div class="stat-row">
+                <div class="stat-item violence"><div class="stat-value">${stats.stats.violence}</div></div>
+                <div class="stat-item harmony"><div class="stat-value">${stats.stats.harmony}</div></div>
+            </div>
+        </div>`;
+    }
+    if (page === 2) {
+        const _kamiInfo    = kamiInfoData[id]    || {};
+        const _kamiAccount = kamiToAccount[id]   || {};
+        const _kamiName    = _kamiInfo.name      || `Kamigotchi ${id}`;
+        const _ownerName   = _kamiAccount.accountName  || '—';
+        const _accountIdx  = _kamiAccount.accountIndex != null ? `#${_kamiAccount.accountIndex}` : '—';
+        const _level       = _kamiInfo.level     != null ? _kamiInfo.level : '—';
+        const _s = _kamiInfo.stats || [];
+        const isSacrificed = sacrificedNFTs.has(String(id));
+        const sacrificeUnix = isSacrificed ? sacrificedNFTs.get(String(id)) : null;
+        const ripDateHTML = isSacrificed && sacrificeUnix
+            ? `<div class="last">r.i.p: ${new Date(sacrificeUnix * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</div>`
+            : '';
+        return `
+        <div class="kami-info">
+            <div>${_kamiName}</div><div>Owner: ${_ownerName}</div><div>(Id: ${_accountIdx})</div><div>Level: ${_level}</div><div${isSacrificed ? '' : ' class="last"'}>stats: ${_s[0]}/${_s[1]}/${_s[2]}/${_s[3]}</div>${ripDateHTML}
+        </div>`;
+    }
+    // page === 0: traits
+    const traits = traitsData[id];
+    if (!traits) return '';
+    const traitsHTML = Object.entries(traits)
+        .map(([key, traitData]) => `
+            <div class="trait">
+                <p>${key.charAt(0).toUpperCase() + key.slice(1)}: ${getTraitName(traitData)}</p>
+            </div>`)
+        .join('');
+    return `<div class="kami-traits">${traitsHTML}</div>`;
 }
 
 function displayNFT(id, showCloseButton = false) {
@@ -1543,46 +1595,12 @@ function displayNFT(id, showCloseButton = false) {
             </div>`)
         .join('');
 
-    const kamiStatsHTML = stats ? `
-        <div class="kami-stats">
-            <div class="stat-row one">
-                <div class="stat-item health"><div class="stat-value">${stats.stats.health}</div></div>
-                <div class="stat-item power"><div class="stat-value">${stats.stats.power}</div></div>
-            </div>
-            <div class="stat-row">
-                <div class="stat-item violence"><div class="stat-value">${stats.stats.violence}</div></div>
-                <div class="stat-item harmony"><div class="stat-value">${stats.stats.harmony}</div></div>
-            </div>
-        </div>` : '';
-
-    const _kamiInfo    = kamiInfoData[id]    || {};
-    const _kamiAccount = kamiToAccount[id]   || {};
-    const _kamiName    = _kamiInfo.name      || `Kamigotchi ${id}`;
-    const _ownerName   = _kamiAccount.accountName  || '—';
-    const _accountIdx  = _kamiAccount.accountIndex != null ? `#${_kamiAccount.accountIndex}` : '—';
-    const _level       = _kamiInfo.level     != null ? _kamiInfo.level : '—';
-    const _s = _kamiInfo.stats || [];
-    const _hea = _s[0];  // health
-    const _pow = _s[1];  // power
-    const _vio = _s[2];  // violence
-    const _har = _s[3];  // harmony
-
-
-
-    const kamiInfoHTML = `
-        <div class="kami-info">
-            <div>${_kamiName}</div><div>Owner: ${_ownerName}</div><div>(Id: ${_accountIdx})</div><div>Level: ${_level}</div><div${isSacrificed ? '' : ' class="last"'}>stats: ${_hea}/${_pow}/${_vio}/${_har}</div>${ripDateHTML}
-        </div>`;
-
-    const kamiTraitsHTML = `
-        <div class="kami-traits">
-            ${traitsHTML}
-        </div>`;
-
     const kamiOverlayControlsHTML = `
         <div class="kami-overlay-controls">
             <button class="kami-overlay-arrow" title="Switch page"></button>
         </div>`;
+
+    const kamiOverlaySlotHTML = `<div class="kami-overlay-slot">${getOverlaySlotHTML(id, kamiOverlayPage)}</div>`;
     
 
 
@@ -1607,9 +1625,7 @@ function displayNFT(id, showCloseButton = false) {
         card.innerHTML = `
             ${closeButtonHTML}
             ${rankBadge}
-            ${kamiTraitsHTML}
-            ${kamiInfoHTML}
-            ${kamiStatsHTML}
+            ${kamiOverlaySlotHTML}
             ${kamiOverlayControlsHTML}
             <div class="nft-card-content">
                 ${imageBlock}
@@ -1619,9 +1635,7 @@ function displayNFT(id, showCloseButton = false) {
         card.innerHTML = `
             ${closeButtonHTML}
             ${rankBadge}
-            ${kamiTraitsHTML}
-            ${kamiInfoHTML}
-            ${kamiStatsHTML}
+            ${kamiOverlaySlotHTML}
             ${kamiOverlayControlsHTML}
             <div class="nft-card-content">
                 ${imageBlock}
@@ -1635,10 +1649,8 @@ function displayNFT(id, showCloseButton = false) {
         applyKamiPage((kamiOverlayPage + 1) % 3);
     });
 
-    // kami-traits always visible by default; sync to current global page
+    // slot already renders the correct page; just mark card active
     card.classList.add('is-active');
-    if (kamiOverlayPage === 1) card.classList.add('swap-active');
-    else if (kamiOverlayPage === 2) card.classList.add('swap-active-2');
 
     return card;
 }
@@ -1868,6 +1880,7 @@ async function loadKamiInfoData(v) {
             });
         });
         console.log(`📖 Loaded info for ${Object.keys(kamiInfoData).length} Kamigotchi, ${Object.keys(kamiAccountsData).length} accounts`);
+        kamiAccountsData = {}; // free memory — reverse lookup is all we need going forward
     } catch (err) {}
 }
 
@@ -1959,7 +1972,6 @@ async function fetchAndSplitBundle(v) {
 const BASE_STATS = { harmony: 10, health: 50, power: 10, violence: 10, slots: 0 };
 
 function buildTraitNameToIndex() {
-    // Build reverse map: traitName → entity entry from kamiTraitIndexData
     const lookup = {};
     Object.values(kamiTraitIndexData).forEach(entry => {
         lookup[entry.name] = entry;
@@ -2258,7 +2270,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.addEventListener('click', (e) => {
         // Cards are dismissed only via their close button, not outside clicks
-
         const filterControls = document.getElementById('filterControls');
         if (filterControls && !filterControls.contains(e.target)) {
             document.querySelectorAll('.filter-group').forEach(group => group.style.display = 'none');
