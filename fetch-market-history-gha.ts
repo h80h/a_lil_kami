@@ -398,7 +398,7 @@ async function main() {
     console.log("=".repeat(60));
 
     // Start Feed stream immediately — deadline = 4.5 min
-    const RUN_DEADLINE_MS = Date.now() + 4.5 * 60 * 1000;
+    const RUN_DEADLINE_MS = Date.now() + 4 * 60 * 1000;
     const feedTradesPromise = fetchFeedTrades(RUN_DEADLINE_MS);
 
     // --------------------------------------------------------
