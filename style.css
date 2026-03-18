@@ -608,6 +608,10 @@ button {
   height: 12px;
 }
 
+.clone-badge {
+  cursor: help;
+}
+
 .new-badge,
 .clone-badge {
   background: linear-gradient(135deg, #e8a6ee 0%, #bc63d2 100%);
@@ -1007,6 +1011,7 @@ button {
     font-size: 20px;
     line-height: 1;
     z-index: 5;
+    cursor: help;
 }
 
 .listing-badge {
