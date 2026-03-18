@@ -342,12 +342,49 @@ async function fetchBackfillBatch(
       } else {
         let newForAccount = 0;
         for (const order of response.Orders) {
-          if (!order.IsComplete || order.IsCanceled) continue;
+          if (order.IsCanceled) continue;
           if (!order.Listing && !order.Bid) continue;
+
+          // Partial-fill bid: BidType=1, IsComplete=false, but has BoughtKamiIndexes
+          const boughtIndexes: number[] = order.Bid?.BoughtKamiIndexes ?? [];
+          const isPartialBid =
+            !order.IsComplete &&
+            order.Bid?.BidType === 1 &&
+            boughtIndexes.length > 0;
+
+          if (!order.IsComplete && !isPartialBid) continue;
 
           const ts   = Number(order.Timestamp);
           const tsMs = ts < 10_000_000_000 ? ts * 1000 : ts;
           if (tsMs < cutoffMs) continue;
+
+          // For partial-fill bids, emit one record per bought kami index
+          if (isPartialBid) {
+            const price = Number(BigInt(order.Bid!.Price ?? "0")) / 1e18;
+            const buyer = order.Bid!.BuyerAccountID ?? "";
+            for (const ki of boughtIndexes) {
+              const subId   = `${order.OrderID}-${ki}-${order.Timestamp}`;
+              const existing = existingHistoryMap.get(subId);
+              const isNew    = !existing;
+              const record: SaleRecord = {
+                orderId:  subId,
+                kamiId:   Number(ki),
+                price,
+                seller:   "",
+                buyer,
+                type:     "bid",
+                time:     new Date(tsMs).toISOString(),
+                ...(existing?.tradeTime ? { tradeTime: existing.tradeTime } : {}),
+                rawTime:  String(order.Timestamp),
+              };
+              newRecords.push(record);
+              if (isNew) { newForAccount++; totalNewSales++; }
+            }
+            continue;
+          }
+
+          // Skip fully-completed ANY bids already captured per-kami as partial fills
+          if (order.Bid?.BidType === 1 && (order.Bid.BoughtKamiIndexes?.length ?? 0) > 0) continue;
 
           const kamiId = Number(order.Listing?.KamiIndex ?? order.Bid?.KamiIndex ?? 0);
           const price  = Number(BigInt(order.Listing?.Price ?? order.Bid?.Price ?? "0")) / 1e18;
