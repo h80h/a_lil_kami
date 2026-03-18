@@ -126,7 +126,8 @@ button {
 #affinityFilterToggle,
 #minmaxFilterToggle,
 #listingFilterBtn,
-.listing-sort-btn {
+.listing-sort-btn,
+#kami-trade-history-btn {
   width: 60px;
   height: 37px;
   color: white;
@@ -211,7 +212,8 @@ button {
 #affinityFilterToggle,
 #minmaxFilterToggle,
 #listingFilterBtn,
-.listing-sort-btn {
+.listing-sort-btn,
+#kami-trade-history-btn {
   background: #93bbbf;
   box-shadow: 1px 5px 0 0 #516668;
   font-size: 9px;
@@ -223,7 +225,8 @@ button {
 #affinityFilterToggle:hover,
 #minmaxFilterToggle:hover,
 #listingFilterBtn:hover,
-.listing-sort-btn:hover {
+.listing-sort-btn:hover,
+#kami-trade-history-btn:hover {
   box-shadow: 1px 3px 0 0 #516668;
 }
 
@@ -233,7 +236,8 @@ button {
 #affinityFilterToggle.active,
 #minmaxFilterToggle.active,
 #listingFilterBtn.active,
-.listing-sort-btn.active {
+.listing-sort-btn.active,
+#kami-trade-history-btn.active {
   background: #55a9b0;
   box-shadow: 1px 3px 0 0 #34656a;
   text-shadow: #eeeeee 0 -1px 4px, rgb(42, 135, 166) 0 1px 1px;
@@ -251,6 +255,7 @@ button {
 .affinity-btn,
 #cloneFilterBtn,
 .listing-sort-btn,
+#kami-trade-history-btn,
 #clearBtn {
   flex: 1;
   margin-bottom: 10px;
@@ -260,7 +265,8 @@ button {
 .sort-btn,
 .affinity-btn,
 #cloneFilterBtn,
-.listing-sort-btn {
+.listing-sort-btn,
+#kami-trade-history-btn {
   transition: all 0.1s ease;
 }
 
@@ -285,7 +291,10 @@ button {
 #listingFilterBtn.active:hover,
 .listing-sort-btn:hover,
 .listing-sort-btn.active,
-.listing-sort-btn.active:hover {
+.listing-sort-btn.active:hover,
+#kami-trade-history-btn:hover,
+#kami-trade-history-btn.active,
+#kami-trade-history-btn.active:hover {
   transform: translateY(2px);
 }
 
@@ -539,7 +548,6 @@ button {
   box-shadow: 0px 2px 2px rgba(0,0,0,0.2);
   overflow: hidden;
   height: 243px;
-  cursor: help;
   user-select: none;
   -webkit-user-select: none;
   width: 100%;
@@ -547,11 +555,11 @@ button {
 }
 
 .nft-card-content {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    width: 100%;
-  }
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+}
 
 /* Rank and stat color container */
 .rank-stat-container {
@@ -574,6 +582,7 @@ button {
   width: 52px;
   background: rgba(255, 240, 31, 0.3);
   padding: 1px 0 0 5px;
+  cursor: help;
 }
 .stat-color-box {
   width: 24px;
@@ -875,7 +884,6 @@ button {
   font-size: 8px;
   padding: 1px 8px;
   overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .kami-traits div,
@@ -1002,10 +1010,11 @@ button {
 }
 
 .listing-badge {
-    position: absolute;
-    bottom: 3px;
-    right: 5px;
-    z-index: 5;
+  position: absolute;
+  bottom: 3px;
+  right: 5px;
+  z-index: 5;
+  cursor: help;
 }
 
 .new-listing-icon {
@@ -1017,6 +1026,7 @@ button {
   z-index: 6;
   text-shadow: 1px 1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, -1px -1px 0 #fff, 1px 0px 0 #fff, 0px 1px 0 #fff, -1px 0px 0 #fff, 0px -1px 0 #fff;
   transform: skewY(-12deg);
+  cursor: help;
 }
 
 .stat-control {
@@ -1175,6 +1185,127 @@ button {
   margin-top: 10px;
 }
 
+
+/* trade-history styles */
+.kami-history {
+  width: 100%;
+  background: #fff;
+  box-sizing: border-box;
+  height: 76px;
+  font-size: 8px;
+  padding: 3px 8px 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  pointer-events: none;
+}
+.kami-history-rows {
+  flex: 1;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-bottom: 14px;
+}
+.kami-history-rows::-webkit-scrollbar { display: none; }
+
+.kami-history-scroll-btns {
+  display: none;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  padding: 1px 0 3px;
+  pointer-events: none;
+  background: #fff;
+}
+.kami-history-visible .kami-history-scroll-btns {
+  display: flex;
+}
+.kami-history-header {
+  color: #888;
+  margin-bottom: 3px;
+}
+.kami-history-empty {
+  color: #aaa;
+  margin-top: 6px;
+  text-align: center;
+}
+.kami-history-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-bottom: 2px;
+}
+.kami-history-row-top {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.kami-history-row-bottom {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  color: #999;
+  flex-wrap: wrap;
+}
+.kami-history-seller {
+  width: 100%;
+}
+.kami-history-price {
+  font-weight: bold;
+  color: #333;
+}
+.kami-history-row-new .kami-history-price {
+  color: #e8873a;
+}
+.kami-history-date {
+  color: #666;
+}
+.kami-history-type {
+  font-size: 7px;
+  padding: 2px 3px;
+  margin-bottom: 1px;
+  border-radius: 2px;
+}
+
+.kami-history-type.listing { background: #fdebd8; color: #eeb272;}
+.kami-history-type.bid     { background: #E0EEFF; color: rgb(164, 178, 195);}
+.kami-history-seller,
+.kami-history-buyer {
+  font-size: 7px;
+  color: #999;
+}
+.kami-history-arrow {
+  font-size: 7px;
+  color: #bbb;
+}
+
+/* △ ▽ scroll buttons inside .kami-history-scroll-btns */
+.kami-history-up,
+.kami-history-down {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #aaa;
+  font-size: 11px;
+  padding: 0 4px;
+  line-height: 1;
+  flex-shrink: 0;
+  pointer-events: all;
+}
+.kami-history-up:hover,
+.kami-history-down:hover {
+  color: #333;
+}
+
+
+
 @media (max-width: 834px){
   .kami-traits div,
   .kami-info div {
@@ -1198,6 +1329,7 @@ button {
   .kami-traits,
   .kami-stats,
   .kami-info,
+  .kami-history,
   .kami-overlay-controls {
     height: 78px;
   }
@@ -1223,7 +1355,8 @@ button {
   }
 
   .kami-traits,
-  .kami-info {
+  .kami-info,
+  .kami-history {
     font-size: 7.5px;
   }
 
@@ -1239,6 +1372,7 @@ button {
   .kami-traits,
   .kami-stats,
   .kami-info,
+  .kami-history,
   .kami-overlay-controls {
     height: 72px;
   }
@@ -1285,6 +1419,7 @@ button {
   .kami-traits,
   .kami-stats,
   .kami-info,
+  .kami-history,
   .kami-overlay-controls {
     height: 72px;
   }
@@ -1324,9 +1459,17 @@ button {
   }
 
   .kami-traits,
-  .kami-info {
+  .kami-info,
+  .kami-history {
     padding: 1px 10px;
     font-size: 10px;
+  }
+
+  .kami-history-seller,
+  .kami-history-buyer,
+  .kami-history-arrow,
+  .kami-history-type {
+    font-size: 9px;
   }
 
   .kami-stats {
@@ -1338,6 +1481,7 @@ button {
   .kami-traits,
   .kami-stats,
   .kami-info,
+  .kami-history,
   .kami-overlay-controls {
     height: 85px;
   }
@@ -1458,6 +1602,7 @@ button {
   .kami-stats,
   .kami-info,
   .kami-traits,
+  .kami-history,
   .kami-overlay-controls {
     height: 127px;
     left: 170px;
@@ -1475,8 +1620,16 @@ button {
   }
 
   .kami-info,
-  .kami-traits {
+  .kami-traits,
+  .kami-history {
     font-size: 11px;
+  }
+
+  .kami-history-seller,
+  .kami-history-buyer,
+  .kami-history-arrow,
+  .kami-history-type {
+    font-size: 10px;
   }
 
   .kami-stats {
@@ -1571,6 +1724,7 @@ button {
   .kami-stats,
   .kami-info,
   .kami-traits,
+  .kami-history,
   .kami-overlay-controls {
     height: 100px;
     left: 146px;
@@ -1585,11 +1739,19 @@ button {
   }
 
   .kami-info,
-  .kami-traits {
+  .kami-traits,
+  .kami-history {
     font-size: 9px;
     padding: 1px 2px;
   }
   
+  .kami-history-seller,
+  .kami-history-buyer,
+  .kami-history-arrow,
+  .kami-history-type {
+    font-size: 8px;
+  }
+
   .kami-stats {
     font-size: 11px;
     padding: 1px 2px;
@@ -1675,6 +1837,7 @@ button {
   .kami-overlay-slot,
   .kami-stats,
   .kami-info,
+  .kami-history,
   .kami-traits,
   .kami-overlay-controls {
     height: 90px;
@@ -1691,10 +1854,18 @@ button {
   }
 
   .kami-info,
-  .kami-traits {
+  .kami-traits,
+  .kami-history {
     font-size: 7.5px;
   }
   
+  .kami-history-seller,
+  .kami-history-buyer,
+  .kami-history-arrow,
+  .kami-history-type {
+    font-size: 6.5px;
+  }
+
   .kami-traits div,
   .kami-info div {
     margin-bottom: 2px;

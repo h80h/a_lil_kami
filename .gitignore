@@ -1,7 +1,7 @@
 .vercel
 node_modules/
 test-extract-kamigotchi-gha.js
-test-fetch-listings-gha.js
+test-fetch-market-history-gha.js
 
 # Environment variables
 .env

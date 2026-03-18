@@ -1625,8 +1625,8 @@ function displayNFT(id, showCloseButton = false) {
 
     card.querySelector('.kami-overlay-arrow').addEventListener('click', (e) => {
         e.stopPropagation();
-        // Cycle all cards together: traits(0) → stats(1) → info(2) → traits ...
-        applyKamiPage((kamiOverlayPage + 1) % 3);
+        // Cycle all cards together: traits(0) → stats(1) → info(2) → history(3) → traits ...
+        applyKamiPage((kamiOverlayPage + 1) % 4);
     });
 
     // slot already renders the correct page; just mark card active

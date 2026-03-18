@@ -5,10 +5,14 @@ on:
     types: [ping_from_cronjob]  # This "type" must match the JSON body later
   workflow_dispatch:            # Allows you to also trigger it manually for testing
 
-# Logic A: Prevents multiple runs from interfering with each other
+# Prevents multiple runs from interfering with each other
 concurrency:
   group: extract-kamigotchi
   cancel-in-progress: false
+
+# Minimal permissions — jobs only need to read repo contents
+permissions:
+  contents: read
 
 jobs:
   # ─── Job 1: Heavy extraction via Playwright ───────────────────────────────
@@ -29,7 +33,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Logic B: Cache Playwright browsers to speed up 5-minute intervals
+      # Cache Playwright browsers to speed up 5-minute intervals
       - name: Cache Playwright browsers
         id: playwright-cache
         uses: actions/cache@v4
@@ -49,6 +53,7 @@ jobs:
 
       - name: Run the extraction script
         id: extraction
+        # Record START_TIME before the script so END_TIME is always set even on failure
         run: |
           echo "START_TIME=$(date +%s)" >> $GITHUB_ENV
           node extract-kamigotchi-gha.js
@@ -61,26 +66,22 @@ jobs:
 
       - name: Final Performance Summary
         if: always()
+        # Fix: guard END_TIME in case extraction step was killed before writing it
         run: |
+          END_TIME=${END_TIME:-$(date +%s)}
           DURATION=$(( END_TIME - START_TIME ))
           echo "=========================================="
           echo "📊 PERFORMANCE SUMMARY"
           echo "Extraction & Upload took: $DURATION seconds"
           echo "=========================================="
 
-      - name: Save logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: extraction-logs-${{ github.run_number }}
-          path: extraction.log
-          # Reduced to 1 day to prevent UI clutter at 5-min intervals
-          retention-days: 1
 
-  # ─── Job 2: Fast listings fetch via gRPC (runs in parallel) ───────────────
-  fetch-listings:
+  # ─── Job 2: Listings + feed stream + backfill (runs in parallel) ──────────
+  fetch-market-history:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    # Fix: raised from 6 → 10 min; script has a 4.5-min internal deadline,
+    # plus npm ci + Node setup + 4 R2 uploads need headroom
+    timeout-minutes: 10
 
     steps:
       - name: Get the code
@@ -95,8 +96,23 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run the listings fetch script
-        run: npx tsx fetch-listings-gha.ts
+      # Fix: cache proto.ts so it isn't re-downloaded from GitHub on every 5-min run
+      - name: Cache proto.ts
+        id: proto-cache
+        uses: actions/cache@v4
+        with:
+          path: proto.ts
+          key: proto-ts-${{ hashFiles('fetch-market-history-gha.ts') }}
+
+      - name: Download proto.ts (if not cached)
+        if: steps.proto-cache.outputs.cache-hit != 'true'
+        run: |
+          curl -fsSL -o proto.ts \
+            https://raw.githubusercontent.com/Asphodel-OS/kamigotchi/main/packages/client/src/clients/kamiden/proto.ts
+          echo "✅ proto.ts downloaded"
+
+      - name: Run the fetch-market-history-gha.ts script
+        run: npx tsx fetch-market-history-gha.ts
         env:
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
@@ -106,16 +122,23 @@ jobs:
   # ─── Job 3: Purge Cloudflare cache once BOTH jobs succeed ─────────────────
   purge-cache:
     runs-on: ubuntu-latest
-    needs: [extract-and-upload, fetch-listings]
+    needs: [extract-and-upload, fetch-market-history]
 
     steps:
       - name: Purge Cloudflare Cache
         id: purge
+        # Fix: added kamiMeta.json (uploaded by Job 1) to the purge list
         run: |
           RESPONSE=$(curl -s -X POST "https://api.cloudflare.com/client/v4/zones/${{ secrets.CLOUDFLARE_ZONE_ID }}/purge_cache" \
             -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_TOKEN }}" \
             -H "Content-Type: application/json" \
-            --data '{"files":["https://data.kami.h80h.xyz/kamiBundle.json","https://data.kami.h80h.xyz/kamiListings.json"]}')
+            --data '{"files":[
+              "https://data.kami.h80h.xyz/kamiBundle.json",
+              "https://data.kami.h80h.xyz/kamiMeta.json",
+              "https://data.kami.h80h.xyz/kamiListings.json",
+              "https://data.kami.h80h.xyz/kamiMarketHistory.json",
+              "https://data.kami.h80h.xyz/kamiMarketHistoryMeta.json"
+            ]}')
 
           echo "Cloudflare Response: $RESPONSE"
 
