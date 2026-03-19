@@ -153,7 +153,7 @@ async function updateLiveStatus() {
 }
 
 // ============================================================
-// GLOBAL STATE
+// GLOBAL STATE.
 // ============================================================
 
 let imagesData = {};
@@ -798,6 +798,7 @@ function setupCloneFilterButton() {
         isShowingClonesOnly = !isShowingClonesOnly;
         cloneBtn.classList.toggle('active', isShowingClonesOnly);
 
+        if (window.__tradeHistoryActive)   return;
         if (isShowingClonesOnly)           preserveScroll(() => { filterClones(); updateURL(); });
         else if (isShowingListingOnly)     preserveScroll(() => { filterListing(); updateURL(); });
         else                               restoreViewAfterToggle();
@@ -1003,6 +1004,10 @@ let _statFilterTimer = null;
 function triggerStatFilter() {
     clearTimeout(_statFilterTimer);
     _statFilterTimer = setTimeout(() => {
+        if (window.__tradeHistoryActive && typeof window._filterTradeHistory === 'function') {
+            window._filterTradeHistory();
+            return;
+        }
         preserveScroll(() => {
             if (isShowingClonesOnly && !(isShowingListingOnly && currentListingSortOrder)) filterClones();
             else if (isShowingListingOnly)              filterListing();
@@ -1283,7 +1288,7 @@ function filterListing() {
         ? `<div class="filter-summary-buttons-container" style="display:flex;flex-wrap:wrap;gap:5px;margin:10px;">${buildTraitSummaryButtonsHTML(selectedTraits)}</div>`
         : '';
 
-    appendCountHeader(resultsDiv, `Found ${listingIds.length} listing Kamigotchi`, filterSummaryHTML);
+    appendCountHeader(resultsDiv, `Found ${listingIds.length} listing Kamigotchi${getAffinityNotation()}`, filterSummaryHTML);
 
     if (filteredNFTIds.length === 0) {
         const noResultsDiv = document.createElement('div');
@@ -1452,7 +1457,7 @@ function getStatColorClass() {
     return statSorts.includes(currentSortOrder) ? currentSortOrder : '';
 }
 
-// Global overlay page state: 0 = traits, 1 = stats, 2 = info
+// Global overlay page state: 0 = traits, 1 = stats, 2 = info.
 let kamiOverlayPage = 0;
 
 function applyKamiPage(page) {
@@ -1733,7 +1738,7 @@ function createCountHeader(count, title) {
 
 
 // ============================================================
-// SELECTED IDs (COMPARISON AREA)
+// SELECTED IDs (COMPARISON AREA).
 // ============================================================
 
 function updateSelectedIDsDisplay() {
@@ -1793,6 +1798,84 @@ function removeSelectedID(id) {
     updateURL();
 }
 window.removeSelectedID = removeSelectedID;
+
+// Exposed for trade-history.js: lets external scripts set the filtered list and trigger a render
+window.setFilteredNFTIds = function(ids) {
+    filteredNFTIds = ids;
+    isFiltering = true;
+    currentLoadIndex = 0;
+};
+window.filterListing = filterListing;
+window.loadInitialNFTs = loadInitialNFTs;
+window.loadMoreNFTs = loadMoreNFTs;
+window.setupInfiniteScroll = setupInfiniteScroll;
+window.updateURL = updateURL;
+window.handlePopState = handlePopState;
+window.setIsShowingListingOnly = function(val) { isShowingListingOnly = val; };
+Object.defineProperty(window, 'traitsData', { get: () => traitsData });
+
+// Patch updateURL: when trade history is active, always keep tradehistory=true in the URL
+// so co-filters (clones, traits, affinity, minmax) don't silently drop it.
+const _origUpdateURL = updateURL;
+updateURL = function(replace) {
+    _origUpdateURL(replace);
+    if (window.__tradeHistoryActive) {
+        const params = new URLSearchParams(window.location.search);
+        params.set('tradehistory', 'true');
+        const newUrl = `${window.location.pathname}?${params.toString()}${window.location.hash}`;
+        history.replaceState(history.state, '', newUrl);
+    }
+};
+
+// Resets only sort-order and listing-sort state without triggering a re-render.
+// Called by trade-history.js before it takes over the results area.
+// Traits, affinity, min-max, and clone filters are intentionally left intact
+// so filterTradeHistory can apply them on top of the history ID list.
+window.resetAllFilters = function() {
+    // Deactivate listing-sort and regular sort buttons only
+    isShowingListingOnly = false;
+    currentListingSortOrder = null;
+    document.querySelectorAll('.listing-sort-btn').forEach(b => b.classList.remove('active'));
+    // listingFilterBtn stays visually active — trade history lives inside the listing section
+    document.getElementById('listingFilterBtn')?.classList.add('active');
+    const listingSortSection = document.querySelector('.listing-sort-section');
+    if (listingSortSection) listingSortSection.style.display = 'block';
+
+    // Remove active from all sort buttons (trade history owns the view)
+    currentSortOrder = 'latest';
+    document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+};
+
+// Filter helpers exposed for trade-history.js
+window.getSelectedTraitsFromCheckboxes = getSelectedTraitsFromCheckboxes;
+window.matchesSelectedTraits = matchesSelectedTraits;
+window.hasActiveStatFilters = hasActiveStatFilters;
+window.passesStatMinMaxFilters = passesStatMinMaxFilters;
+window.appendCountHeader = appendCountHeader;
+window.buildTraitSummaryButtonsHTML = buildTraitSummaryButtonsHTML;
+window.getAffinityNotation = getAffinityNotation;
+Object.defineProperty(window, 'selectedBodyAffinities', { get: () => selectedBodyAffinities });
+Object.defineProperty(window, 'selectedHandAffinities', { get: () => selectedHandAffinities });
+Object.defineProperty(window, 'affinityData',            { get: () => affinityData });
+Object.defineProperty(window, 'traitSignatures',         { get: () => traitSignatures });
+Object.defineProperty(window, 'isShowingClonesOnly',     { get: () => isShowingClonesOnly });
+
+// Patched updateSelectedTraitsDisplay: when trade history owns the view, re-run
+// filterTradeHistory instead of script.js's own re-render (which doesn't know about history).
+const _origUpdateSelectedTraitsDisplay = updateSelectedTraitsDisplay;
+updateSelectedTraitsDisplay = function(forceUpdate) {
+    if (window.__tradeHistoryActive) {
+        validateAffinitiesAgainstCheckboxes();
+        updateAffinityButtonStates();
+        setTimeout(() => {
+            if (window.__tradeHistoryActive && typeof window._filterTradeHistory === 'function') {
+                window._filterTradeHistory();
+            }
+        }, 0);
+        return;
+    }
+    _origUpdateSelectedTraitsDisplay(forceUpdate);
+};
 
 function clearAllSelectedIDs() {
     selectedIDs.clear();
@@ -2036,12 +2119,28 @@ async function loadData() {
         updateSelectedIDsDisplay();
         allNFTIds = getSortedNFTIds();
 
-        if (initialFilterActive)       filterByTraits();
+        const _urlParamsInit = new URLSearchParams(window.location.search);
+        if (_urlParamsInit.get('tradehistory') === 'true') {
+            // Set flag early so the updateURL patch below preserves tradehistory=true in URL.
+            // Also prime listingFilterBtn + listing-sort-section as trade history lives there.
+            window.__tradeHistoryActive = true;
+            document.getElementById('listingFilterBtn')?.classList.add('active');
+            const _lss = document.querySelector('.listing-sort-section');
+            if (_lss) _lss.style.display = 'block';
+        } else if (initialFilterActive)       filterByTraits();
         else if (isShowingClonesOnly)  filterClones();
         else if (isShowingListingOnly) filterListing();
         else                           loadInitialNFTs();
 
         updateURL(true);
+
+        // Signal kami data is fully ready. trade-history.js hooks __onKamiDataReady so it
+        // can safely call filterTradeHistory without racing against loadData.
+        window.__kamiDataReady = true;
+        if (typeof window.__onKamiDataReady === 'function') {
+            window.__onKamiDataReady();
+            window.__onKamiDataReady = null;
+        }
 
         const now = new Date();
         const label = `Last updated:\n${now.toLocaleDateString([], { month: 'short', day: 'numeric' })} ${now.toLocaleTimeString()}`;
@@ -2083,6 +2182,7 @@ async function refreshData() {
         const currentListingSort    = currentListingSortOrder;
         const wasShowingClones      = isShowingClonesOnly;
         const wasShowingListing     = isShowingListingOnly;
+        const wasTradeHistory       = !!window.__tradeHistoryActive;
 
         const v = Date.now();
         await Promise.all([
@@ -2150,22 +2250,29 @@ async function refreshData() {
         if (minmaxToggle)  minmaxToggle.classList.toggle('active', minmaxWasVisible);
 
         document.getElementById('cloneFilterBtn')?.classList.toggle('active', isShowingClonesOnly);
-        document.getElementById('listingFilterBtn')?.classList.toggle('active', isShowingListingOnly);
+        document.getElementById('listingFilterBtn')?.classList.toggle('active', isShowingListingOnly || wasTradeHistory);
 
         const listingSortSectionRefresh = document.querySelector('.listing-sort-section');
-        if (listingSortSectionRefresh) listingSortSectionRefresh.style.display = isShowingListingOnly ? 'block' : 'none';
+        if (listingSortSectionRefresh) listingSortSectionRefresh.style.display = (isShowingListingOnly || wasTradeHistory) ? 'block' : 'none';
         document.querySelectorAll('.listing-sort-btn').forEach(b => b.classList.remove('active'));
         if (isShowingListingOnly && currentListingSortOrder) {
             document.querySelector(`.listing-sort-btn[listing-data-sort="${currentListingSortOrder}"]`)?.classList.add('active');
         }
 
         const hasAnyFilter = currentFilters || currentAffinityString || currentMinMaxString;
-        preserveScroll(() => {
-            if (isShowingClonesOnly && !(isShowingListingOnly && currentListingSortOrder)) filterClones();
-            else if (isShowingListingOnly) filterListing();
-            else if (hasAnyFilter)         filterByTraits();
-            else                           { isFiltering = false; loadInitialNFTs(); }
-        });
+        if (wasTradeHistory) {
+            document.getElementById('kami-trade-history-btn')?.classList.add('active');
+            if (typeof window._filterTradeHistory === 'function') {
+                preserveScroll(() => window._filterTradeHistory());
+            }
+        } else {
+            preserveScroll(() => {
+                if (isShowingClonesOnly && !(isShowingListingOnly && currentListingSortOrder)) filterClones();
+                else if (isShowingListingOnly) filterListing();
+                else if (hasAnyFilter)         filterByTraits();
+                else                           { isFiltering = false; loadInitialNFTs(); }
+            });
+        }
 
         updateURL(true);
 
