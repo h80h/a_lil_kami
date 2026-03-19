@@ -317,8 +317,7 @@ async function fetchFeedTrades(deadlineMs: number): Promise<SaleRecord[]> {
 
 async function fetchBackfillBatch(
   batch: KamiAccount[],
-  existingHistoryMap: Map<string, SaleRecord>,
-  cutoffMs: number
+  existingHistoryMap: Map<string, SaleRecord>
 ): Promise<{ newRecords: SaleRecord[]; totalNewSales: number }> {
   const client = await getClient();
   const newRecords: SaleRecord[] = [];
@@ -356,7 +355,6 @@ async function fetchBackfillBatch(
 
           const ts   = Number(order.Timestamp);
           const tsMs = ts < 10_000_000_000 ? ts * 1000 : ts;
-          if (tsMs < cutoffMs) continue;
 
           // For partial-fill bids, emit one record per bought kami index
           if (isPartialBid) {
@@ -472,15 +470,10 @@ async function main() {
     console.log(`\n🔢 Backfill: accounts ${startIndex + 1}–${endIndex} of ${totalAccounts} (${batch.length} accounts)`);
 
     // Seed historyMap from existing R2 data
-    const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
-    const cutoffMs       = Date.now() - THIRTY_DAYS_MS;
-
+    // Seed historyMap from existing R2 data (all-time, no cutoff)
     const historyMap = new Map<string, SaleRecord>();
     for (const record of prevHistory) {
-      const tsMs = Number(record.rawTime) < 10_000_000_000
-        ? Number(record.rawTime) * 1000
-        : Number(record.rawTime);
-      if (tsMs >= cutoffMs) historyMap.set(record.orderId, record);
+      historyMap.set(record.orderId, record);
     }
 
     // --------------------------------------------------------
@@ -488,7 +481,7 @@ async function main() {
     // --------------------------------------------------------
     const [feedTrades, { newRecords: backfillRecords, totalNewSales }] = await Promise.all([
       feedTradesPromise,
-      fetchBackfillBatch(batch, historyMap, cutoffMs),
+      fetchBackfillBatch(batch, historyMap),
     ]);
 
     // --------------------------------------------------------
