@@ -112,7 +112,7 @@
       : '';
 
     const rows = [...records].reverse().map(r => {
-      const tradeDate = r.tradeTime ? new Date(r.tradeTime).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '???';
+      const tradeTime = r.tradeTime ? new Date(r.tradeTime).toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '???';
       const tag    = r.type === 'bid' ? 'offer' : 'sale';
       const seller = resolveAccount(r.seller);
       const buyer  = resolveAccount(r.buyer);
@@ -127,7 +127,7 @@
           <span class="kami-history-arrow">=></span>
           <span class="kami-history-buyer">${buyer}</span>
         </div>
-        <span class="kami-history-date">${tradeDate}</span>
+        <span class="kami-history-tradetime">${tradeTime}</span>
       </div>`;
     }).join('');
 

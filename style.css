@@ -1234,7 +1234,7 @@ button {
 }
 .kami-history-header {
   color: #888;
-  margin-bottom: 3px;
+  margin-bottom: 2px;
   display: flex;
   align-items: center;
   gap: 5px;
@@ -1281,9 +1281,7 @@ button {
 .kami-history-row-new .kami-history-price {
   color: #e8873a;
 }
-.kami-history-date {
-  color: #666;
-}
+
 .kami-history-type {
   font-size: 7px;
   padding: 2px 3px;
@@ -1295,7 +1293,7 @@ button {
 .kami-history-type.bid     { background: #E0EEFF; color: rgb(164, 178, 195);}
 .kami-history-seller,
 .kami-history-buyer,
-.kami-history-date {
+.kami-history-tradetime {
   font-size: 7px;
 }
 
@@ -1492,7 +1490,7 @@ button {
   .kami-history-buyer,
   .kami-history-arrow,
   .kami-history-type,
-  .kami-history-date {
+  .kami-history-tradetime {
     font-size: 9px;
   }
 
@@ -1653,7 +1651,7 @@ button {
   .kami-history-buyer,
   .kami-history-arrow,
   .kami-history-type,
-  .kami-history-date {
+  .kami-history-tradetime {
     font-size: 10px;
   }
 
@@ -1774,7 +1772,7 @@ button {
   .kami-history-buyer,
   .kami-history-arrow,
   .kami-history-type,
-  .kami-history-date {
+  .kami-history-tradetime {
     font-size: 8px;
   }
 
@@ -1889,7 +1887,7 @@ button {
   .kami-history-buyer,
   .kami-history-arrow,
   .kami-history-type,
-  .kami-history-date {
+  .kami-history-tradetime {
     font-size: 6.5px;
   }
 
