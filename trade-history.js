@@ -352,6 +352,9 @@ function filterTradeHistory() {
   // Expose so the updateSelectedTraitsDisplay patch in script.js can call it
   window._filterTradeHistory = filterTradeHistory;
 
+  // Expose so refreshData in script.js can reload market history on demand
+  window._reloadTradeHistory = loadHistoryData;
+
   function activateTradeHistory() {
     _savedSearch = window.location.search;
     isShowingTradeHistory = true;

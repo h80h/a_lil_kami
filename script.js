@@ -2189,6 +2189,7 @@ async function refreshData() {
             fetchAndSplitBundle(v),
             loadSacrificeData(v),
             loadListingsData(v),
+            typeof window._reloadTradeHistory === 'function' ? window._reloadTradeHistory() : Promise.resolve(),
         ]);
 
         await loadKamiInfoData(v);
