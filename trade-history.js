@@ -112,7 +112,7 @@
       : '';
 
     const rows = [...records].reverse().map(r => {
-      const tradeTime = r.tradeTime ? new Date(r.tradeTime).toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '???';
+      const tradeTime = r.tradeTime ? new Date(r.tradeTime).toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '???';
       const tag    = r.type === 'bid' ? 'offer' : 'sale';
       const seller = resolveAccount(r.seller);
       const buyer  = resolveAccount(r.buyer);

@@ -341,15 +341,17 @@ async function fetchBackfillBatch(
       } else {
         let newForAccount = 0;
         for (const order of response.Orders) {
-          if (order.IsCanceled) continue;
           if (!order.Listing && !order.Bid) continue;
 
-          // Partial-fill bid: BidType=1, IsComplete=false, but has BoughtKamiIndexes
+          // Partial-fill bid: BidType=1 with BoughtKamiIndexes means trades happened
+          // even if the order is later canceled or not fully complete
           const boughtIndexes: number[] = order.Bid?.BoughtKamiIndexes ?? [];
           const isPartialBid =
-            !order.IsComplete &&
             order.Bid?.BidType === 1 &&
             boughtIndexes.length > 0;
+
+          // Skip canceled orders unless they are BidType=1 with completed trades
+          if (order.IsCanceled && !isPartialBid) continue;
 
           if (!order.IsComplete && !isPartialBid) continue;
 
