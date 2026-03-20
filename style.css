@@ -879,7 +879,8 @@ button {
 
 /* kami-traits: same position/size as kami-stats/kami-info */
 .kami-traits,
-.kami-info {
+.kami-info,
+.kami-history {
   border-radius: 4px;
   width: 100%;
   background: #fff;
@@ -1192,7 +1193,7 @@ button {
 
 
 /* trade-history styles */
-.kami-history {
+/* .kami-history {
   width: 100%;
   background: #fff;
   box-sizing: border-box;
@@ -1203,7 +1204,7 @@ button {
   display: flex;
   flex-direction: column;
   pointer-events: none;
-}
+} */
 .kami-history-rows {
   flex: 1;
   overflow-y: auto;
@@ -1241,9 +1242,7 @@ button {
 }
 .last-trade-badge {
   color: #bbb;
-  font-size: 6.5px;
-  background: #f4f4f4;
-  border-radius: 2px;
+  font-size: 7px;
   padding: 1px 3px;
   letter-spacing: 0.3px;
   flex-shrink: 0;
@@ -1278,13 +1277,10 @@ button {
   font-weight: bold;
   color: #333;
 }
-.kami-history-row-new .kami-history-price {
-  color: #e8873a;
-}
 
 .kami-history-type {
   font-size: 7px;
-  padding: 2px 3px;
+  padding: 2px 3px 1px 3px;
   margin-bottom: 1px;
   border-radius: 2px;
 }
@@ -1293,7 +1289,8 @@ button {
 .kami-history-type.bid     { background: #E0EEFF; color: rgb(164, 178, 195);}
 .kami-history-seller,
 .kami-history-buyer,
-.kami-history-tradetime {
+.kami-history-tradetime,
+.last-trade-badge {
   font-size: 7px;
 }
 
@@ -1490,7 +1487,8 @@ button {
   .kami-history-buyer,
   .kami-history-arrow,
   .kami-history-type,
-  .kami-history-tradetime {
+  .kami-history-tradetime,
+  .last-trade-badge {
     font-size: 9px;
   }
 
@@ -1651,7 +1649,8 @@ button {
   .kami-history-buyer,
   .kami-history-arrow,
   .kami-history-type,
-  .kami-history-tradetime {
+  .kami-history-tradetime,
+  .last-trade-badge {
     font-size: 10px;
   }
 
@@ -1772,7 +1771,8 @@ button {
   .kami-history-buyer,
   .kami-history-arrow,
   .kami-history-type,
-  .kami-history-tradetime {
+  .kami-history-tradetime,
+  .last-trade-badge {
     font-size: 8px;
   }
 
@@ -1887,7 +1887,8 @@ button {
   .kami-history-buyer,
   .kami-history-arrow,
   .kami-history-type,
-  .kami-history-tradetime {
+  .kami-history-tradetime,
+  .last-trade-badge {
     font-size: 6.5px;
   }
 
