@@ -366,6 +366,7 @@ async function fetchBackfillBatch(
               const subId   = `${order.OrderID}-${ki}-${order.Timestamp}`;
               const existing = existingHistoryMap.get(subId);
               const isNew    = !existing;
+              const isoTime = new Date(tsMs).toISOString();
               const record: SaleRecord = {
                 orderId:  subId,
                 kamiId:   Number(ki),
@@ -373,8 +374,8 @@ async function fetchBackfillBatch(
                 seller:   existing?.seller || accountId,
                 buyer,
                 type:     "bid",
-                time:     new Date(tsMs).toISOString(),
-                ...(existing?.tradeTime ? { tradeTime: existing.tradeTime } : {}),
+                time:     isoTime,
+                tradeTime: existing?.tradeTime ?? isoTime,
                 rawTime:  String(order.Timestamp),
               };
               newRecords.push(record);
@@ -395,6 +396,7 @@ async function fetchBackfillBatch(
           const existing = existingHistoryMap.get(order.OrderID);
           const isNew    = !existing;
 
+          const isoTime = new Date(tsMs).toISOString();
           const record: SaleRecord = {
             orderId: order.OrderID,
             kamiId,
@@ -402,9 +404,9 @@ async function fetchBackfillBatch(
             seller,
             buyer,
             type,
-            time:    new Date(tsMs).toISOString(),
-            ...(existing?.tradeTime ? { tradeTime: existing.tradeTime } : {}),
-            rawTime: String(order.Timestamp),
+            time:      isoTime,
+            tradeTime: existing?.tradeTime ?? isoTime,
+            rawTime:   String(order.Timestamp),
           };
 
           newRecords.push(record);
