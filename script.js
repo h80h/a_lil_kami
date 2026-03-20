@@ -1021,7 +1021,9 @@ function triggerStatFilter() {
 function preserveScroll(fn) {
     const scrollY = window.scrollY;
     fn();
-    requestAnimationFrame(() => window.scrollTo({ top: scrollY, behavior: 'instant' }));
+    requestAnimationFrame(() => {
+        if (window.scrollY !== scrollY) window.scrollTo({ top: scrollY, behavior: 'instant' });
+    });
 }
 
 
@@ -2394,18 +2396,22 @@ if (!document.getElementById('enhanced-trait-styles')) {
     document.body.appendChild(messageBox);
 
     document.addEventListener('mouseover', (e) => {
-        if (e.target.closest('.listing-badge') || e.target.closest('.new-listing-icon')) {
-            const container = e.target.closest('.image-container');
-            const price = container?.querySelector('.listing-price');
-            if (price) price.style.opacity = '0.7';
-        }
+        const badge = e.target.closest('.listing-badge, .new-listing-icon');
+        if (!badge) return;
+        const related = e.relatedTarget;
+        if (related && badge.contains(related)) return;
+        const container = badge.closest('.image-container');
+        const price = container?.querySelector('.listing-price');
+        if (price) price.style.opacity = '0.7';
     });
     document.addEventListener('mouseout', (e) => {
-        if (e.target.closest('.listing-badge') || e.target.closest('.new-listing-icon')) {
-            const container = e.target.closest('.image-container');
-            const price = container?.querySelector('.listing-price');
-            if (price) price.style.opacity = '';
-        }
+        const badge = e.target.closest('.listing-badge, .new-listing-icon');
+        if (!badge) return;
+        const related = e.relatedTarget;
+        if (related && badge.contains(related)) return;
+        const container = badge.closest('.image-container');
+        const price = container?.querySelector('.listing-price');
+        if (price) price.style.opacity = '';
     });
 }
 
