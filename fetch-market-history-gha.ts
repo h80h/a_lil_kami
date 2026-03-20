@@ -370,7 +370,7 @@ async function fetchBackfillBatch(
                 orderId:  subId,
                 kamiId:   Number(ki),
                 price,
-                seller:   "",
+                seller:   existing?.seller || accountId,
                 buyer,
                 type:     "bid",
                 time:     new Date(tsMs).toISOString(),
@@ -388,7 +388,7 @@ async function fetchBackfillBatch(
 
           const kamiId = Number(order.Listing?.KamiIndex ?? order.Bid?.KamiIndex ?? 0);
           const price  = Number(BigInt(order.Listing?.Price ?? order.Bid?.Price ?? "0")) / 1e18;
-          const seller = order.Listing?.SellerAccountID ?? "";
+          const seller = order.Listing?.SellerAccountID ?? (order.Bid ? accountId : "");
           const buyer  = order.Listing?.BuyerAccountID ?? order.Bid?.BuyerAccountID ?? "";
           const type   = order.Listing ? "listing" : "bid";
 
