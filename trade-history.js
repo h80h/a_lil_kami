@@ -62,8 +62,8 @@
       if (!res.ok) throw new Error(`Failed to load kamiMarketHistoryMeta.json for trade-history: ${res.status}`);
       const meta = await res.json();
       if (meta?.tradeNewWindow && Object.keys(meta.tradeNewWindow).length > 0) {
-        console.log('📜 New trades detected — reloading page');
-        location.reload();
+        console.log('📜 New trades detected — refreshing data');
+        if (typeof window.refreshData === 'function') await window.refreshData();
       }
     } catch (err) {
       console.warn('📜 Meta poll failed:', err);

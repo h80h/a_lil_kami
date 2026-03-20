@@ -1812,6 +1812,7 @@ window.setupInfiniteScroll = setupInfiniteScroll;
 window.updateURL = updateURL;
 window.handlePopState = handlePopState;
 window.setIsShowingListingOnly = function(val) { isShowingListingOnly = val; };
+window.refreshData = refreshData;
 Object.defineProperty(window, 'traitsData', { get: () => traitsData });
 
 // Patch updateURL: when trade history is active, always keep tradehistory=true in the URL
