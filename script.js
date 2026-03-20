@@ -1021,9 +1021,11 @@ function triggerStatFilter() {
 function preserveScroll(fn) {
     const scrollY = window.scrollY;
     fn();
-    requestAnimationFrame(() => {
-        if (window.scrollY !== scrollY) window.scrollTo({ top: scrollY, behavior: 'instant' });
-    });
+    // Re-assert scroll position across several frames to survive async DOM re-renders
+    const restore = () => { if (window.scrollY !== scrollY) window.scrollTo({ top: scrollY, behavior: 'instant' }); };
+    requestAnimationFrame(() => { restore(); requestAnimationFrame(restore); });
+    setTimeout(restore, 50);
+    setTimeout(restore, 150);
 }
 
 
@@ -2175,6 +2177,11 @@ async function refreshData() {
     const originalText = refreshBtn.innerHTML;
     refreshBtn.disabled = true;
 
+    // Capture scroll position before any async work so auto-refresh never jumps the page
+    const savedScrollY = window.scrollY;
+    const pinScroll = () => { if (window.scrollY !== savedScrollY) window.scrollTo({ top: savedScrollY, behavior: 'instant' }); };
+    const scrollPinInterval = setInterval(pinScroll, 16);
+
     try {
         console.log('🔄 Refreshing data...');
 
@@ -2280,6 +2287,10 @@ async function refreshData() {
 
         updateURL(true);
 
+        // DOM is now settled — stop pinning and do one final restoration
+        clearInterval(scrollPinInterval);
+        requestAnimationFrame(() => { requestAnimationFrame(pinScroll); });
+
         refreshBtn.innerHTML = `<svg id="refreshComplete" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><mask id="SVGkzXYXbbR"><g fill="none" stroke="#fff" stroke-dasharray="24" stroke-dashoffset="24" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M2 13.5l4 4l10.75 -10.75"><animate fill="freeze" attributeName="stroke-dashoffset" dur="0.4s" values="24;0"/></path><path stroke="#000" stroke-width="6" d="M7.5 13.5l4 4l10.75 -10.75"><animate fill="freeze" attributeName="stroke-dashoffset" begin="0.4s" dur="0.4s" values="24;0"/></path><path d="M7.5 13.5l4 4l10.75 -10.75"><animate fill="freeze" attributeName="stroke-dashoffset" begin="0.4s" dur="0.4s" values="24;0"/></path></g></mask><rect width="24" height="24" fill="currentColor" mask="url(#SVGkzXYXbbR)"/></svg>`;
         setTimeout(() => {
             refreshBtn.innerHTML = originalText;
@@ -2292,6 +2303,7 @@ async function refreshData() {
         }, 2000);
 
     } catch (error) {
+        clearInterval(scrollPinInterval);
         console.error('Error refreshing data:', error);
         const messageBox = document.getElementById('messageBox');
         messageBox.textContent = 'Failed to refresh data. Please try again.';
