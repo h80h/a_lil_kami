@@ -582,7 +582,7 @@ button {
   width: 52px;
   background: rgba(255, 240, 31, 0.3);
   padding: 1px 0 0 5px;
-  cursor: help;
+  cursor: pointer;
 }
 .stat-color-box {
   width: 24px;
@@ -1191,20 +1191,6 @@ button {
   margin-top: 10px;
 }
 
-
-/* trade-history styles */
-/* .kami-history {
-  width: 100%;
-  background: #fff;
-  box-sizing: border-box;
-  height: 76px;
-  font-size: 8px;
-  padding: 3px 8px 0;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  pointer-events: none;
-} */
 .kami-history-rows {
   flex: 1;
   overflow-y: auto;
@@ -1322,6 +1308,29 @@ button {
   color: #333;
 }
 
+
+.listing-time-ago {
+  color: #333;
+  border-color: #fff;
+  cursor: help;
+  font-size: 8px;
+}
+
+.listing-time {
+  position: absolute;
+  top: 3px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 7px;
+  font-family: 'dogica_pixelregular', monospace;
+  background: #000;
+  color: #fff;
+  padding: 2px 2px;
+  border-radius: 4px;
+  z-index: 7;
+  opacity: 0;
+  white-space: nowrap;
+}
 
 
 @media (max-width: 834px){

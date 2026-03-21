@@ -1457,6 +1457,18 @@ function clearFilters() {
 // NFT CARD RENDERING
 // ============================================================
 
+function formatTimeAgo(rawTime) {
+    const diffMs = Date.now() - rawTime;
+    const diffSec = Math.floor(diffMs / 1000);
+    if (diffSec < 60)  return `${diffSec}s ago`;
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60)  return `${diffMin}m ago`;
+    const diffHr = Math.floor(diffMin / 60);
+    if (diffHr < 24)   return `${diffHr}h ago`;
+    const diffDay = Math.floor(diffHr / 24);
+    return `${diffDay}d ago`;
+}
+
 function getStatColorClass() {
     const statSorts = ['harmony', 'health', 'power', 'violence'];
     return statSorts.includes(currentSortOrder) ? currentSortOrder : '';
@@ -1576,9 +1588,14 @@ function displayNFT(id, showCloseButton = false) {
     const listingBadgeHTML   = isListing    ? `<div class="listing-badge"><img id="kamiswap_icon" src="https://app.kamigotchi.io/assets/marketplace-BqMKbOFC.png" style="border:none"></div>` : '';
     const listingPriceHTML   = isListing    ? `<div class="listing-price">Ξ${listingPrice}</div>` : '';
     const newListingIconHTML = isNewListing ? `<div class="new-listing-icon">New</div>` : '';
-    const statColorHTML      = statColorClass
-        ? `<div class="stat-color-box ${statColorClass}" title="${statColorClass.charAt(0).toUpperCase() + statColorClass.slice(1)} Sort">${statValue}</div>`
+    const listingTimeHTML    = (isShowingListingOnly && listingData?.timestamp)
+        ? `<div class="stat-color-box listing-time-ago">📍</div>`
         : '';
+    const statColorHTML      = listingTimeHTML
+        ? listingTimeHTML
+        : (statColorClass
+            ? `<div class="stat-color-box ${statColorClass}" title="${statColorClass.charAt(0).toUpperCase() + statColorClass.slice(1)} Sort">${statValue}</div>`
+            : '');
 
     const traitsHTML = Object.entries(traits)
         .map(([key, traitData]) => `
@@ -1602,6 +1619,10 @@ function displayNFT(id, showCloseButton = false) {
             ${cloneBadgeHTML}
         </div>`;
 
+    const listingTimeTextHTML = (isShowingListingOnly && listingData?.timestamp)
+        ? `<div class="listing-time">${formatTimeAgo(listingData.timestamp)} · ${new Date(listingData.timestamp).toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric'})}</div>`
+        : '';
+
     const imageBlock = `
         <div class="image-container">
             <img src="${imageUrl}" alt="NFT #${id}" loading="lazy" onerror="this.src='https://via.placeholder.com/250?text=Not+Found'">
@@ -1609,6 +1630,7 @@ function displayNFT(id, showCloseButton = false) {
             ${listingBadgeHTML}
             ${listingPriceHTML}
             ${newListingIconHTML}
+            ${listingTimeTextHTML}
         </div>`;
 
     if (isMobile) {
@@ -2495,6 +2517,25 @@ if (!document.getElementById('enhanced-trait-styles')) {
         const container = badge.closest('.image-container');
         const price = container?.querySelector('.listing-price');
         if (price) price.style.opacity = '';
+    });
+
+    document.addEventListener('mouseover', (e) => {
+        const timeIcon = e.target.closest('.listing-time-ago');
+        if (!timeIcon) return;
+        const related = e.relatedTarget;
+        if (related && timeIcon.contains(related)) return;
+        const container = timeIcon.closest('.nft-card')?.querySelector('.image-container');
+        const timeEl = container?.querySelector('.listing-time');
+        if (timeEl) timeEl.style.opacity = '0.7';
+    });
+    document.addEventListener('mouseout', (e) => {
+        const timeIcon = e.target.closest('.listing-time-ago');
+        if (!timeIcon) return;
+        const related = e.relatedTarget;
+        if (related && timeIcon.contains(related)) return;
+        const container = timeIcon.closest('.nft-card')?.querySelector('.image-container');
+        const timeEl = container?.querySelector('.listing-time');
+        if (timeEl) timeEl.style.opacity = '';
     });
 }
 
