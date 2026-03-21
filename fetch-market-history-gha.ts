@@ -314,7 +314,9 @@ async function fetchFeedTrades(deadlineMs: number): Promise<SaleRecord[]> {
 
 async function fetchBackfillBatch(
   batch: KamiAccount[],
-  existingHistoryMap: Map<string, SaleRecord>
+  existingHistoryMap: Map<string, SaleRecord>,
+  bidDedupIndex: Set<string>,
+  getBaseOrderId: (orderId: string) => string
 ): Promise<{ newRecords: SaleRecord[]; totalNewSales: number }> {
   const client = await getClient();
   const newRecords: SaleRecord[] = [];
@@ -363,20 +365,30 @@ async function fetchBackfillBatch(
               const subId   = `${order.OrderID}-${ki}-${order.Timestamp}`;
               const existing = existingHistoryMap.get(subId);
               const isNew    = !existing;
+
+              // Skip if a bid with the same base order + kamiId + seller already recorded
+              const seller = existing?.seller || accountId;
+              const dedupKey = `${getBaseOrderId(subId)}|${Number(ki)}|${seller}`;
+              if (!existing && bidDedupIndex.has(dedupKey)) continue;
+
               const isoTime = new Date(tsMs).toISOString();
               const record: SaleRecord = {
                 orderId:  subId,
                 kamiId:   Number(ki),
                 price,
-                seller:   existing?.seller || accountId,
+                seller,
                 buyer,
                 type:     "bid",
                 time:     isoTime,
                 tradeTime: existing?.tradeTime ?? isoTime,
-                rawTime:  String(order.Timestamp),
+                rawTime:  existing?.rawTime ?? String(order.Timestamp),
               };
               newRecords.push(record);
-              if (isNew) { newForAccount++; totalNewSales++; }
+              if (isNew) {
+                bidDedupIndex.add(dedupKey);
+                newForAccount++;
+                totalNewSales++;
+              }
             }
             continue;
           }
@@ -403,7 +415,7 @@ async function fetchBackfillBatch(
             type,
             time:      isoTime,
             tradeTime: existing?.tradeTime ?? isoTime,
-            rawTime:   String(order.Timestamp),
+            rawTime:   existing?.rawTime ?? String(order.Timestamp),
           };
 
           newRecords.push(record);
@@ -477,51 +489,85 @@ async function main() {
       historyMap.set(record.orderId, record);
     }
 
+    // Index for bid dedup: "baseOrderId|kamiId|seller" -> true
+    // baseOrderId strips the trailing "-{kamiId}-{timestamp}" suffix added to partial-fill bids
+    function getBaseOrderId(orderId: string): string {
+      // subIds have the form  "{realOrderId}-{kamiIndex}-{timestamp}"
+      // Strip the last two dash-separated numeric segments when present
+      return orderId.replace(/-\d+-\d+$/, "");
+    }
+    const bidDedupIndex = new Set<string>();
+    for (const record of prevHistory) {
+      if (record.type === "bid") {
+        const key = `${getBaseOrderId(record.orderId)}|${record.kamiId}|${record.seller}`;
+        bidDedupIndex.add(key);
+      }
+    }
+
     // --------------------------------------------------------
     // Run backfill batch concurrently with feed stream
     // --------------------------------------------------------
     const [feedTrades, { newRecords: backfillRecords, totalNewSales }] = await Promise.all([
       feedTradesPromise,
-      fetchBackfillBatch(batch, historyMap),
+      fetchBackfillBatch(batch, historyMap, bidDedupIndex, getBaseOrderId),
     ]);
 
     // --------------------------------------------------------
     // Merge: backfill first, then feed (feed wins on conflict — has tradeTime)
+    // Never overwrite rawTime or tradeTime of an already-stored record.
+    // Skip bid records that share the same base orderId + kamiId + seller as an existing one.
     // --------------------------------------------------------
     for (const record of backfillRecords) {
+      if (record.type === "bid") {
+        const key = `${getBaseOrderId(record.orderId)}|${record.kamiId}|${record.seller}`;
+        if (bidDedupIndex.has(key)) continue;
+        bidDedupIndex.add(key);
+      }
       const existing = historyMap.get(record.orderId);
-      historyMap.set(record.orderId, { ...existing, ...record });
+      if (existing) {
+        historyMap.set(record.orderId, {
+          ...existing,
+          ...record,
+          rawTime:   existing.rawTime,
+          tradeTime: existing.tradeTime,
+        });
+      } else {
+        historyMap.set(record.orderId, record);
+      }
     }
     for (const record of feedTrades) {
+      if (record.type === "bid") {
+        const key = `${getBaseOrderId(record.orderId)}|${record.kamiId}|${record.seller}`;
+        if (bidDedupIndex.has(key)) continue;
+        bidDedupIndex.add(key);
+      }
       const existing = historyMap.get(record.orderId);
-      historyMap.set(record.orderId, { ...existing, ...record });
+      if (existing) {
+        historyMap.set(record.orderId, {
+          ...existing,
+          ...record,
+          rawTime:   existing.rawTime,
+          tradeTime: existing.tradeTime,
+        });
+      } else {
+        historyMap.set(record.orderId, record);
+      }
     }
 
     const mergedHistory = Array.from(historyMap.values())
       .sort((a, b) => Number(b.rawTime) - Number(a.rawTime));
 
-    // Deduplicate bid records: if the same kamiId+seller already appears,
-    // keep only the first (most recent) and drop subsequent duplicates.
-    const seenBidKey = new Set<string>();
-    const dedupedHistory = mergedHistory.filter(r => {
-      if (r.type !== "bid") return true;
-      const key = `${r.kamiId}:${r.seller}`;
-      if (seenBidKey.has(key)) return false;
-      seenBidKey.add(key);
-      return true;
-    });
-
-    console.log(`\n📊 History: ${prevHistory.length} previous + ${backfillRecords.length} backfill (${totalNewSales} new) + ${feedTrades.length} feed → ${mergedHistory.length} total (${mergedHistory.length - dedupedHistory.length} bid duplicate(s) removed → ${dedupedHistory.length} kept)`);
+    console.log(`\n📊 History: ${prevHistory.length} previous + ${backfillRecords.length} backfill (${totalNewSales} new) + ${feedTrades.length} feed → ${mergedHistory.length} total`);
 
     // Detect new trades for meta hash
     const prevOrderIds  = new Set(prevHistory.map(r => r.orderId));
-    const newRecordsAll = dedupedHistory.filter(r => !prevOrderIds.has(r.orderId));
+    const newRecordsAll = mergedHistory.filter(r => !prevOrderIds.has(r.orderId));
     if (newRecordsAll.length > 0) {
       const kamiIds = [...new Set(newRecordsAll.map(r => r.kamiId))].sort((a, b) => a - b);
       console.log(`\n✨ Found ${newRecordsAll.length} new trade(s) for: ${kamiIds.join(', ')}`);
     }
 
-    await uploadToR2(HISTORY_KEY, { history: dedupedHistory });
+    await uploadToR2(HISTORY_KEY, { history: mergedHistory });
 
     // --------------------------------------------------------
     // Update backfill cursor (from fetch-history-backfill-gha.ts)
@@ -541,7 +587,7 @@ async function main() {
     // totalCount is sufficient — any new record (feed or backfill) increments it
     await uploadToR2(META_KEY, {
       lastUpdated: new Date().toISOString(),
-      totalCount:  dedupedHistory.length,
+      totalCount:  mergedHistory.length,
     });
 
     // --------------------------------------------------------
