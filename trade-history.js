@@ -15,7 +15,6 @@
 
   let kamiHistoryMap = new Map();
   let accountNameMap = new Map();
-  let tradeNewWindow = {};
 
   function getBaseUrl() {
     const isLocal = window.location.hostname === 'localhost' || window.location.hostname.startsWith('192.168.');
@@ -24,12 +23,21 @@
 
   async function loadAccountNames() {
     try {
-      const res = await fetch(`${getBaseUrl()}/kamiBundle.json?v=${Date.now()}`);
-      if (!res.ok) throw new Error(`Failed to load kamiBundle.json for trade-history: ${res.status}`);
-      const bundle = await res.json();
-      const accounts = bundle?.kamiAccounts ?? {};
-      for (const acc of Object.values(accounts)) {
-        if (acc.id && acc.name) accountNameMap.set(String(acc.id), acc.name);
+      const meta = await fetch(`${getBaseUrl()}/kamiMeta.json?v=${Date.now()}`).then(r => r.ok ? r.json() : null);
+      const accounts = meta?.kamiAccounts ?? null;
+
+      if (accounts && Object.keys(accounts).length > 0) {
+        // kamiMeta.json already has kamiAccounts (new extractor)
+        for (const acc of Object.values(accounts)) {
+          if (acc.id && acc.name) accountNameMap.set(String(acc.id), acc.name);
+        }
+      } else {
+        // Fall back to kamiBundle.json (old extractor or first deploy)
+        const bundle = await fetch(`${getBaseUrl()}/kamiBundle.json?v=${Date.now()}`).then(r => r.ok ? r.json() : null);
+        const bundleAccounts = bundle?.kamiAccounts ?? {};
+        for (const acc of Object.values(bundleAccounts)) {
+          if (acc.id && acc.name) accountNameMap.set(String(acc.id), acc.name);
+        }
       }
     } catch (err) {
       console.warn('📜 Account name load failed:', err);
@@ -41,9 +49,8 @@
       const res = await fetch(`${getBaseUrl()}/kamiMarketHistory.json?v=${Date.now()}`);
       if (!res.ok) throw new Error(`Failed to load kamiMarketHistory.json for trade-history: ${res.status}`);
       const data = await res.json();
-      // Support new shape { history, tradeNewWindow } and legacy bare array
+      // Support new shape { history } and legacy bare array
       const records = Array.isArray(data) ? data : (data?.history ?? []);
-      tradeNewWindow = (!Array.isArray(data) && data?.tradeNewWindow) ? data.tradeNewWindow : {};
       kamiHistoryMap.clear();
       for (const record of records) {
         const key = String(record.kamiId);
@@ -56,15 +63,28 @@
     }
   }
 
+  let cachedHistoryCount = 0;
+
   async function pollMeta() {
     try {
       const res = await fetch(`${getBaseUrl()}/kamiMarketHistoryMeta.json?v=${Date.now()}`);
-      if (!res.ok) throw new Error(`Failed to load kamiMarketHistoryMeta.json for trade-history: ${res.status}`);
+      if (!res.ok) return;
       const meta = await res.json();
-      if (meta?.tradeNewWindow && Object.keys(meta.tradeNewWindow).length > 0) {
-        console.log('📜 New trades detected — refreshing data');
-        if (typeof window.refreshData === 'function') await window.refreshData();
+      const newCount = meta?.totalCount ?? 0;
+
+      if (newCount !== cachedHistoryCount && cachedHistoryCount > 0) {
+        const prevIds = new Set([...kamiHistoryMap.keys()].flatMap(k => (kamiHistoryMap.get(k) || []).map(r => r.orderId)));
+        await loadHistoryData();
+        const newTrades = [];
+        kamiHistoryMap.forEach((records) => records.forEach(r => { if (!prevIds.has(r.orderId)) newTrades.push(r); }));
+        const kamiIds = [...new Set(newTrades.map(r => r.kamiId))].sort((a, b) => a - b);
+        console.log(`📜 Found ${newTrades.length} new trade(s) for: ${kamiIds.join(', ')}`);
+        if (window.__tradeHistoryActive && typeof window._filterTradeHistory === 'function') {
+          window._filterTradeHistory();
+        }
       }
+
+      cachedHistoryCount = newCount;
     } catch (err) {
       console.warn('📜 Meta poll failed:', err);
     }
@@ -76,7 +96,7 @@
 
   function resolveAccount(rawId) {
     if (!rawId) return '—';
-    return accountNameMap.get(String(rawId))
+    return accountNameMap.get(String(rawId)) ?? '—';
   }
 
   function timeAgo(dateStr) {
@@ -116,8 +136,7 @@
       const tag    = r.type === 'bid' ? 'offer' : 'sale';
       const seller = resolveAccount(r.seller);
       const buyer  = resolveAccount(r.buyer);
-      const isNew = tradeNewWindow[r.orderId] > 0;
-      return `<div class="kami-history-row${isNew ? ' kami-history-row-new' : ''}">
+      return `<div class="kami-history-row">
         <div class="kami-history-row-top">
           <span class="kami-history-price">Ξ${r.price}</span>
           <span class="kami-history-type ${r.type}">${tag}</span>
@@ -275,6 +294,8 @@ function filterTradeHistory() {
     const resultsDiv = document.getElementById('results');
     if (!resultsDiv) return;
 
+    const _savedScrollY = window.scrollY;
+
     // Reset only sort/listing-sort; traits, affinity, min-max, clone stay active
     window.resetAllFilters();
 
@@ -346,6 +367,7 @@ function filterTradeHistory() {
 
     requestAnimationFrame(() => {
       window.applyKamiPage(3);
+      window.scrollTo({ top: _savedScrollY, behavior: 'instant' });
     });
   }
 
@@ -354,6 +376,9 @@ function filterTradeHistory() {
 
   // Expose so refreshData in script.js can reload market history on demand
   window._reloadTradeHistory = loadHistoryData;
+
+  // Expose so patchInfoOverlays in script.js can keep accountNameMap in sync
+  window._reloadAccountNames = loadAccountNames;
 
   function activateTradeHistory() {
     _savedSearch = window.location.search;
@@ -371,6 +396,7 @@ function filterTradeHistory() {
     window.__tradeHistoryActive = false;
     document.getElementById('kami-trade-history-btn')?.classList.remove('active');
     if (typeof window.applyKamiPage === 'function') window.applyKamiPage(0);
+    const _savedScrollY = window.scrollY;
     if (!skipRestore) {
       // Start from _savedSearch (preserves listing=true, listing-sort, sort, etc. that were
       // active before trade history) then overlay co-filters from the current URL (clones,
@@ -388,10 +414,12 @@ function filterTradeHistory() {
       const restoreSearch = savedParams.toString() ? `?${savedParams.toString()}` : '';
       history.replaceState(null, '', restoreSearch || window.location.pathname);
       if (typeof window.handlePopState === 'function') window.handlePopState();
+      requestAnimationFrame(() => window.scrollTo({ top: _savedScrollY, behavior: 'instant' }));
     } else {
       // No restore — rebuild URL from current filter state (strips tradehistory=true since
       // __tradeHistoryActive is now false so the updateURL patch won't re-add it).
       if (typeof window.updateURL === 'function') window.updateURL(true);
+      requestAnimationFrame(() => window.scrollTo({ top: _savedScrollY, behavior: 'instant' }));
     }
     _savedSearch = '';
   }
@@ -415,7 +443,29 @@ function filterTradeHistory() {
       const isSortBtn        = e.target.closest('.sort-btn');
       const isListingSortBtn = e.target.closest('.listing-sort-btn:not(#kami-trade-history-btn)');
       const isListingBtn     = e.target.closest('#listingFilterBtn');
-      if (isSortBtn || isListingSortBtn) {
+      if (isSortBtn) {
+        // Override _savedSearch so deactivateTradeHistory restores with the clicked
+        // sort active, rather than whatever sort was set before trade history was entered.
+        const sortValue = isSortBtn.getAttribute('data-sort');
+        if (sortValue) {
+          const params = new URLSearchParams(_savedSearch);
+          params.set('sort', sortValue);
+          params.set('listing', 'true');
+          params.delete('listing-sort');
+          _savedSearch = `?${params.toString()}`;
+        }
+        deactivateTradeHistory();
+        return;
+      }
+      if (isListingSortBtn) {
+        // Override _savedSearch so deactivateTradeHistory restores into listing mode
+        // with the sort that was just clicked, rather than whatever was active before
+        // trade history was entered.
+        const listingSortValue = isListingSortBtn.getAttribute('listing-data-sort') ?? 'recent';
+        const params = new URLSearchParams(_savedSearch);
+        params.set('listing', 'true');
+        params.set('listing-sort', listingSortValue);
+        _savedSearch = `?${params.toString()}`;
         deactivateTradeHistory();
         return;
       }
