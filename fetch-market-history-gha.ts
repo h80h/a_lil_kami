@@ -112,8 +112,10 @@ interface SaleRecord {
 
 interface SimpleListing {
   id: number;
+  orderId?: string;
   price: number;
   time: string;
+  listedTime?: string;
   rawTime: string;
 }
 
@@ -602,17 +604,41 @@ async function main() {
         const date = new Date(ts < 10_000_000_000 ? ts * 1000 : ts);
         byId[listing.KamiIndex] = {
           id:      Number(listing.KamiIndex),
+          orderId: listing.OrderID,
           price:   Number(BigInt(listing.Price)) / 1e18,
           time:    date.toISOString(),
           rawTime: listing.Timestamp,
         };
       });
 
-      const prevIdTimeMap = new Map(Object.values(prevListings).map(l => [String(l.id), l.rawTime]));
+      // Build a map of kamiIndex -> prev listing for easy lookup
+      const prevByKamiIndex = new Map<string, SimpleListing>(
+        Object.values(prevListings).map(l => [String(l.id), l])
+      );
+
+      // A listing is "new" when its OrderID has never been seen before
+      const prevOrderIdSet = new Set(
+        Object.values(prevListings).map(l => l.orderId).filter(Boolean)
+      );
       const newListingId = Object.keys(byId).filter(id => {
-        const prevTime = prevIdTimeMap.get(id);
-        return prevTime === undefined || String(prevTime) !== String(byId[id].rawTime);
+        const incoming = byId[id];
+        return !incoming.orderId || !prevOrderIdSet.has(incoming.orderId);
       });
+
+      // Merge: for listings that already existed (same orderId), preserve rawTime and listedTime
+      for (const id of Object.keys(byId)) {
+        const incoming = byId[id];
+        const prev = prevByKamiIndex.get(id);
+        const isNew = !incoming.orderId || !prevOrderIdSet.has(incoming.orderId!);
+        if (isNew) {
+          // Brand-new listing: set listedTime from time
+          incoming.listedTime = incoming.time;
+        } else if (prev) {
+          // Existing listing: never overwrite rawTime or listedTime
+          incoming.rawTime    = prev.rawTime;
+          incoming.listedTime = prev.listedTime;
+        }
+      }
 
       const listingNewWindow: Record<string, number> = {};
       for (const [id, remaining] of Object.entries(prevWindow)) {
