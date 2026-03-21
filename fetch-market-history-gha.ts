@@ -500,17 +500,28 @@ async function main() {
     const mergedHistory = Array.from(historyMap.values())
       .sort((a, b) => Number(b.rawTime) - Number(a.rawTime));
 
-    console.log(`\n📊 History: ${prevHistory.length} previous + ${backfillRecords.length} backfill (${totalNewSales} new) + ${feedTrades.length} feed → ${mergedHistory.length} total`);
+    // Deduplicate bid records: if the same kamiId+seller already appears,
+    // keep only the first (most recent) and drop subsequent duplicates.
+    const seenBidKey = new Set<string>();
+    const dedupedHistory = mergedHistory.filter(r => {
+      if (r.type !== "bid") return true;
+      const key = `${r.kamiId}:${r.seller}`;
+      if (seenBidKey.has(key)) return false;
+      seenBidKey.add(key);
+      return true;
+    });
+
+    console.log(`\n📊 History: ${prevHistory.length} previous + ${backfillRecords.length} backfill (${totalNewSales} new) + ${feedTrades.length} feed → ${mergedHistory.length} total (${mergedHistory.length - dedupedHistory.length} bid duplicate(s) removed → ${dedupedHistory.length} kept)`);
 
     // Detect new trades for meta hash
     const prevOrderIds  = new Set(prevHistory.map(r => r.orderId));
-    const newRecordsAll = mergedHistory.filter(r => !prevOrderIds.has(r.orderId));
+    const newRecordsAll = dedupedHistory.filter(r => !prevOrderIds.has(r.orderId));
     if (newRecordsAll.length > 0) {
       const kamiIds = [...new Set(newRecordsAll.map(r => r.kamiId))].sort((a, b) => a - b);
       console.log(`\n✨ Found ${newRecordsAll.length} new trade(s) for: ${kamiIds.join(', ')}`);
     }
 
-    await uploadToR2(HISTORY_KEY, { history: mergedHistory });
+    await uploadToR2(HISTORY_KEY, { history: dedupedHistory });
 
     // --------------------------------------------------------
     // Update backfill cursor (from fetch-history-backfill-gha.ts)
@@ -530,7 +541,7 @@ async function main() {
     // totalCount is sufficient — any new record (feed or backfill) increments it
     await uploadToR2(META_KEY, {
       lastUpdated: new Date().toISOString(),
-      totalCount:  mergedHistory.length,
+      totalCount:  dedupedHistory.length,
     });
 
     // --------------------------------------------------------
