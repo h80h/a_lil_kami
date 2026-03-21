@@ -169,23 +169,20 @@ async function uploadToR2(key: string, payload: unknown, cacheControl = "public,
   console.log(`   ✅ ${key} uploaded successfully`);
 }
 
-async function fetchPreviousHistory(): Promise<{ history: SaleRecord[]; tradeNewWindow: Record<string, number> }> {
+async function fetchPreviousHistory(): Promise<{ history: SaleRecord[] }> {
   try {
     const cmd = new GetObjectCommand({ Bucket: process.env.R2_BUCKET_NAME, Key: HISTORY_KEY });
     const res = await r2Client.send(cmd);
     const body = await res.Body?.transformToString();
-    if (!body) return { history: [], tradeNewWindow: {} };
+    if (!body) return { history: [] };
     const parsed = JSON.parse(body);
     if (parsed && typeof parsed === "object" && "history" in parsed) {
-      return {
-        history:         parsed.history         ?? [],
-        tradeNewWindow:  parsed.tradeNewWindow   ?? {},
-      };
+      return { history: parsed.history ?? [] };
     }
     // Legacy: entire object was the bare array
-    return { history: Array.isArray(parsed) ? parsed : [], tradeNewWindow: {} };
+    return { history: Array.isArray(parsed) ? parsed : [] };
   } catch {
-    return { history: [], tradeNewWindow: {} };
+    return { history: [] };
   }
 }
 
@@ -446,7 +443,7 @@ async function main() {
     const [
       rawListings,
       { listings: prevListings, listingNewWindow: prevWindow },
-      { history: prevHistory, tradeNewWindow: prevTradeWindow },
+      { history: prevHistory },
       cursor,
       bundle,
     ] = await Promise.all([
@@ -505,31 +502,15 @@ async function main() {
 
     console.log(`\n📊 History: ${prevHistory.length} previous + ${backfillRecords.length} backfill (${totalNewSales} new) + ${feedTrades.length} feed → ${mergedHistory.length} total`);
 
-    // --------------------------------------------------------
-    // tradeNewWindow — mirrors listingNewWindow, keyed by orderId
-    // --------------------------------------------------------
-    const NEW_TRADE_WINDOW_RUNS = 13;
-
-    const prevOrderIds = new Set(prevHistory.map(r => r.orderId));
-    const newOrderIds  = mergedHistory
-      .filter(r => !prevOrderIds.has(r.orderId))
-      .map(r => r.orderId);
-
-    const tradeNewWindow: Record<string, number> = {};
-    for (const [id, remaining] of Object.entries(prevTradeWindow)) {
-      const next = remaining - 1;
-      if (next > 0) tradeNewWindow[id] = next;
-    }
-    for (const id of newOrderIds) {
-      tradeNewWindow[id] = NEW_TRADE_WINDOW_RUNS;
+    // Detect new trades for meta hash
+    const prevOrderIds  = new Set(prevHistory.map(r => r.orderId));
+    const newRecordsAll = mergedHistory.filter(r => !prevOrderIds.has(r.orderId));
+    if (newRecordsAll.length > 0) {
+      const kamiIds = [...new Set(newRecordsAll.map(r => r.kamiId))].sort((a, b) => a - b);
+      console.log(`\n✨ Found ${newRecordsAll.length} new trade(s) for: ${kamiIds.join(', ')}`);
     }
 
-    if (newOrderIds.length > 0) {
-      console.log(`\n✨ Found ${newOrderIds.length} new trade(s): ${newOrderIds.join(", ")}`);
-    }
-    console.log(`⏱️  IDs in trade-window: ${Object.keys(tradeNewWindow).length > 0 ? Object.keys(tradeNewWindow).join(", ") : "none"}`);
-
-    await uploadToR2(HISTORY_KEY, { history: mergedHistory, tradeNewWindow });
+    await uploadToR2(HISTORY_KEY, { history: mergedHistory });
 
     // --------------------------------------------------------
     // Update backfill cursor (from fetch-history-backfill-gha.ts)
@@ -546,7 +527,11 @@ async function main() {
     // --------------------------------------------------------
     // META — lightweight file for browser polling
     // --------------------------------------------------------
-    await uploadToR2(META_KEY, { lastUpdated: new Date().toISOString(), tradeNewWindow });
+    // totalCount is sufficient — any new record (feed or backfill) increments it
+    await uploadToR2(META_KEY, {
+      lastUpdated: new Date().toISOString(),
+      totalCount:  mergedHistory.length,
+    });
 
     // --------------------------------------------------------
     // LISTINGS PROCESSING (from fetch-listings-gha.ts, unchanged)
@@ -591,7 +576,7 @@ async function main() {
       sortedEntries.forEach((item, i) => { listings[i + 1] = item; });
 
       console.log(`\nSuccessfully fetched ${sortedEntries.length} listings:`);
-      console.dir(listings, { maxArrayLength: null });
+      
 
       await uploadToR2("kamiListings.json", { listings, newListingId, listingNewWindow });
 

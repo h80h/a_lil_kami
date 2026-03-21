@@ -173,6 +173,7 @@ let listingMetaInfo = { newListingId: [], listingNewWindow: {} };
 let cachedListingsHash = null;
 let cachedListingsMetaHash = null;
 let cachedMetaHash = null;
+let cachedAccountsHash = null;
 
 let traitSignatures = {};
 let traitAffinityLookup = {};
@@ -1963,6 +1964,59 @@ function getSignificantMetaHash(meta) {
     });
 }
 
+function patchNewBadges(newWindow) {
+    metadataInfo.kamiNewWindow = newWindow;
+    document.querySelectorAll('.nft-card').forEach(card => {
+        const id = card.dataset.nftId;
+        const rankStatContainer = card.querySelector('.rank-stat-container');
+        if (!rankStatContainer) return;
+        const shouldHave = Object.prototype.hasOwnProperty.call(newWindow, String(id));
+        const existing   = rankStatContainer.querySelector('.new-badge');
+        if (shouldHave && !existing) {
+            const badge = document.createElement('div');
+            badge.className = 'new-badge';
+            badge.title = 'Recently Added!';
+            badge.textContent = 'NEW';
+            rankStatContainer.appendChild(badge);
+        } else if (!shouldHave && existing) {
+            existing.remove();
+        }
+    });
+}
+
+function patchNewListingIcons(newListingWindow) {
+    listingMetaInfo.listingNewWindow = newListingWindow;
+    document.querySelectorAll('.nft-card').forEach(card => {
+        const id = card.dataset.nftId;
+        const imageContainer = card.querySelector('.image-container');
+        if (!imageContainer) return;
+        const shouldHave = String(id) in newListingWindow;
+        const existing   = imageContainer.querySelector('.new-listing-icon');
+        if (shouldHave && !existing) {
+            const icon = document.createElement('div');
+            icon.className = 'new-listing-icon';
+            icon.textContent = 'New';
+            imageContainer.appendChild(icon);
+        } else if (!shouldHave && existing) {
+            existing.remove();
+        }
+    });
+}
+
+function patchInfoOverlays(freshAccounts) {
+    kamiToAccount = {};
+    Object.entries(freshAccounts).forEach(([accountIndex, acc]) => {
+        (acc.kamis || []).forEach(kamiIndex => {
+            kamiToAccount[kamiIndex] = { accountIndex, accountName: acc.name };
+        });
+    });
+    if (kamiOverlayPage !== 2) return; // nobody is on the info page, skip DOM work
+    document.querySelectorAll('.nft-card').forEach(card => {
+        const slot = card.querySelector('.kami-overlay-slot');
+        if (slot) slot.innerHTML = getOverlaySlotHTML(card.dataset.nftId, 2);
+    });
+}
+
 async function checkForUpdates() {
     try {
         const v = Math.floor(Date.now() / (5 * 60 * 1000));
@@ -1976,30 +2030,47 @@ async function checkForUpdates() {
 
         let shouldRefresh = false;
 
+        // ── listings ─────────────────────────────────────────────────────
+        let newListings = null;
         if (listingsRes.ok) {
-            const newListings = await listingsRes.json();
+            newListings = await listingsRes.json();
             const newHash = getSignificantListingsHash(newListings);
             if (cachedListingsHash && newHash !== cachedListingsHash) {
                 console.log('🛍️ Listings changed, refreshing all data...');
                 shouldRefresh = true;
             }
             cachedListingsHash = newHash;
+
             const newListingMetaHash = JSON.stringify(newListings?.listingNewWindow ?? {});
-            if (cachedListingsMetaHash && newListingMetaHash !== cachedListingsMetaHash) {
-                console.log('✨ Listing window changed, refreshing all data...');
-                shouldRefresh = true;
+            if (cachedListingsMetaHash && newListingMetaHash !== cachedListingsMetaHash && !shouldRefresh) {
+                patchNewListingIcons(newListings?.listingNewWindow ?? {});
             }
             cachedListingsMetaHash = newListingMetaHash;
         }
 
+        // ── kami meta ─────────────────────────────────────────────────────
         if (metaRes.ok) {
             const newMeta = await metaRes.json();
-            const newHash = getSignificantMetaHash(newMeta);
-            if (cachedMetaHash && newHash !== cachedMetaHash) {
-                console.log('✨ Metadata changed, refreshing all data...');
+
+            const countChanged   = newMeta.totalCount !== metadataInfo.totalCount;
+            const windowChanged  = JSON.stringify(newMeta.kamiNewWindow) !== JSON.stringify(metadataInfo.kamiNewWindow);
+            const newAccountsHash = JSON.stringify(newMeta.kamiAccounts ?? {});
+            const accountsChanged = cachedAccountsHash && newAccountsHash !== cachedAccountsHash;
+
+            if (countChanged) {
+                console.log('🆕 New Kamigotchi detected, refreshing all data...');
                 shouldRefresh = true;
+            } else if (windowChanged && !shouldRefresh) {
+                patchNewBadges(newMeta.kamiNewWindow);
             }
-            cachedMetaHash = newHash;
+
+            if (accountsChanged && !shouldRefresh) {
+                patchInfoOverlays(newMeta.kamiAccounts ?? {});
+            }
+
+            cachedMetaHash    = getSignificantMetaHash(newMeta);
+            cachedAccountsHash = newAccountsHash;
+            if (!shouldRefresh) metadataInfo.totalCount = newMeta.totalCount;
         }
 
         if (shouldRefresh) await refreshData();
@@ -2154,6 +2225,7 @@ async function loadData() {
         cachedListingsHash     = getSignificantListingsHash(listingMetaInfo);
         cachedListingsMetaHash = JSON.stringify(listingMetaInfo.listingNewWindow);
         cachedMetaHash         = getSignificantMetaHash(metadataInfo);
+        cachedAccountsHash     = JSON.stringify(metadataInfo.kamiAccounts ?? {});
         startAutoRefresh();
 
     } catch (error) {
@@ -2197,7 +2269,6 @@ async function refreshData() {
         const v = Date.now();
         await Promise.all([
             fetchAndSplitBundle(v),
-            loadSacrificeData(v),
             loadListingsData(v),
             typeof window._reloadTradeHistory === 'function' ? window._reloadTradeHistory() : Promise.resolve(),
         ]);

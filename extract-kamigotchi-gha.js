@@ -280,6 +280,7 @@ async function runExtraction() {
       lastUpdate:    bundle.kamiMetadata.lastUpdate,
       kamiNewWindow: bundle.kamiMetadata.kamiNewWindow,
       totalCount:    bundle.kamiMetadata.totalCount,
+      kamiAccounts:  kamiAccountsMap,
     };
 
     await Promise.all([
