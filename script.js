@@ -625,12 +625,12 @@ function getSortedListingIds(ids) {
             const priceA = itemA?.price ?? Infinity;
             const priceB = itemB?.price ?? Infinity;
             if (priceA !== priceB) return priceA - priceB;
-            return Number(itemB?.timestamp ?? 0) - Number(itemA?.timestamp ?? 0);
+            return new Date(itemB?.listedTime ?? 0).getTime() - new Date(itemA?.listedTime ?? 0).getTime();
         }
 
         if (currentListingSortOrder === 'recent') {
-            const tsA = Number(itemA?.timestamp ?? 0);
-            const tsB = Number(itemB?.timestamp ?? 0);
+            const tsA = new Date(itemA?.listedTime ?? 0).getTime();
+            const tsB = new Date(itemB?.listedTime ?? 0).getTime();
             if (tsA !== tsB) return tsB - tsA;
             return (itemA?.price ?? Infinity) - (itemB?.price ?? Infinity);
         }
@@ -1591,7 +1591,7 @@ function displayNFT(id, showCloseButton = false) {
     const listingBadgeHTML   = isListing    ? `<div class="listing-badge"><img id="kamiswap_icon" src="https://app.kamigotchi.io/assets/marketplace-BqMKbOFC.png" style="border:none"></div>` : '';
     const listingPriceHTML   = isListing    ? `<div class="listing-price">Ξ${listingPrice}</div>` : '';
     const newListingIconHTML = isNewListing ? `<div class="new-listing-icon">New</div>` : '';
-    const listingTimeHTML    = (isShowingListingOnly && listingData?.timestamp)
+    const listingTimeHTML    = (isShowingListingOnly && listingData?.listedTime)
         ? `<div class="stat-color-box listing-time-ago">📍</div>`
         : '';
     const statColorHTML      = listingTimeHTML
@@ -1622,7 +1622,7 @@ function displayNFT(id, showCloseButton = false) {
             ${cloneBadgeHTML}
         </div>`;
 
-    const listingTimeTextHTML = (isShowingListingOnly && listingData?.timestamp)
+    const listingTimeTextHTML = (isShowingListingOnly && listingData?.listedTime)
         ? `<div class="listing-time">${timeAgo(listingData.listedTime)} · ${new Date(listingData.listedTime).toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric'})}</div>`
         : '';
 
@@ -1943,9 +1943,9 @@ async function loadListingsData(v) {
             const rawListings = (data && typeof data === 'object' && 'listings' in data) ? data.listings : data;
             listingNFTs = new Map(Object.values(rawListings).map((item) => {
                 if (item !== null && typeof item === 'object') {
-                    return [String(item.id), { price: item.price, timestamp: item.rawTime ?? null }];
+                    return [String(item.id), { price: item.price, listedTime: item.listedTime ?? null }];
                 } else {
-                    return [String(item), { price: item, timestamp: null }];
+                    return [String(item), { price: item, listedTime: null }];
                 }
             }));
             listingMetaInfo = {
