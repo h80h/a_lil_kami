@@ -150,7 +150,8 @@ async function fetchFromR2<T>(key: string, fallback: T): Promise<T> {
     const body = await res.Body?.transformToString();
     if (!body) return fallback;
     return JSON.parse(body) as T;
-  } catch {
+  } catch (err) {
+    console.warn(`⚠️  R2 read failed for ${key}: ${(err as any)?.message}`);
     return fallback;
   }
 }
@@ -569,19 +570,28 @@ async function main() {
       console.log(`\n✨ Found ${newRecordsAll.length} new trade(s) for: ${kamiIds.join(', ')}`);
     }
 
+    if (mergedHistory.length < prevHistory.length) {
+      console.warn(`\n⚠️  Merged history (${mergedHistory.length}) is smaller than previous (${prevHistory.length}) — R2 read may have failed. Aborting upload to preserve existing data.`);
+      process.exit(1);
+    }
+
     await uploadToR2(HISTORY_KEY, { history: mergedHistory });
 
     // --------------------------------------------------------
     // Update backfill cursor (from fetch-history-backfill-gha.ts)
     // --------------------------------------------------------
-    const newNextIndex = endIndex >= totalAccounts ? 0 : endIndex;
-    const newCursor: Cursor = { nextIndex: newNextIndex, total: totalAccounts };
-    if (newNextIndex === 0) {
-      newCursor.completedAt = new Date().toISOString();
-      console.log(`\n✅ All ${totalAccounts} accounts processed — cursor reset to 0`);
+    if (totalAccounts === 0) {
+      console.warn(`\n⚠️  kamiBundle.json returned 0 accounts — skipping cursor update to preserve progress`);
+    } else {
+      const newNextIndex = endIndex >= totalAccounts ? 0 : endIndex;
+      const newCursor: Cursor = { nextIndex: newNextIndex, total: totalAccounts };
+      if (newNextIndex === 0) {
+        newCursor.completedAt = new Date().toISOString();
+        console.log(`\n✅ All ${totalAccounts} accounts processed — cursor reset to 0`);
+      }
+      await uploadToR2(CURSOR_KEY, newCursor);
+      console.log(`💾 Cursor updated: nextIndex=${newCursor.nextIndex}`);
     }
-    await uploadToR2(CURSOR_KEY, newCursor);
-    console.log(`💾 Cursor updated: nextIndex=${newCursor.nextIndex}`);
 
     // --------------------------------------------------------
     // META — lightweight file for browser polling
