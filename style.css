@@ -49,8 +49,8 @@ h2 {
 .affinity-filter-section,
 .minmax-filter-section,
 .listing-sort-section {
-    margin-bottom: 30px;
-    border-radius: 10px;
+  margin-bottom: 30px;
+  border-radius: 10px;
 }
 
 #search-section-container {
@@ -165,8 +165,8 @@ button {
 }
 
 #refreshDataBtn:disabled {
-    cursor: not-allowed;
-    opacity: 0.6;
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 #searchBtn_svg,
@@ -299,7 +299,7 @@ button {
 }
 
 #filterControls {
-    margin-bottom: 14px;
+  margin-bottom: 14px;
 }
 
 /* Dropdown Wrapper */
@@ -591,7 +591,7 @@ button {
   align-items: center;
   justify-content: center;
   color: #fff;
-  padding: 1px 0;
+  padding: 1px 0 0 0;
 }
 
 .rank-badge,
@@ -643,7 +643,7 @@ button {
 
 .new-badge,
 .clone-badge {
-    animation: newBadgeSparkle 1.5s ease-in-out infinite;
+  animation: newBadgeSparkle 1.5s ease-in-out infinite;
 }
 
 .nft-card img {
@@ -672,44 +672,43 @@ button {
 }
 
 .count-header-trait-btn {
-    background-color: #f0f0f0;
-    color: #333;
-    border: 1px solid #ccc;
-    padding: 3px 8px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 13px;
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    transition: background-color 0.2s;
+  background-color: #f0f0f0;
+  color: #333;
+  border: 1px solid #ccc;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: background-color 0.2s;
 }
 
 .count-header-trait-btn:hover {
-    background-color: #e0e0e0;
+  background-color: #e0e0e0;
 }
 
 .count-header-trait-btn span {
-    font-weight: bold;
-    color: #888;
+  font-weight: bold;
+  color: #888;
 }
 
 .scroll-to-top {
-    position: fixed;
-    bottom: 30px;
-    right: 30px;
-    border-radius: 50%;
-    cursor: pointer;
-    z-index: 1000;
-    opacity: 0;
-    visibility: hidden;
-    transition: opacity 0.3s ease, visibility 0.3s ease, transform 0.15s ease;
-    
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0;
-    line-height: 1;
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+  border-radius: 50%;
+  cursor: pointer;
+  z-index: 1000;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease, visibility 0.3s ease, transform 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  line-height: 1;
 }
 
 .scroll-to-top,
@@ -719,41 +718,41 @@ button {
 }
 
 .scroll-to-top:hover {
-    transform: translateY(-3px);
+  transform: translateY(-3px);
 }
 
 .scroll-to-top:active {
-    transform: translateY(-1px);
+  transform: translateY(-1px);
 }
 
 .scroll-to-top.show {
-    opacity: 1;
-    visibility: visible;
+  opacity: 1;
+  visibility: visible;
 }
 
 .trait-name-row {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
 }
 
 .trait-info-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .trait-affinity {
-    display: inline-block;
-    padding: 2px 6px;
-    color: white;
-    border-radius: 3px;
-    font-size: 10px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+  display: inline-block;
+  padding: 2px 6px;
+  color: white;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .trait-affinity.NORMAL {
@@ -773,19 +772,19 @@ button {
 }
 
 .trait-stats {
-    display: flex;
-    gap: 4px;
-    flex-wrap: wrap;
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
 }
 
 .trait-stat {
-    display: inline-block;
-    padding: 2px 5px;
-    border-radius: 3px;
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 0.3px;
-    color: #fff;
+  display: inline-block;
+  padding: 2px 5px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  color: #fff;
 }
 
 .trait-stat.harmony,
@@ -829,15 +828,15 @@ button {
 }
 
 .checkbox-label .trait-label-text {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .checkbox-label {
-    padding: 8px 10px !important;
-    min-height: 50px;
-    align-items: flex-start !important;
+  padding: 8px 10px !important;
+  min-height: 50px;
+  align-items: flex-start !important;
 }
 
 .kami-stats {
@@ -852,7 +851,6 @@ button {
   height: 76px;
   padding: 0;
   font-size: 10px;
-  font-weight: bold;
 }
 
 .nft-card.is-active .kami-overlay-slot,
@@ -955,14 +953,14 @@ button {
 }
 
 .stat-row {
-    display: flex;
-    margin: 0 14px;
-    justify-content: space-between;
+  display: flex;
+  margin: 0 14px;
+  justify-content: space-between;
 }
 
 .stat-row.one {
-    margin-bottom: 10px;
-    margin-top: 6px;
+  margin-bottom: 10px;
+  margin-top: 6px;
 }
 
 @property --stat-angle-1 {
@@ -972,47 +970,47 @@ button {
 }
 
 .stat-item {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 15px;
-    height: 23px;
-    width: 35px;
-    position: relative;
-    cursor: default;
-    background: linear-gradient(
-        -75deg,
-        color-mix(in srgb, var(--btn-color) 60%, #BBB),
-        color-mix(in srgb, var(--btn-color) 60%, white),
-        color-mix(in srgb, var(--btn-color) 60%, #BBB)
-    );
-    box-shadow:
-        inset 0 0.125em 0.125em rgba(0, 0, 0, 0.05),
-        0 0 0.1em 0.25em inset rgba(255, 255, 255, 0.2);
-    border: 1px solid #888;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 15px;
+  height: 23px;
+  width: 35px;
+  position: relative;
+  cursor: default;
+  background: linear-gradient(
+    -75deg,
+    color-mix(in srgb, var(--btn-color) 60%, #BBB),
+    color-mix(in srgb, var(--btn-color) 60%, white),
+    color-mix(in srgb, var(--btn-color) 60%, #BBB)
+  );
+  box-shadow:
+    inset 0 0.125em 0.125em rgba(0, 0, 0, 0.05),
+    0 0 0.1em 0.25em inset rgba(255, 255, 255, 0.2);
+  border: 1px solid #888;
 }
 
 .stat-value {
-    color: #555;
-    text-align: center;
-    position: relative;
-    z-index: 2;
+  color: #555;
+  text-align: center;
+  position: relative;
+  z-index: 2;
 }
 
 .image-container {
-    position: relative;
+  position: relative;
 }
 
 .sacrifice-badge {
-    position: absolute;
-    bottom: 10px;
-    right: 5px;
-    color: white;
-    padding: 2px 2px;
-    font-size: 20px;
-    line-height: 1;
-    z-index: 5;
-    cursor: help;
+  position: absolute;
+  bottom: 10px;
+  right: 5px;
+  color: white;
+  padding: 2px 2px;
+  font-size: 20px;
+  line-height: 1;
+  z-index: 5;
+  cursor: help;
 }
 
 .listing-badge {
@@ -1229,7 +1227,7 @@ button {
 .last-trade-badge {
   color: #bbb;
   font-size: 7px;
-  padding: 1px 3px;
+  padding: 1px 0;
   letter-spacing: 0.3px;
   flex-shrink: 0;
 }
@@ -1241,7 +1239,7 @@ button {
 .kami-history-row {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
   padding-bottom: 2px;
 }
 .kami-history-row-top {
@@ -1252,7 +1250,7 @@ button {
 .kami-history-row-bottom {
   display: flex;
   align-items: center;
-  gap: 3px;
+  gap: 2px;
   color: #999;
   flex-wrap: wrap;
 }
@@ -1260,7 +1258,6 @@ button {
   width: 100%;
 }
 .kami-history-price {
-  font-weight: bold;
   color: #333;
 }
 
@@ -1310,7 +1307,6 @@ button {
 
 
 .listing-time-ago {
-  color: #333;
   border-color: #fff;
   cursor: help;
   font-size: 8px;
@@ -1332,8 +1328,71 @@ button {
   white-space: nowrap;
 }
 
+#messageBox {
+  position: fixed;
+  top: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #f8d7da;
+  color: #721c24;
+  padding: 10px 20px;
+  border: 1px solid #f5c6cb;
+  border-radius: 5px;
+  z-index: 1000;
+  display: none;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  font-size: 14px;
+}
 
-@media (max-width: 834px){
+/* ============================================================
+   CUSTOM TOOLTIP (replaces native title attribute delay)
+   ============================================================ */
+[data-tooltip]:not(.listing-badge) {
+    position: relative;
+}
+
+[data-tooltip]::after {
+    content: attr(data-tooltip);
+    position: absolute;    
+    font-family: 'dogica_pixelregular', monospace;
+    white-space: nowrap;
+    border-radius: 4px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.1s ease;
+    z-index: 9999;
+}
+
+[data-tooltip]:hover::after {
+    opacity: 0.7;
+}
+
+#refreshDataBtn[data-tooltip]::after {
+  top: calc(100% + 4px);
+  left: auto;
+  right: calc(0% + 10px);
+  background: #000;
+  color: #fff;
+  font-size: 9px;
+  padding: 4px;
+}
+
+.listing-price {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 8px;
+  font-family: 'dogica_pixelregular', monospace;
+  background: #000;
+  color: #fff;
+  padding: 4px 8px;
+  border-radius: 4px;
+  z-index: 7;
+  opacity: 0;
+}
+
+@media (max-width: 834px){  
   .kami-traits div,
   .kami-info div {
     margin-bottom: 2px;
@@ -1365,6 +1424,10 @@ button {
     width: 45px;
     padding-left: 2px;
   }
+
+  .listing-time {
+    font-size: 6.9px;
+  }
 }
 
 @media (max-width: 820px){
@@ -1387,10 +1450,6 @@ button {
     font-size: 7.5px;
   }
 
-  .kami-stats {
-    font-weight: unset;
-  }
-
   .stat-row {
     margin: 0 10px;
   }
@@ -1402,6 +1461,10 @@ button {
   .kami-history,
   .kami-overlay-controls {
     height: 72px;
+  }
+
+  .listing-time {
+    font-size: 6.5px;
   }
 }
 
@@ -1448,11 +1511,15 @@ button {
   .kami-info,
   .kami-history,
   .kami-overlay-controls {
-    height: 72px;
+    height: 75px;
   }
 
   .nft-card-content {
     gap: 1px;
+  }
+
+  .kami-history-header {
+    margin-bottom: 1px;
   }
 }
 
@@ -1460,6 +1527,10 @@ button {
   .container {
     max-width: 400px;
     padding: 10px 5px;
+  }
+
+  #messageBox {
+    top: 10px;
   }
 
   #results,
@@ -1496,11 +1567,14 @@ button {
   .kami-history-buyer,
   .kami-history-arrow,
   .kami-history-type,
-  .kami-history-tradetime,
   .last-trade-badge {
     font-size: 9px;
   }
 
+  .kami-history-tradetime {
+    font-size: 8.5px;
+  }
+  
   .kami-stats {
     padding: 1px 3px;
     font-size: 11px;
@@ -1532,6 +1606,11 @@ button {
 
   .kami-overlay-arrow {
     margin-bottom: 9px;
+  }
+
+  .listing-time,
+  .listing-price {
+    font-size: 9px;
   }
 }
 
@@ -1697,6 +1776,10 @@ button {
     white-space: pre-wrap;
     min-width: 110px;
   }
+
+  #messageBox {
+    min-width: 65%;
+  }  
 }
 
 @media (max-width: 326px) {
@@ -1785,6 +1868,10 @@ button {
     font-size: 8px;
   }
 
+  .sacrifice-time {
+    font-size: 8.5px;
+  }
+
   .kami-stats {
     font-size: 11px;
     padding: 1px 2px;
@@ -1807,6 +1894,11 @@ button {
 
   .kami-overlay-arrow {
     margin-bottom: 12px;
+  }
+
+  .listing-time,
+  .listing-price {
+    font-size: 7.5px;
   }
 }
 
@@ -1901,6 +1993,10 @@ button {
     font-size: 6.5px;
   }
 
+  .sacrifice-time {
+    font-size: 7px;
+  }
+
   .kami-traits div,
   .kami-info div {
     margin-bottom: 2px;
@@ -1933,52 +2029,19 @@ button {
   .scroll-to-top {
     right: 5px;
   }
-}
 
-/* ============================================================
-   CUSTOM TOOLTIP (replaces native title attribute delay)
-   ============================================================ */
-[data-tooltip]:not(.listing-badge) {
-    position: relative;
-}
+  .online-text,
+  .mint-price-text,
+  .reroll-price-text {
+    font-size: 8px;
+  }
 
-[data-tooltip]::after {
-    content: attr(data-tooltip);
-    position: absolute;    
-    font-family: 'dogica_pixelregular', monospace;
-    white-space: nowrap;
-    border-radius: 4px;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.1s ease;
-    z-index: 9999;
-}
+  .listing-time,
+  .listing-price {
+    font-size: 6.5px;
+  }
 
-[data-tooltip]:hover::after {
-    opacity: 0.7;
-}
-
-#refreshDataBtn[data-tooltip]::after {
-  top: calc(100% + 4px);
-  left: auto;
-  right: calc(0% + 10px);
-  background: #000;
-  color: #fff;
-  font-size: 9px;
-  padding: 4px;
-}
-
-.listing-price {
-  position: absolute;
-  bottom: 12px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 8px;
-  font-family: 'dogica_pixelregular', monospace;
-  background: #000;
-  color: #fff;
-  padding: 4px 8px;
-  border-radius: 4px;
-  z-index: 7;
-  opacity: 0;
+  .listing-price {
+    padding: 2px 4px;
+  }
 }

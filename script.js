@@ -1522,7 +1522,7 @@ function getOverlaySlotHTML(id, page) {
         const isSacrificed = sacrificedNFTs.has(String(id));
         const sacrificeUnix = isSacrificed ? sacrificedNFTs.get(String(id)) : null;
         const ripDateHTML = isSacrificed && sacrificeUnix
-            ? `<div class="last">r.i.p: ${new Date(sacrificeUnix * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</div>`
+            ? `<div class="last sacrifice-time">r.i.p: ${new Date(sacrificeUnix * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</div>`
             : '';
         return `
         <div class="kami-info">
@@ -2482,20 +2482,6 @@ if (!document.getElementById('enhanced-trait-styles')) {
     const styleTag = document.createElement('style');
     styleTag.id = 'enhanced-trait-styles';
     styleTag.textContent = `
-        #messageBox {
-            position: fixed;
-            top: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background-color: #f8d7da;
-            color: #721c24;
-            padding: 10px 20px;
-            border: 1px solid #f5c6cb;
-            border-radius: 5px;
-            z-index: 1000;
-            display: none;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-        }
     `;
     document.head.appendChild(styleTag);
 
