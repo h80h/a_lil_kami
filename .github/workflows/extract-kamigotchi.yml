@@ -18,7 +18,7 @@ jobs:
   # ─── Job 1: Heavy extraction via Playwright ───────────────────────────────
   extract-and-upload:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 8
 
     steps:
       - name: Get the code
@@ -81,7 +81,7 @@ jobs:
     runs-on: ubuntu-latest
     # Fix: raised from 6 → 10 min; script has a 4.5-min internal deadline,
     # plus npm ci + Node setup + 4 R2 uploads need headroom
-    timeout-minutes: 10
+    timeout-minutes: 5
 
     steps:
       - name: Get the code

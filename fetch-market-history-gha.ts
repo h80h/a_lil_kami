@@ -5,7 +5,7 @@
  * Runs as a single GHA job — no coordination needed between scripts.
  *
  * Concurrency model:
- *   - Feed stream starts immediately (deadline = 4.5 min)
+ *   - Feed stream starts immediately (deadline = 4 min)
  *   - Backfill gRPC calls (100 accounts) run concurrently with feed stream
  *   - Listings fetch runs concurrently with both
  *   - All three results merge into one kamiMarketHistory.json upload
@@ -517,7 +517,7 @@ async function main() {
     console.log("🛒 Kamigotchi Listings + History Fetch (Combined)");
     console.log("=".repeat(60));
 
-    // Start Feed stream immediately — deadline = 4.5 min
+    // Start Feed stream immediately — deadline = 4 min
     const RUN_DEADLINE_MS = Date.now() + 4 * 60 * 1000;
     const feedTradesPromise = fetchFeedTrades(RUN_DEADLINE_MS);
 
@@ -766,6 +766,7 @@ async function main() {
     console.log("\n" + "=".repeat(60));
     console.log("✅ Combined fetch & upload complete");
     console.log("=".repeat(60));
+    process.exit(0);
 
   } catch (err) {
     if (err instanceof Error) {
