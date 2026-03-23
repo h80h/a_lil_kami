@@ -173,7 +173,7 @@ async function uploadToR2(key: string, payload: unknown, cacheControl = "public,
 }
 
 // ─── VERSIONING HELPER ────────────────────────────────────────────────────────
-const MAX_VERSIONS = 3;
+const MAX_VERSIONS = 288;
 
 // Files worth versioning (skip cursor and tiny meta files)
 const VERSIONED_KEYS = new Set(["kamiMarketHistory.json", "kamiListings.json"]);

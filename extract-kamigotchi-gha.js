@@ -15,7 +15,7 @@ const r2Client = new S3Client({
 });
 
 // ─── VERSIONING HELPER ────────────────────────────────────────────────────────
-const MAX_VERSIONS = 3;
+const MAX_VERSIONS = 288;
 
 async function versionFile(key) {
   try {
