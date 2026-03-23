@@ -18,7 +18,7 @@ jobs:
   # ─── Job 1: Heavy extraction via Playwright ───────────────────────────────
   extract-and-upload:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 5
 
     steps:
       - name: Get the code
