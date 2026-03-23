@@ -389,12 +389,13 @@ async function fetchFeedTrades(deadlineMs: number): Promise<SaleRecord[]> {
 async function fetchBackfillBatch(
   batch: KamiAccount[],
   existingHistoryMap: Map<string, SaleRecord>,
-  bidDedupIndex: Set<string>,
   getBaseOrderId: (orderId: string) => string
 ): Promise<{ newRecords: SaleRecord[]; totalNewSales: number }> {
   const client = await getClient();
   const newRecords: SaleRecord[] = [];
   let totalNewSales = 0;
+  // Local dedup: prevents the same trade being recorded twice across accounts in this batch
+  const batchDedupIndex = new Set<string>();
 
   // Warm-up
   console.log("\n⏳ Warming up backfill for 5s...");
@@ -443,7 +444,7 @@ async function fetchBackfillBatch(
               // Skip if a bid with the same base order + kamiId + timestamp already recorded
               const seller   = existing?.seller || order.Bid!.SellerAccountID || "";
               const dedupKey = `${getBaseOrderId(subId)}|${Number(ki)}|${order.Timestamp}`;
-              if (!existing && bidDedupIndex.has(dedupKey)) continue;
+              if (!existing && batchDedupIndex.has(dedupKey)) continue;
 
               const isoTime = new Date(tsMs).toISOString();
               const record: SaleRecord = {
@@ -459,7 +460,7 @@ async function fetchBackfillBatch(
               };
               newRecords.push(record);
               if (isNew) {
-                bidDedupIndex.add(dedupKey);
+                batchDedupIndex.add(dedupKey);
                 newForAccount++;
                 totalNewSales++;
               }
@@ -556,7 +557,6 @@ async function main() {
 
     console.log(`\n🔢 Backfill: accounts ${startIndex + 1}–${endIndex} of ${totalAccounts} (${batch.length} accounts)`);
 
-    // Seed historyMap from existing R2 data
     // Seed historyMap from existing R2 data (all-time, no cutoff)
     const historyMap = new Map<string, SaleRecord>();
     for (const record of prevHistory) {
@@ -565,25 +565,21 @@ async function main() {
 
     // Index for bid dedup: "baseOrderId|kamiId|rawTime" -> true
     // baseOrderId strips the trailing "-{kamiId}-{timestamp}" suffix added to partial-fill bids
+    // Used only to dedup between backfill and feed within the current run.
+    // Cross-run dedup is already handled by existingHistoryMap.get(subId) inside fetchBackfillBatch.
     function getBaseOrderId(orderId: string): string {
       // subIds have the form  "{realOrderId}-{kamiIndex}-{timestamp}"
       // Strip the last two dash-separated numeric segments when present
       return orderId.replace(/-\d+-\d+$/, "");
     }
     const bidDedupIndex = new Set<string>();
-    for (const record of prevHistory) {
-      if (record.type === "bid") {
-        const key = `${getBaseOrderId(record.orderId)}|${record.kamiId}|${record.rawTime}`;
-        bidDedupIndex.add(key);
-      }
-    }
 
     // --------------------------------------------------------
     // Run backfill batch concurrently with feed stream
     // --------------------------------------------------------
     const [feedTrades, { newRecords: backfillRecords, totalNewSales }] = await Promise.all([
       feedTradesPromise,
-      fetchBackfillBatch(batch, historyMap, bidDedupIndex, getBaseOrderId),
+      fetchBackfillBatch(batch, historyMap, getBaseOrderId),
     ]);
 
     // --------------------------------------------------------
