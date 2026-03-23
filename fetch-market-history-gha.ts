@@ -341,13 +341,15 @@ async function fetchFeedTrades(deadlineMs: number): Promise<SaleRecord[]> {
         }
 
         for (const e of accepts) {
-          if (!e.OrderID || seen.has(e.OrderID)) continue;
-          seen.add(e.OrderID);
+          if (!e.OrderID) continue;
+          const acceptId = `${e.OrderID}-${e.KamiIndex}-${e.Timestamp}`;
+          if (seen.has(acceptId)) continue;
+          seen.add(acceptId);
           const ts = Number(e.Timestamp);
           const tsMs = ts < 10_000_000_000 ? ts * 1000 : ts;
           const iso = new Date(tsMs).toISOString();
           trades.push({
-            orderId:   e.OrderID,
+            orderId:   acceptId,
             kamiId:    Number(e.KamiIndex),
             price:     Number(BigInt(e.Price)) / 1e18,
             seller:    e.SellerAccountID,
@@ -431,16 +433,16 @@ async function fetchBackfillBatch(
 
           // For partial-fill bids, emit one record per bought kami index
           if (isPartialBid) {
-            const price = Number(BigInt(order.Bid!.Price ?? "0")) / 1e18;
-            const buyer = order.Bid!.BuyerAccountID ?? "";
+            const price  = Number(BigInt(order.Bid!.Price ?? "0")) / 1e18;
+            const buyer  = order.Bid!.BuyerAccountID ?? accountId;
             for (const ki of boughtIndexes) {
               const subId   = `${order.OrderID}-${ki}-${order.Timestamp}`;
               const existing = existingHistoryMap.get(subId);
               const isNew    = !existing;
 
-              // Skip if a bid with the same base order + kamiId + seller already recorded
-              const seller = existing?.seller || accountId;
-              const dedupKey = `${getBaseOrderId(subId)}|${Number(ki)}|${seller}`;
+              // Skip if a bid with the same base order + kamiId + timestamp already recorded
+              const seller   = existing?.seller || order.Bid!.SellerAccountID || "";
+              const dedupKey = `${getBaseOrderId(subId)}|${Number(ki)}|${order.Timestamp}`;
               if (!existing && bidDedupIndex.has(dedupKey)) continue;
 
               const isoTime = new Date(tsMs).toISOString();
@@ -470,7 +472,7 @@ async function fetchBackfillBatch(
 
           const kamiId = Number(order.Listing?.KamiIndex ?? order.Bid?.KamiIndex ?? 0);
           const price  = Number(BigInt(order.Listing?.Price ?? order.Bid?.Price ?? "0")) / 1e18;
-          const seller = order.Listing?.SellerAccountID ?? (order.Bid ? accountId : "");
+          const seller = order.Listing?.SellerAccountID ?? order.Bid?.SellerAccountID ?? "";
           const buyer  = order.Listing?.BuyerAccountID ?? order.Bid?.BuyerAccountID ?? "";
           const type   = order.Listing ? "listing" : "bid";
 
@@ -561,7 +563,7 @@ async function main() {
       historyMap.set(record.orderId, record);
     }
 
-    // Index for bid dedup: "baseOrderId|kamiId|seller" -> true
+    // Index for bid dedup: "baseOrderId|kamiId|rawTime" -> true
     // baseOrderId strips the trailing "-{kamiId}-{timestamp}" suffix added to partial-fill bids
     function getBaseOrderId(orderId: string): string {
       // subIds have the form  "{realOrderId}-{kamiIndex}-{timestamp}"
@@ -571,7 +573,7 @@ async function main() {
     const bidDedupIndex = new Set<string>();
     for (const record of prevHistory) {
       if (record.type === "bid") {
-        const key = `${getBaseOrderId(record.orderId)}|${record.kamiId}|${record.seller}`;
+        const key = `${getBaseOrderId(record.orderId)}|${record.kamiId}|${record.rawTime}`;
         bidDedupIndex.add(key);
       }
     }
@@ -587,11 +589,11 @@ async function main() {
     // --------------------------------------------------------
     // Merge: backfill first, then feed (feed wins on conflict — has tradeTime)
     // Never overwrite rawTime or tradeTime of an already-stored record.
-    // Skip bid records that share the same base orderId + kamiId + seller as an existing one.
+    // Skip bid records that share the same base orderId + kamiId + rawTime as an existing one.
     // --------------------------------------------------------
     for (const record of backfillRecords) {
       if (record.type === "bid") {
-        const key = `${getBaseOrderId(record.orderId)}|${record.kamiId}|${record.seller}`;
+        const key = `${getBaseOrderId(record.orderId)}|${record.kamiId}|${record.rawTime}`;
         if (bidDedupIndex.has(key)) continue;
         bidDedupIndex.add(key);
       }
@@ -609,7 +611,7 @@ async function main() {
     }
     for (const record of feedTrades) {
       if (record.type === "bid") {
-        const key = `${getBaseOrderId(record.orderId)}|${record.kamiId}|${record.seller}`;
+        const key = `${getBaseOrderId(record.orderId)}|${record.kamiId}|${record.rawTime}`;
         if (bidDedupIndex.has(key)) continue;
         bidDedupIndex.add(key);
       }
