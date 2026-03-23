@@ -16,7 +16,7 @@
 
 import { execSync } from "child_process";
 import { existsSync } from "fs";
-import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, GetObjectCommand, CopyObjectCommand, ListObjectsV2Command, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { Upload } from "@aws-sdk/lib-storage";
 import { Readable } from "stream";
 import { createRequire } from "module";
@@ -172,6 +172,63 @@ async function uploadToR2(key: string, payload: unknown, cacheControl = "public,
   console.log(`   ✅ ${key} uploaded successfully`);
 }
 
+// ─── VERSIONING HELPER ────────────────────────────────────────────────────────
+const MAX_VERSIONS = 3;
+
+// Files worth versioning (skip cursor and tiny meta files)
+const VERSIONED_KEYS = new Set(["kamiMarketHistory.json", "kamiListings.json"]);
+
+async function versionFile(key: string): Promise<void> {
+  if (!VERSIONED_KEYS.has(key)) return;
+
+  try {
+    await r2Client.send(new GetObjectCommand({
+      Bucket: process.env.R2_BUCKET_NAME,
+      Key: key,
+    }));
+  } catch (err: any) {
+    if (err.name === 'NoSuchKey' || err.$metadata?.httpStatusCode === 404) {
+      console.log(`   ⏭️  No existing ${key} to version (first run)`);
+      return;
+    }
+    console.warn(`   ⚠️  Could not check ${key} before versioning: ${err.message}`);
+    return;
+  }
+
+  try {
+    const timestamp = new Date().toISOString();
+    const versionKey = `versions/${key}/${timestamp}`;
+
+    await r2Client.send(new CopyObjectCommand({
+      Bucket: process.env.R2_BUCKET_NAME,
+      CopySource: `${process.env.R2_BUCKET_NAME}/${key}`,
+      Key: versionKey,
+    }));
+    console.log(`   🗂️  Versioned ${key} → ${versionKey}`);
+
+    const listed = await r2Client.send(new ListObjectsV2Command({
+      Bucket: process.env.R2_BUCKET_NAME,
+      Prefix: `versions/${key}/`,
+    }));
+
+    const versions = listed.Contents ?? [];
+    if (versions.length > MAX_VERSIONS) {
+      versions.sort((a, b) => (a.Key ?? "").localeCompare(b.Key ?? "")); // oldest first
+      const toDelete = versions.slice(0, versions.length - MAX_VERSIONS);
+      for (const v of toDelete) {
+        await r2Client.send(new DeleteObjectCommand({
+          Bucket: process.env.R2_BUCKET_NAME,
+          Key: v.Key!,
+        }));
+        console.log(`   🗑️  Pruned old version: ${v.Key}`);
+      }
+    }
+  } catch (err: any) {
+    console.warn(`   ⚠️  Versioning failed for ${key}: ${err.message}`);
+  }
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 async function fetchPreviousHistory(): Promise<{ history: SaleRecord[] }> {
   try {
     const cmd = new GetObjectCommand({ Bucket: process.env.R2_BUCKET_NAME, Key: HISTORY_KEY });
@@ -184,8 +241,14 @@ async function fetchPreviousHistory(): Promise<{ history: SaleRecord[] }> {
     }
     // Legacy: entire object was the bare array
     return { history: Array.isArray(parsed) ? parsed : [] };
-  } catch {
-    return { history: [] };
+  } catch (err: any) {
+    // Genuine first run — safe to start with empty history
+    if (err.name === "NoSuchKey" || err.$metadata?.httpStatusCode === 404) {
+      console.log("   ⏭️  No existing kamiMarketHistory.json found — starting fresh");
+      return { history: [] };
+    }
+    // Any other R2 error — abort to protect existing data
+    throw new Error(`R2 read failed for ${HISTORY_KEY}: ${err.message}`);
   }
 }
 
@@ -204,8 +267,14 @@ async function fetchPreviousListings(): Promise<{ listings: Record<string, Simpl
     }
     // Legacy: entire object was the listings map
     return { listings: parsed ?? {}, listingNewWindow: {} };
-  } catch {
-    return { listings: {}, listingNewWindow: {} };
+  } catch (err: any) {
+    // Genuine first run — safe to start with empty listings
+    if (err.name === "NoSuchKey" || err.$metadata?.httpStatusCode === 404) {
+      console.log("   ⏭️  No existing kamiListings.json found — starting fresh");
+      return { listings: {}, listingNewWindow: {} };
+    }
+    // Any other R2 error — abort to protect existing data
+    throw new Error(`R2 read failed for kamiListings.json: ${err.message}`);
   }
 }
 
@@ -575,6 +644,7 @@ async function main() {
       process.exit(1);
     }
 
+    await versionFile(HISTORY_KEY);
     await uploadToR2(HISTORY_KEY, { history: mergedHistory });
 
     // --------------------------------------------------------
@@ -671,10 +741,25 @@ async function main() {
       console.log(`\nSuccessfully fetched ${sortedEntries.length} listings:`);
       
 
+      // ─── SANITY GUARD ───────────────────────────────────────────────────────
+      // Listings can legitimately drop to 0 (nothing on sale), so we only guard
+      // against a suspiciously large drop compared to previous — over 80% gone
+      // in one run is almost certainly a fetch error, not real market activity.
+      const prevListingCount = Object.keys(prevListings).length;
+      if (prevListingCount > 0 && sortedEntries.length < prevListingCount * 0.2) {
+        throw new Error(
+          `Safety abort: fetched ${sortedEntries.length} listings but previous run had ${prevListingCount}. ` +
+          `This looks like an incomplete fetch — refusing to overwrite R2 data.`
+        );
+      }
+      // ────────────────────────────────────────────────────────────────────────
+
+      await versionFile("kamiListings.json");
       await uploadToR2("kamiListings.json", { listings, newListingId, listingNewWindow });
 
     } else {
       console.log("No active listings found.");
+      await versionFile("kamiListings.json");
       await uploadToR2("kamiListings.json", { listings: {}, newListingId: [], listingNewWindow: {} });
     }
 

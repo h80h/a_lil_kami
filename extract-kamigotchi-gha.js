@@ -1,5 +1,5 @@
 const { chromium } = require('playwright');
-const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
+const { S3Client, GetObjectCommand, CopyObjectCommand, ListObjectsV2Command, DeleteObjectCommand } = require('@aws-sdk/client-s3');
 const { Upload } = require("@aws-sdk/lib-storage");
 const { Readable } = require('stream');
 
@@ -13,6 +13,62 @@ const r2Client = new S3Client({
     secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
   },
 });
+
+// ─── VERSIONING HELPER ────────────────────────────────────────────────────────
+const MAX_VERSIONS = 3;
+
+async function versionFile(key) {
+  try {
+    // 1. Check the file exists before trying to version it
+    await r2Client.send(new GetObjectCommand({
+      Bucket: process.env.R2_BUCKET_NAME,
+      Key: key,
+    }));
+  } catch (err) {
+    if (err.name === 'NoSuchKey' || err.$metadata?.httpStatusCode === 404) {
+      console.log(`   ⏭️  No existing ${key} to version (first run)`);
+      return;
+    }
+    console.warn(`   ⚠️  Could not check ${key} before versioning: ${err.message}`);
+    return;
+  }
+
+  try {
+    // 2. Copy current file to versions/<key>/<timestamp>
+    const timestamp = new Date().toISOString();
+    const versionKey = `versions/${key}/${timestamp}`;
+
+    await r2Client.send(new CopyObjectCommand({
+      Bucket: process.env.R2_BUCKET_NAME,
+      CopySource: `${process.env.R2_BUCKET_NAME}/${key}`,
+      Key: versionKey,
+    }));
+    console.log(`   🗂️  Versioned ${key} → ${versionKey}`);
+
+    // 3. Prune oldest versions if we exceed MAX_VERSIONS
+    const listed = await r2Client.send(new ListObjectsV2Command({
+      Bucket: process.env.R2_BUCKET_NAME,
+      Prefix: `versions/${key}/`,
+    }));
+
+    const versions = listed.Contents || [];
+    if (versions.length > MAX_VERSIONS) {
+      versions.sort((a, b) => a.Key.localeCompare(b.Key)); // oldest first
+      const toDelete = versions.slice(0, versions.length - MAX_VERSIONS);
+      for (const v of toDelete) {
+        await r2Client.send(new DeleteObjectCommand({
+          Bucket: process.env.R2_BUCKET_NAME,
+          Key: v.Key,
+        }));
+        console.log(`   🗑️  Pruned old version: ${v.Key}`);
+      }
+    }
+  } catch (err) {
+    // Versioning failure should never block the main upload
+    console.warn(`   ⚠️  Versioning failed for ${key}: ${err.message}`);
+  }
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 async function uploadBundleToR2(bundleData) {
   const filename = 'kamiBundle.json';
@@ -50,6 +106,7 @@ async function uploadBundleToR2(bundleData) {
 async function uploadMetaToR2(metaData) {
   const filename = 'kamiMeta.json';
   console.log(`\n📤 Uploading ${filename} to Cloudflare R2...`);
+  await versionFile(filename);
   try {
     const parallelUploads3 = new Upload({
       client: r2Client,
@@ -71,8 +128,8 @@ async function uploadMetaToR2(metaData) {
 }
 
 async function fetchPreviousMetadata() {
+  console.log('📋 Fetching previous metadata from R2 bundle...');
   try {
-    console.log('📋 Fetching previous metadata from R2 bundle...');
     const command = new GetObjectCommand({
       Bucket: process.env.R2_BUCKET_NAME,
       Key: 'kamiBundle.json',
@@ -82,7 +139,13 @@ async function fetchPreviousMetadata() {
     const bundle = JSON.parse(body);
     return bundle.kamiMetadata || { previousMaxId: null, isFirstRun: true, kamiNewWindow: {} };
   } catch (error) {
-    return { previousMaxId: null, isFirstRun: true, kamiNewWindow: {} };
+    // Genuine first run (bucket empty) — safe to continue with defaults
+    if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
+      console.log('   ⏭️  No existing kamiBundle.json found — treating as first run');
+      return { previousMaxId: null, isFirstRun: true, kamiNewWindow: {} };
+    }
+    // Any other R2 error (network flake, auth, etc.) — abort to protect existing data
+    throw new Error(`R2 read failed for kamiBundle.json: ${error.message}`);
   }
 }
 
@@ -282,6 +345,20 @@ async function runExtraction() {
       totalCount:    bundle.kamiMetadata.totalCount,
       kamiAccounts:  kamiAccountsMap,
     };
+
+    // ─── SANITY GUARD ─────────────────────────────────────────────────────────
+    // If we fetched significantly fewer Kamis than last time, something went wrong
+    // during extraction (site flake, early exit, etc.). Abort to protect R2 data.
+    if (!isFirstRun && previousMetadata.totalCount) {
+      const DROP_THRESHOLD = 0.9; // allow up to 10% drop (e.g. kami burned/removed)
+      if (allIds.length < previousMetadata.totalCount * DROP_THRESHOLD) {
+        throw new Error(
+          `Safety abort: extracted ${allIds.length} items but previous run had ${previousMetadata.totalCount}. ` +
+          `This looks like an incomplete extraction — refusing to overwrite R2 data.`
+        );
+      }
+    }
+    // ──────────────────────────────────────────────────────────────────────────
 
     await Promise.all([
       uploadBundleToR2(bundle),
