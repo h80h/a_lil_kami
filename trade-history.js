@@ -406,7 +406,7 @@ function filterTradeHistory() {
       const baseSearch   = _savedSearch || '?listing=true';
       const savedParams  = new URLSearchParams(baseSearch);
       const currentParams = new URLSearchParams(window.location.search);
-      for (const key of ['clones', 'traits', 'affinity', 'minmax']) {
+      for (const key of ['clones', 'traits', 'affinity', 'minmax', 'ids']) {
         const val = currentParams.get(key);
         if (val !== null) savedParams.set(key, val);
         else savedParams.delete(key);
