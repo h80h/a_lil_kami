@@ -1675,7 +1675,7 @@ function displayNFT(id, showCloseButton = false) {
             const scores = kamiScoresData[id] || [];
             rankBadgeEl.textContent = ingameRank ?? rank;
             rankBadgeEl.title = `In-game Rank: #${ingameRank ?? '?'} | Overall: ${scores[1] ?? '?'} | Rarity: ${scores[0] ?? '?'}`;
-            rankBadgeEl.setAttribute("style", "color: #62c1e5");
+            rankBadgeEl.setAttribute("style", "color: #667eea");
         }
         rankBadgeEl.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -1689,7 +1689,7 @@ function displayNFT(id, showCloseButton = false) {
                     const scores = kamiScoresData[cId] || [];
                     badge.textContent = ingameRank ?? (nftRarityScores[cId]?.rank ?? '?');
                     badge.title = `In-game Rank: #${ingameRank ?? '?'} | Overall: ${scores[1] ?? '?'} | Rarity: ${scores[0] ?? '?'}`;
-                    badge.setAttribute("style", "color: #62c1e5");
+                    badge.setAttribute("style", "color: #667eea");
                 } else {
                     const rd = nftRarityScores[cId];
                     const r = rd ? rd.rank : '?';
