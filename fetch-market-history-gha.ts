@@ -764,7 +764,11 @@ async function main() {
       }
       console.log(`⏱️  IDs in listing-window: ${Object.keys(listingNewWindow).length > 0 ? Object.keys(listingNewWindow).join(", ") : "none"}`);
 
-      const sortedEntries = Object.values(byId).sort((a, b) => a.id - b.id);
+      const sortedEntries = Object.values(byId).sort((a, b) => {
+        const tA = a.listedTime ? new Date(a.listedTime).getTime() : 0;
+        const tB = b.listedTime ? new Date(b.listedTime).getTime() : 0;
+        return tB - tA;
+      });
       const listings: Record<number, SimpleListing> = {};
       sortedEntries.forEach((item, i) => { listings[i + 1] = item; });
 
