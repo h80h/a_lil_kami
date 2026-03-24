@@ -164,6 +164,9 @@ let traitNameToIndex = {};
 let kamiInfoData = {};
 let kamiAccountsData = {};
 let kamiToAccount = {};    // { [kamiIndex]: { accountIndex, accountName } }  — built after load
+let kamiScoresData = {};   // { [kamiIndex]: [rarityScore, overallScore] } — from kamiScores
+let kamiInGameRanks = {};  // { [kamiIndex]: rank } — computed client-side from kamiScoresData
+let isShowingIngameRank = false; // global toggle: false = openrarity, true = in-game
 let affinityData = {};
 let metadataInfo = {};
 let sacrificedNFTs = new Map(); // kami_index (string) → revealed_at_unix (number)
@@ -1664,6 +1667,41 @@ function displayNFT(id, showCloseButton = false) {
         applyKamiPage((kamiOverlayPage + 1) % 4);
     });
 
+    // Rank badge click: toggle ALL badges globally between openrarity and in-game rank
+    const rankBadgeEl = card.querySelector('.rank-badge');
+    if (rankBadgeEl) {
+        if (isShowingIngameRank) {
+            const ingameRank = kamiInGameRanks[id];
+            const scores = kamiScoresData[id] || [];
+            rankBadgeEl.textContent = ingameRank ?? rank;
+            rankBadgeEl.title = `In-game Rank: #${ingameRank ?? '?'} | Overall: ${scores[1] ?? '?'} | Rarity: ${scores[0] ?? '?'}`;
+            rankBadgeEl.setAttribute("style", "color: #62c1e5");
+        }
+        rankBadgeEl.addEventListener('click', (e) => {
+            e.stopPropagation();
+            isShowingIngameRank = !isShowingIngameRank;
+            document.querySelectorAll('.nft-card').forEach(c => {
+                const badge = c.querySelector('.rank-badge');
+                if (!badge) return;
+                const cId = c.dataset.nftId;
+                if (isShowingIngameRank) {
+                    const ingameRank = kamiInGameRanks[cId];
+                    const scores = kamiScoresData[cId] || [];
+                    badge.textContent = ingameRank ?? (nftRarityScores[cId]?.rank ?? '?');
+                    badge.title = `In-game Rank: #${ingameRank ?? '?'} | Overall: ${scores[1] ?? '?'} | Rarity: ${scores[0] ?? '?'}`;
+                    badge.setAttribute("style", "color: #62c1e5");
+                } else {
+                    const rd = nftRarityScores[cId];
+                    const r = rd ? rd.rank : '?';
+                    const s = rd ? rd.score.toFixed(4) : '?';
+                    badge.textContent = r;
+                    badge.title = rd?.isTied ? `Rank: #${r} (Tied) | Score: ${s}` : `Rank: #${r} | Score: ${s}`;
+                    badge.setAttribute("style", "background: rgba(255, 240, 31, 0.3);");
+                }
+            });
+        });
+    }
+
     // slot already renders the correct page; just mark card active
     card.classList.add('is-active');
 
@@ -2127,6 +2165,7 @@ async function fetchAndSplitBundle(v) {
     metadataInfo      = bundle.kamiMetadata || { newKamiIds: [] }; bundle.kamiMetadata   = null;
     kamiInfoData      = bundle.kamiInfo     || {};                 bundle.kamiInfo       = null;
     kamiAccountsData  = bundle.kamiAccounts || {};                 bundle.kamiAccounts   = null;
+    kamiScoresData    = bundle.kamiScores   || {};                 bundle.kamiScores     = null;
     bundle = null;
 }
 
@@ -2167,6 +2206,20 @@ function processLoadedData() {
     traitCounts         = calculateTraitCounts();
     nftRarityScores     = calculateRarityScores();
     console.log('✅ OpenRarity calculation complete!');
+
+    // Compute in-game ranks from kamiScores: sort by overall desc, then rarity desc
+    kamiInGameRanks = {};
+    const scoreEntries = Object.entries(kamiScoresData);
+    if (scoreEntries.length > 0) {
+        scoreEntries
+            .sort((a, b) => {
+                const overallDiff = (b[1][1] ?? -1) - (a[1][1] ?? -1);
+                if (overallDiff !== 0) return overallDiff;
+                return (b[1][0] ?? -1) - (a[1][0] ?? -1);
+            })
+            .forEach(([ id ], i) => { kamiInGameRanks[id] = i + 1; });
+        console.log('✅ In-game rank calculation complete!');
+    }
 }
 
 async function loadData() {
