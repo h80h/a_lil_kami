@@ -187,7 +187,7 @@ async function runExtraction() {
       throw new Error(`Data load failed: received 0 items after all retries. The site may be down or the network API did not load.`);
     }
 
-    const { imageMap, traitsMap, traitIndexMap, kamiInfoMap, kamiAccountsMap, prices } = await page.evaluate(() => {
+    const { imageMap, traitsMap, traitIndexMap, kamiInfoMap, kamiAccountsMap, prices, kamiScoresMap } = await page.evaluate(() => {
       function extractSlimTraits(kamiData) {
         // kamiTraits: each kami maps trait slot → trait name string only
         // affinity stays on body/hand for the filter UI to use via kamiTraitIndex lookup
@@ -269,6 +269,23 @@ async function runExtraction() {
         } catch { return { mintPrice: null, rerollPrice: null }; }
       })();
 
+      // Scores: fetch rarity and overall for all kami IDs
+      const allIds = allFull.map(k => k.index);
+      const kamiScores = {};
+      try {
+        const rarityResults  = network.explorer.kamis.scores.rarity(allIds);
+        const overallResults = network.explorer.kamis.scores.overall(allIds);
+        const rarityMap  = {};
+        const overallMap = {};
+        rarityResults.forEach(r  => { rarityMap[r.index]  = r.rarity; });
+        overallResults.forEach(r => { overallMap[r.index] = r.score; });
+        allIds.forEach(id => {
+          kamiScores[id] = [rarityMap[id] ?? null, overallMap[id] ?? null];
+        });
+      } catch (e) {
+        console.warn('scores fetch failed:', e.message);
+      }
+
       return {
         imageMap:        img,
         traitsMap:       extractSlimTraits(trtRaw),
@@ -276,6 +293,7 @@ async function runExtraction() {
         kamiInfoMap:     kamiInfo,
         kamiAccountsMap: accounts,
         prices,
+        kamiScoresMap:   kamiScores,
       };
     });
 
@@ -327,6 +345,7 @@ async function runExtraction() {
       kamiTraitIndex: traitIndexMap,
       kamiInfo: kamiInfoMap,
       kamiAccounts: kamiAccountsMap,
+      kamiScores: kamiScoresMap,
       kamiMetadata: {
         lastUpdate: new Date().toISOString(),
         previousMaxId: currentMaxId,
