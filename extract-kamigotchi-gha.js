@@ -168,7 +168,7 @@ async function runExtraction() {
     await page.waitForFunction(() => typeof window.network !== 'undefined' && window.network?.explorer?.kamis?.all, { timeout: 120000 });
 
     let dataLoaded = false;
-    let retries = 6;
+    let retries = 10;
     let previousCount = 0;
 
     while (retries > 0 && !dataLoaded) {
