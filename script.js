@@ -2211,13 +2211,31 @@ function processLoadedData() {
     kamiInGameRanks = {};
     const scoreEntries = Object.entries(kamiScoresData);
     if (scoreEntries.length > 0) {
-        scoreEntries
-            .sort((a, b) => {
-                const overallDiff = (b[1][1] ?? -1) - (a[1][1] ?? -1);
-                if (overallDiff !== 0) return overallDiff;
-                return (b[1][0] ?? -1) - (a[1][0] ?? -1);
-            })
-            .forEach(([ id ], i) => { kamiInGameRanks[id] = i + 1; });
+        scoreEntries.sort((a, b) => {
+            const overallDiff = (b[1][1] ?? -1) - (a[1][1] ?? -1);
+            if (overallDiff !== 0) return overallDiff;
+            return (b[1][0] ?? -1) - (a[1][0] ?? -1);
+        });
+
+        let currentRank = 1;
+        let prevOverall = null;
+        let prevRarity = null;
+
+        scoreEntries.forEach(([id, scores], index) => {
+            const overallScore = scores[1] ?? -1;
+            const rarityScore = scores[0] ?? -1;
+
+            // If it's not the first item, and either score differs from the previous, update the rank
+            if (prevOverall !== null && (overallScore !== prevOverall || rarityScore !== prevRarity)) {
+                currentRank = index + 1;
+            }
+
+            kamiInGameRanks[id] = currentRank;
+
+            prevOverall = overallScore;
+            prevRarity = rarityScore;
+        });
+        
         console.log('✅ In-game rank calculation complete!');
     }
 }
