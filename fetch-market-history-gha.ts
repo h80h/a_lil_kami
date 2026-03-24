@@ -473,16 +473,34 @@ async function fetchBackfillBatch(
 
           const kamiId = Number(order.Listing?.KamiIndex ?? order.Bid?.KamiIndex ?? 0);
           const price  = Number(BigInt(order.Listing?.Price ?? order.Bid?.Price ?? "0")) / 1e18;
-          const seller = order.Listing?.SellerAccountID ?? order.Bid?.SellerAccountID ?? "";
-          const buyer  = order.Listing?.BuyerAccountID ?? order.Bid?.BuyerAccountID ?? "";
           const type   = order.Listing ? "listing" : "bid";
 
-          const existing = existingHistoryMap.get(order.OrderID);
-          const isNew    = !existing;
+          // For BidType=2 bids the feed stores records under a composite key
+          // "{orderId}-{kamiIndex}-{timestamp}" — try that first so we find any
+          // manually-edited or feed-captured record before falling back to plain orderId.
+          const compositeSubId = type === "bid"
+            ? `${order.OrderID}-${kamiId}-${order.Timestamp}`
+            : null;
+          const existing =
+            (compositeSubId && existingHistoryMap.get(compositeSubId)) ||
+            existingHistoryMap.get(order.OrderID) ||
+            undefined;
+          // Use whichever key the existing record was stored under
+          const resolvedOrderId = compositeSubId && existingHistoryMap.has(compositeSubId)
+            ? compositeSubId
+            : order.OrderID;
+          const isNew = !existing;
+
+          // Preserve seller/buyer from existing record first; the API does not
+          // populate SellerAccountID on accepted bids (BidType=2), so fall back
+          // to accountId only when the current account is the seller side (i.e. not the buyer).
+          const isBuyer = type === "bid" && order.Bid?.BuyerAccountID === accountId;
+          const seller = existing?.seller || order.Listing?.SellerAccountID || order.Bid?.SellerAccountID || (type === "bid" && !isBuyer ? accountId : "");
+          const buyer  = existing?.buyer  || order.Listing?.BuyerAccountID  || order.Bid?.BuyerAccountID  || "";
 
           const isoTime = new Date(tsMs).toISOString();
           const record: SaleRecord = {
-            orderId: order.OrderID,
+            orderId: resolvedOrderId,
             kamiId,
             price,
             seller,
@@ -559,8 +577,13 @@ async function main() {
 
     // Seed historyMap from existing R2 data (all-time, no cutoff)
     const historyMap = new Map<string, SaleRecord>();
+    // Track orderIds that already have a non-empty seller in R2 so the merge
+    // loop never lets a wrong value written earlier in the same batch run
+    // permanently lock out a correct seller written later in the same run.
+    const r2SellerLock = new Set<string>();
     for (const record of prevHistory) {
       historyMap.set(record.orderId, record);
+      if (record.seller) r2SellerLock.add(record.orderId);
     }
 
     // Index for bid dedup: "baseOrderId|kamiId|rawTime" -> true
@@ -595,9 +618,15 @@ async function main() {
       }
       const existing = historyMap.get(record.orderId);
       if (existing) {
+        // Only treat existing.seller as a hard lock if it came from R2 (manual edit
+        // or a prior correct run). If it was written this run (e.g. buyer's account
+        // processed before seller's), allow a non-empty record.seller to win.
+        const sellerLocked = r2SellerLock.has(record.orderId);
         historyMap.set(record.orderId, {
           ...existing,
           ...record,
+          seller:    sellerLocked ? existing.seller : (record.seller || existing.seller),
+          buyer:     existing.buyer     || record.buyer,
           rawTime:   existing.rawTime,
           tradeTime: existing.tradeTime,
         });
@@ -613,9 +642,12 @@ async function main() {
       }
       const existing = historyMap.get(record.orderId);
       if (existing) {
+        const sellerLocked = r2SellerLock.has(record.orderId);
         historyMap.set(record.orderId, {
           ...existing,
           ...record,
+          seller:    sellerLocked ? existing.seller : (record.seller || existing.seller),
+          buyer:     existing.buyer     || record.buyer,
           rawTime:   existing.rawTime,
           tradeTime: existing.tradeTime,
         });
