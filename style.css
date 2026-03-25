@@ -1013,12 +1013,17 @@ button {
   cursor: help;
 }
 
-.listing-badge {
+.listing-badge,
+.wild-badge {
   position: absolute;
   bottom: 3px;
   right: 5px;
   z-index: 5;
   cursor: help;
+}
+
+.wild-badge {
+  bottom: 4px;
 }
 
 .new-listing-icon {
@@ -1041,7 +1046,8 @@ button {
 }
 
 .stat-icon,
-#kamiswap_icon {
+#kamiswap_icon,
+#wild_icon {
   width: 28px;
   height: 28px;
 }
@@ -1347,7 +1353,7 @@ button {
 /* ============================================================
    CUSTOM TOOLTIP (replaces native title attribute delay)
    ============================================================ */
-[data-tooltip]:not(.listing-badge) {
+[data-tooltip] {
     position: relative;
 }
 

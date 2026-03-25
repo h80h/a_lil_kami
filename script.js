@@ -170,6 +170,7 @@ let isShowingIngameRank = false; // global toggle: false = openrarity, true = in
 let affinityData = {};
 let metadataInfo = {};
 let sacrificedNFTs = new Map(); // kami_index (string) → revealed_at_unix (number)
+let wildNFTs = new Set();
 let listingNFTs = new Map();
 let listingMetaInfo = { newListingId: [], listingNewWindow: {} };
 
@@ -1562,10 +1563,7 @@ function displayNFT(id, showCloseButton = false) {
     const isNew        = metadataInfo.kamiNewWindow && Object.prototype.hasOwnProperty.call(metadataInfo.kamiNewWindow, String(id));
     const isClone      = traitSignatures.cloneIds.has(id);
     const isSacrificed = sacrificedNFTs.has(String(id));
-    const sacrificeUnix = isSacrificed ? sacrificedNFTs.get(String(id)) : null;
-    const ripDateHTML   = isSacrificed && sacrificeUnix
-        ? `<div class="last">r.i.p: ${new Date(sacrificeUnix * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</div>`
-        : '';
+    const isWild = wildNFTs.has(String(id));
     const listingData  = listingNFTs.get(String(id));
     const listingPrice = listingData?.price;
     const isListing    = listingData !== undefined;
@@ -1591,6 +1589,7 @@ function displayNFT(id, showCloseButton = false) {
     const newBadgeHTML       = isNew        ? `<div class="new-badge" title="Recently Added!">NEW</div>` : '';
     const cloneBadgeHTML     = isClone      ? `<div class="clone-badge" title="This Kamigotchi has identical traits to others">CLONE</div>` : '';
     const sacrificeBadgeHTML = isSacrificed ? `<div class="sacrifice-badge" title="This Kamigotchi has been sacrificed">🕳️</div>` : '';
+    const wildBadgeHTML      = isWild       ? `<div class="wild-badge" title="This Kamigotchi is in wild"><img id="wild_icon" src="https://app.kamigotchi.io/assets/link_to_external_apps-BtyJUHk_.png" style="border:none"></div>` : '';
     const listingBadgeHTML   = isListing    ? `<div class="listing-badge"><img id="kamiswap_icon" src="https://app.kamigotchi.io/assets/marketplace-BqMKbOFC.png" style="border:none"></div>` : '';
     const listingPriceHTML   = isListing    ? `<div class="listing-price">Ξ${listingPrice}</div>` : '';
     const newListingIconHTML = isNewListing ? `<div class="new-listing-icon">New</div>` : '';
@@ -1602,13 +1601,6 @@ function displayNFT(id, showCloseButton = false) {
         : (statColorClass
             ? `<div class="stat-color-box ${statColorClass}" title="${statColorClass.charAt(0).toUpperCase() + statColorClass.slice(1)} Sort">${statValue}</div>`
             : '');
-
-    const traitsHTML = Object.entries(traits)
-        .map(([key, traitData]) => `
-            <div class="trait">
-                <p>${key.charAt(0).toUpperCase() + key.slice(1)}: ${getTraitName(traitData)}</p>
-            </div>`)
-        .join('');
 
     const kamiOverlayControlsHTML = `
         <div class="kami-overlay-controls">
@@ -1637,6 +1629,7 @@ function displayNFT(id, showCloseButton = false) {
             ${listingPriceHTML}
             ${newListingIconHTML}
             ${listingTimeTextHTML}
+            ${wildBadgeHTML}
         </div>`;
 
     if (isMobile) {
@@ -2166,6 +2159,14 @@ async function fetchAndSplitBundle(v) {
     kamiInfoData      = bundle.kamiInfo     || {};                 bundle.kamiInfo       = null;
     kamiAccountsData  = bundle.kamiAccounts || {};                 bundle.kamiAccounts   = null;
     kamiScoresData    = bundle.kamiScores   || {};                 bundle.kamiScores     = null;
+    if (bundle.wildKami) {
+        wildNFTs = new Set(bundle.wildKami.map(String));
+        console.log(`🔍 Found ${wildNFTs.size} wild Kamigotchi`);
+    } else {
+        wildNFTs = new Set();
+    }
+    bundle.wildKami = null;
+
     bundle = null;
 }
 
@@ -2365,6 +2366,7 @@ async function refreshData() {
         const v = Date.now();
         await Promise.all([
             fetchAndSplitBundle(v),
+            loadSacrificeData(v),
             loadListingsData(v),
             typeof window._reloadTradeHistory === 'function' ? window._reloadTradeHistory() : Promise.resolve(),
         ]);

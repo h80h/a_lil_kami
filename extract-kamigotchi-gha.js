@@ -187,7 +187,7 @@ async function runExtraction() {
       throw new Error(`Data load failed: received 0 items after all retries. The site may be down or the network API did not load.`);
     }
 
-    const { imageMap, traitsMap, traitIndexMap, kamiInfoMap, kamiAccountsMap, prices, kamiScoresMap } = await page.evaluate(() => {
+    const { imageMap, traitsMap, traitIndexMap, kamiInfoMap, kamiAccountsMap, prices, kamiScoresMap, wildSet } = await page.evaluate(() => {
       function extractSlimTraits(kamiData) {
         // kamiTraits: each kami maps trait slot → trait name string only
         // affinity stays on body/hand for the filter UI to use via kamiTraitIndex lookup
@@ -212,6 +212,7 @@ async function runExtraction() {
       const img      = {};
       const trtRaw   = {};
       const kamiInfo = {};
+      const wild = new Set();
 
       // stats array order: [harmony, health, power, violence]
       const STAT_KEYS = ['health', 'power', 'violence', 'harmony'];
@@ -219,6 +220,8 @@ async function runExtraction() {
       allFull.forEach(k => {
         img[k.index]    = k.image;
         trtRaw[k.index] = k.traits;
+
+        if (k.state === '721_EXTERNAL') wild.add(k.index);
 
         // kamiInfo entry: name, level (k.progress.level), stats as compact array [harmony, health, power, violence]
         kamiInfo[k.index] = {
@@ -294,6 +297,7 @@ async function runExtraction() {
         kamiAccountsMap: accounts,
         prices,
         kamiScoresMap:   kamiScores,
+        wildSet:         Array.from(wild),
       };
     });
 
@@ -346,6 +350,7 @@ async function runExtraction() {
       kamiInfo: kamiInfoMap,
       kamiAccounts: kamiAccountsMap,
       kamiScores: kamiScoresMap,
+      wildKami: wildSet,
       kamiMetadata: {
         lastUpdate: new Date().toISOString(),
         previousMaxId: currentMaxId,
