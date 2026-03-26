@@ -149,6 +149,74 @@ async function fetchPreviousMetadata() {
   }
 }
 
+// ─── WILD KAMI OWNER RESOLUTION (on-chain ownerOf) ───────────────────────────
+const WILD_NFT_CONTRACT = '0x5d4376b62fa8AC16dFabe6a9861E11c33A48C677';
+const WILD_RPC_URL = 'https://archival-jsonrpc-yominet-1.anvil.asia-southeast.initia.xyz';
+const WILD_RPC_BATCH = 10; // requests per batch to avoid overwhelming the endpoint
+
+function encodeOwnerOfCalldata(tokenId) {
+  const hex = BigInt(tokenId).toString(16).padStart(64, '0');
+  return '0x6352211e' + hex;
+}
+
+function decodeOwnerAddress(hexResult) {
+  return '0x' + hexResult.slice(-40).toLowerCase();
+}
+
+async function resolveWildOwners(wildIds, accountsMap) {
+  // Build hex-address → account lookup from decimal account ids
+  const hexAddrToAccount = {};
+  Object.entries(accountsMap).forEach(([accountIndex, acc]) => {
+    if (acc.id) {
+      const hexAddr = '0x' + BigInt(acc.id).toString(16).toLowerCase();
+      hexAddrToAccount[hexAddr] = { accountIndex, accountName: acc.name };
+    }
+  });
+
+  console.log(`\n🔗 Resolving owners for ${wildIds.length} wild Kamigotchi via RPC (batch=${WILD_RPC_BATCH})...`);
+
+  const wildKamiOwners = {};
+  let resolved = 0;
+
+  // Process in batches to avoid connection overload
+  for (let i = 0; i < wildIds.length; i += WILD_RPC_BATCH) {
+    const batch = wildIds.slice(i, i + WILD_RPC_BATCH);
+    const results = await Promise.allSettled(
+      batch.map(async (kamiIndex) => {
+        const response = await fetch(WILD_RPC_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jsonrpc: '2.0', id: 1, method: 'eth_call',
+            params: [{ to: WILD_NFT_CONTRACT, data: encodeOwnerOfCalldata(kamiIndex) }, 'latest'],
+          }),
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const json = await response.json();
+        if (!json.result) throw new Error('empty result');
+        const addr = decodeOwnerAddress(json.result);
+        const acc = hexAddrToAccount[addr];
+        return { kamiIndex, accountIndex: acc?.accountIndex ?? null, accountName: acc?.accountName ?? null };
+      })
+    );
+
+    results.forEach((r, j) => {
+      if (r.status === 'fulfilled') {
+        const { kamiIndex, accountIndex, accountName } = r.value;
+        wildKamiOwners[kamiIndex] = { accountIndex, accountName };
+        if (accountName) resolved++;
+      } else {
+        wildKamiOwners[batch[j]] = { accountIndex: null, accountName: null };
+        console.warn(`   ⚠️  ownerOf failed for #${batch[j]}: ${r.reason?.message}`);
+      }
+    });
+  }
+
+  console.log(`   ✅ Resolved ${resolved}/${wildIds.length} wild owners by name`);
+  return wildKamiOwners;
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 async function runExtraction() {
   let browser;
   const startTime = Date.now();
@@ -303,6 +371,11 @@ async function runExtraction() {
 
     await browser.close();
 
+    // Resolve wild kami owners on-chain (server-side avoids browser CORS/rate-limit issues)
+    const wildKamiOwners = wildSet.length > 0
+      ? await resolveWildOwners(wildSet, kamiAccountsMap)
+      : {};
+
     // Check for new Kamigotchi
     console.log('\n📋 Checking for new Kamigotchi...');
     const previousMetadata = await fetchPreviousMetadata();
@@ -350,7 +423,7 @@ async function runExtraction() {
       kamiInfo: kamiInfoMap,
       kamiAccounts: kamiAccountsMap,
       kamiScores: kamiScoresMap,
-      wildKami: wildSet,
+      wildKamiOwners: wildKamiOwners,
       kamiMetadata: {
         lastUpdate: new Date().toISOString(),
         previousMaxId: currentMaxId,
