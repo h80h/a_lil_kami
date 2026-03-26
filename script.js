@@ -2093,6 +2093,7 @@ async function checkForUpdates() {
         ]);
 
         let shouldRefresh = false;
+        let freshMetaAccounts = null; // kamiAccounts from kamiMeta.json for this tick
 
         // ── listings ─────────────────────────────────────────────────────
         let newListings = null;
@@ -2135,9 +2136,23 @@ async function checkForUpdates() {
             cachedMetaHash    = getSignificantMetaHash(newMeta);
             cachedAccountsHash = newAccountsHash;
             if (!shouldRefresh) metadataInfo.totalCount = newMeta.totalCount;
+
+            // Stash for post-refresh reconciliation below
+            if (newMeta.kamiAccounts) freshMetaAccounts = newMeta.kamiAccounts;
         }
 
-        if (shouldRefresh) await refreshData();
+        if (shouldRefresh) {
+            await refreshData();
+            // The bundle fetched by refreshData() may still lag behind kamiMeta.json:
+            // a kami that was just minted/rerolled (gaining its first owner) and then
+            // immediately listed can arrive in kamiListings.json before the bundle is
+            // regenerated with the new owner mapping.  Re-applying the kamiAccounts
+            // from kamiMeta.json — already fetched moments ago in this same tick —
+            // ensures those newly-listed kamis show the correct owner instead of '—'.
+            if (freshMetaAccounts) {
+                patchInfoOverlays(freshMetaAccounts);
+            }
+        }
     } catch (err) {}
 }
 
