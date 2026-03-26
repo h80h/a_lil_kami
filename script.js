@@ -171,6 +171,55 @@ let affinityData = {};
 let metadataInfo = {};
 let sacrificedNFTs = new Map(); // kami_index (string) → revealed_at_unix (number)
 let wildNFTs = new Set();
+
+// ============================================================
+// WILD NFT OWNER LOOKUP (on-chain via ownerOf)
+// ============================================================
+const WILD_OWNER_CACHE = {};  // { [kamiIndex]: accountName | 'loading' | 'error' }
+const WILD_ACCOUNT_IDX_CACHE = {};  // { [kamiIndex]: accountIndex } — populated alongside WILD_OWNER_CACHE
+let wildHexAddrToAccount = {}; // { [lowercaseHexAddr]: { accountIndex, accountName } } — built in loadKamiInfoData
+const WILD_NFT_CONTRACT = '0x5d4376b62fa8AC16dFabe6a9861E11c33A48C677';
+const WILD_RPC_URL = 'https://archival-jsonrpc-yominet-1.anvil.asia-southeast.initia.xyz';
+
+function encodeOwnerOfCalldata(tokenId) {
+    // ownerOf(uint256) selector = 0x6352211e, arg padded to 32 bytes
+    const hex = BigInt(tokenId).toString(16).padStart(64, '0');
+    return '0x6352211e' + hex;
+}
+
+function decodeAddress(hexResult) {
+    // Result is 32-byte padded address; take last 20 bytes
+    return '0x' + hexResult.slice(-40);
+}
+
+async function fetchWildOwner(kamiIndex) {
+    const _cached = WILD_OWNER_CACHE[kamiIndex];
+    if (_cached === 'loading') return null;
+    if (_cached && _cached !== 'error') return _cached;
+    if (_cached === 'error') return null;
+
+    WILD_OWNER_CACHE[kamiIndex] = 'loading';
+    try {
+        const response = await fetch(WILD_RPC_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                jsonrpc: '2.0', id: 1, method: 'eth_call',
+                params: [{ to: WILD_NFT_CONTRACT, data: encodeOwnerOfCalldata(kamiIndex) }, 'latest'],
+            }),
+        });
+        const json = await response.json();
+        const addr = decodeAddress(json.result); // e.g. "0xFbFfBA9191E5E8612dB4F0Ae4976A2f87eD3610a"
+        const acc = wildHexAddrToAccount[addr.toLowerCase()];
+        const result = acc ? acc.accountName : addr;
+        WILD_OWNER_CACHE[kamiIndex] = result;
+        if (acc?.accountIndex != null) WILD_ACCOUNT_IDX_CACHE[kamiIndex] = acc.accountIndex;
+        return result;
+    } catch {
+        WILD_OWNER_CACHE[kamiIndex] = 'error';
+        return null;
+    }
+}
 let listingNFTs = new Map();
 let listingMetaInfo = { newListingId: [], listingNewWindow: {} };
 
@@ -1519,8 +1568,34 @@ function getOverlaySlotHTML(id, page) {
         const _kamiInfo    = kamiInfoData[id]    || {};
         const _kamiAccount = kamiToAccount[id]   || {};
         const _kamiName    = _kamiInfo.name      || `Kamigotchi ${id}`;
-        const _ownerName   = _kamiAccount.accountName  || '—';
-        const _accountIdx  = _kamiAccount.accountIndex != null ? `#${_kamiAccount.accountIndex}` : '—';
+        const isWildKami   = wildNFTs.has(String(id));
+
+        let _ownerName;
+        if (isWildKami) {
+            const cached = WILD_OWNER_CACHE[String(id)];
+            if (cached && cached !== 'loading' && cached !== 'error') {
+                _ownerName = cached;
+            } else {
+                _ownerName = cached === 'loading' ? '...' : '—';
+                // Kick off fetch and patch the DOM slot when it resolves
+                if (!cached) {
+                    fetchWildOwner(String(id)).then(addr => {
+                        if (!addr) return;
+                        const card = document.querySelector(`.nft-card[data-nft-id="${id}"]`);
+                        const slot = card?.querySelector('.kami-overlay-slot');
+                        if (slot && kamiOverlayPage === 2) {
+                            slot.innerHTML = getOverlaySlotHTML(id, 2);
+                        }
+                    });
+                }
+            }
+        } else {
+            _ownerName = _kamiAccount.accountName || '—';
+        }
+
+        const _accountIdx  = isWildKami
+            ? (WILD_ACCOUNT_IDX_CACHE[String(id)] != null ? `#${WILD_ACCOUNT_IDX_CACHE[String(id)]}` : '—')
+            : (_kamiAccount.accountIndex != null ? `#${_kamiAccount.accountIndex}` : '—');
         const _level       = _kamiInfo.level     != null ? _kamiInfo.level : '—';
         const _s = _kamiInfo.stats || [];
         const isSacrificed = sacrificedNFTs.has(String(id));
@@ -2001,6 +2076,15 @@ async function loadKamiInfoData(v) {
                 kamiToAccount[kamiIndex] = { accountIndex, accountName: acc.name };
             });
         });
+        // Build hex-address → account lookup for resolving wild kami owners
+        // Account ids are decimal uint256; convert to lowercase hex to match ownerOf results
+        wildHexAddrToAccount = {};
+        Object.entries(kamiAccountsData).forEach(([accountIndex, acc]) => {
+            if (acc.id) {
+                const hexAddr = '0x' + BigInt(acc.id).toString(16).toLowerCase();
+                wildHexAddrToAccount[hexAddr] = { accountIndex, accountName: acc.name };
+            }
+        });
         console.log(`📖 Loaded info for ${Object.keys(kamiInfoData).length} Kamigotchi, ${Object.keys(kamiAccountsData).length} accounts`);
         kamiAccountsData = {}; // free memory — reverse lookup is all we need going forward
     } catch (err) {}
@@ -2252,6 +2336,8 @@ async function loadData() {
             loadListingsData(v),
         ]);
         await loadKamiInfoData(v);
+        // Fire all wild owner RPC lookups in parallel so results are cached before any card is opened
+        wildNFTs.forEach(id => fetchWildOwner(id));
 
         if (metadataInfo.newKamiIds?.length > 0) {
             console.log(`✨ Found ${metadataInfo.newKamiIds.length} new Kamigotchi!`);
@@ -2372,6 +2458,7 @@ async function refreshData() {
         ]);
 
         await loadKamiInfoData(v);
+        wildNFTs.forEach(id => fetchWildOwner(id));
 
         if (metadataInfo.newKamiIds?.length > 0) {
             console.log(`✨ Found ${metadataInfo.newKamiIds.length} new Kamigotchi!`);
