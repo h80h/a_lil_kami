@@ -233,7 +233,7 @@ function getTraitStringFromState() {
         let isCoveredByAffinity = false;
         if (type === 'body' || type === 'hand') {
             const affinitySet = type === 'body' ? selectedBodyAffinities : selectedHandAffinities;
-            const entry = traitNameToIndex[value];
+            const entry = lookupTrait(type, value);
             if (entry && affinitySet.has(entry.affinity)) isCoveredByAffinity = true;
         }
 
@@ -335,7 +335,7 @@ function loadStateFromURL({ restorePanels = true } = {}) {
                     Object.values(traitsData).forEach(nft => {
                         const traitName = nft[type]; // now a plain string
                         if (traitName) {
-                            const entry = traitNameToIndex[traitName];
+                            const entry = lookupTrait(type, traitName);
                             if (entry && entry.affinity === affinityValue) {
                                 const cb = document.querySelector(`.trait-checkbox[data-trait-type="${type}"][data-trait-value="${traitName}"]`);
                                 if (cb) cb.checked = true;
@@ -536,7 +536,7 @@ function buildTraitAffinityLookup() {
         ['body', 'hand'].forEach(type => {
             const traitName = nft[type]; // now a plain string
             if (traitName) {
-                const entry = traitNameToIndex[traitName];
+                const entry = lookupTrait(type, traitName);
                 if (entry && entry.affinity) lookup[type][traitName] = entry.affinity;
             }
         });
@@ -547,8 +547,8 @@ function buildTraitAffinityLookup() {
 function extractAffinityData() {
     const affinities = {};
     Object.entries(traitsData).forEach(([id, traits]) => {
-        const bodyEntry = traits.body ? traitNameToIndex[traits.body] : null;
-        const handEntry = traits.hand ? traitNameToIndex[traits.hand] : null;
+        const bodyEntry = traits.body ? lookupTrait('body', traits.body) : null;
+        const handEntry = traits.hand ? lookupTrait('hand', traits.hand) : null;
         affinities[id] = {
             body: bodyEntry?.affinity || 'NORMAL',
             hand: handEntry?.affinity || 'NORMAL',
@@ -1052,7 +1052,7 @@ function createFilterControls() {
             const traitName = getTraitName(traitData);
             allTraits[traitType].add(traitName);
             if (!traitDetails[traitType][traitName]) {
-                const indexEntry = traitNameToIndex[traitName] || {};
+                const indexEntry = lookupTrait(traitType, traitName) || {};
                 traitDetails[traitType][traitName] = {
                     affinity: indexEntry.affinity || null,
                     stats: indexEntry.stats || {},
@@ -2054,15 +2054,41 @@ function patchNewListingIcons(newListingWindow) {
         const id = card.dataset.nftId;
         const imageContainer = card.querySelector('.image-container');
         if (!imageContainer) return;
-        const shouldHave = String(id) in newListingWindow;
-        const existing   = imageContainer.querySelector('.new-listing-icon');
-        if (shouldHave && !existing) {
+
+        // Patch new-listing-icon
+        const shouldHaveNewIcon = String(id) in newListingWindow;
+        const existingNewIcon   = imageContainer.querySelector('.new-listing-icon');
+        if (shouldHaveNewIcon && !existingNewIcon) {
             const icon = document.createElement('div');
             icon.className = 'new-listing-icon';
             icon.textContent = 'New';
             imageContainer.appendChild(icon);
-        } else if (!shouldHave && existing) {
-            existing.remove();
+        } else if (!shouldHaveNewIcon && existingNewIcon) {
+            existingNewIcon.remove();
+        }
+
+        // Patch listing-badge and listing-price
+        const listingData       = listingNFTs.get(String(id));
+        const shouldHaveListing = listingData !== undefined;
+        const existingBadge     = imageContainer.querySelector('.listing-badge');
+        const existingPrice     = imageContainer.querySelector('.listing-price');
+        if (shouldHaveListing && !existingBadge) {
+            const badge = document.createElement('div');
+            badge.className = 'listing-badge';
+            badge.innerHTML = `<img id="kamiswap_icon" src="https://app.kamigotchi.io/assets/marketplace-BqMKbOFC.png" style="border:none">`;
+            imageContainer.appendChild(badge);
+        } else if (!shouldHaveListing && existingBadge) {
+            existingBadge.remove();
+        }
+        if (shouldHaveListing && !existingPrice) {
+            const price = document.createElement('div');
+            price.className = 'listing-price';
+            price.textContent = `Ξ${listingData.price}`;
+            imageContainer.appendChild(price);
+        } else if (!shouldHaveListing && existingPrice) {
+            existingPrice.remove();
+        } else if (shouldHaveListing && existingPrice) {
+            existingPrice.textContent = `Ξ${listingData.price}`;
         }
     });
 }
@@ -2197,7 +2223,30 @@ async function fetchAndSplitBundle(v) {
 
 const BASE_STATS = { harmony: 10, health: 50, power: 10, violence: 10, slots: 0 };
 
+// Traits that share a name across categories — resolved by entity id per category.
+// All other traits are looked up by name alone (no ambiguity).
+const AMBIGUOUS_TRAIT_ENTITIES = {
+    'background:Blue':      151,
+    'background:Orange':    165,
+    'background:Pink':      166,
+    'background:Purple':    167,
+    'background:Yellow':    171,
+    'background:Butterfly': 172,
+    'body:Butterfly':       181,
+    'body:Drip':            185,
+    'body:Plant':           199,
+    'color:Blue':           213,
+    'color:Orange':         217,
+    'color:Pink':           218,
+    'color:Purple':         219,
+    'color:Yellow':         222,
+    'face:Drip':            247,
+    'hand:Plant':           276,
+};
+
 function buildTraitNameToIndex() {
+    // Primary lookup: name → entry (for unambiguous traits)
+    // Ambiguous traits are overwritten here but resolved via lookupTrait()
     const lookup = {};
     Object.values(kamiTraitIndexData).forEach(entry => {
         lookup[entry.name] = entry;
@@ -2205,13 +2254,30 @@ function buildTraitNameToIndex() {
     return lookup;
 }
 
+// Entity id → entry map, built once alongside traitNameToIndex
+let traitEntityToIndex = {};
+function buildTraitEntityToIndex() {
+    const lookup = {};
+    Object.values(kamiTraitIndexData).forEach(entry => {
+        lookup[entry.entity] = entry;
+    });
+    return lookup;
+}
+
+// Resolve a trait entry given its category slot and name.
+// Ambiguous names are routed to the correct entity; all others fall back to name lookup.
+function lookupTrait(category, name) {
+    const entityId = AMBIGUOUS_TRAIT_ENTITIES[`${category}:${name}`];
+    if (entityId !== undefined) return traitEntityToIndex[entityId];
+    return traitNameToIndex[name];
+}
+
 function calculateKamiStats() {
     const result = {};
     Object.entries(traitsData).forEach(([kamiId, traits]) => {
         const stats = { ...BASE_STATS };
-        Object.values(traits).forEach(traitName => {
-            // traitsData[kamiId][slot] is now a plain name string
-            const entry = traitNameToIndex[traitName];
+        Object.entries(traits).forEach(([category, traitName]) => {
+            const entry = lookupTrait(category, traitName);
             if (entry && entry.stats) {
                 Object.entries(entry.stats).forEach(([statName, value]) => {
                     if (Object.prototype.hasOwnProperty.call(stats, statName)) stats[statName] += value;
@@ -2225,6 +2291,7 @@ function calculateKamiStats() {
 
 function processLoadedData() {
     traitNameToIndex    = buildTraitNameToIndex();
+    traitEntityToIndex  = buildTraitEntityToIndex();
     kamiStatsData       = calculateKamiStats();
     affinityData        = extractAffinityData();
     traitAffinityLookup = buildTraitAffinityLookup();
@@ -2478,6 +2545,8 @@ async function refreshData() {
                 else                           { isFiltering = false; loadInitialNFTs(); }
             });
         }
+
+        if (selectedIDs.size > 0) updateSelectedIDsDisplay();
 
         updateURL(true);
 

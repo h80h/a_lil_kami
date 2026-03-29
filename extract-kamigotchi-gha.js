@@ -258,7 +258,7 @@ async function runExtraction() {
     const { imageMap, traitsMap, traitIndexMap, kamiInfoMap, kamiAccountsMap, prices, kamiScoresMap, wildSet } = await page.evaluate(() => {
       function extractSlimTraits(kamiData) {
         // kamiTraits: each kami maps trait slot → trait name string only
-        // affinity stays on body/hand for the filter UI to use via kamiTraitIndex lookup
+        // ambiguous same-name traits are resolved in script.js via slot+name lookup
         const traitsToKeep = ["background", "body", "color", "face", "hand"];
         const detailedData = {};
         for (const kamiId in kamiData) {
@@ -304,7 +304,7 @@ async function runExtraction() {
       const allTraitEntities = network.explorer.traits.all();
       const traitIndex = {};
       allTraitEntities.forEach((t, i) => {
-        const entry = { name: t.name, rarity: t.rarity };
+        const entry = { entity: t.entity, name: t.name, rarity: t.rarity };
         if (t.affinity) entry.affinity = t.affinity;
         if (t.stats) {
           const stats = {};
