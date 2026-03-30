@@ -2622,7 +2622,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.mint-price-text, .reroll-price-text').forEach(el => {
         el.addEventListener('click', () => {
             const tag = el.classList.contains('mint-price-text') ? 'mint-price-text' : 'reroll-price-text';
-            if (window.umami) umami.track('price-check', tag);
+            if (window.umami) umami.track('price-check', { tag });
             el.style.webkitTextFillColor = '#333';
             el.style.color = '#333';
             setTimeout(() => {
