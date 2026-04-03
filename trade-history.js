@@ -210,22 +210,39 @@
       return;
     }
 
-    // Handle scroll button states dynamically based on scroll position
+    // Handle scroll button states dynamically based on scroll position.
+    // NOTE: must only be called after layout is fully flushed — always use
+    // scheduleUpdateScrollButtons (double-rAF) after DOM/style changes.
+    // .kami-history-scroll-btns starts as display:none and .nft-card has
+    // contain:layout, so clientHeight/scrollHeight both read 0 in the first
+    // rAF tick — making isAtBottom always true and permanently disabling the
+    // down button.
     function updateScrollButtons(panel) {
       if (!panel) return;
       const card = panel.closest(".nft-card");
       if (!card) return;
-      const upBtn = card.querySelector(".kami-history-up");
-      const downBtn = card.querySelector(".kami-history-down");
+      const controls = card.querySelector(".kami-overlay-controls");
+      if (!controls) return;
+      const upBtn = controls.querySelector(".kami-history-up");
+      const downBtn = controls.querySelector(".kami-history-down");
       if (!upBtn || !downBtn) return;
 
-      const isAtTop = panel.scrollTop <= 1;
-      const isAtBottom =
-        Math.ceil(panel.scrollTop + panel.clientHeight) >=
-        panel.scrollHeight - 1;
+      const rows = panel.querySelectorAll(".kami-history-row");
+      const totalPages = rows.length;
+      const pageHeight = panel.clientHeight || 1;
+      const currentPage = Math.round(panel.scrollTop / pageHeight);
 
-      upBtn.disabled = isAtTop;
-      downBtn.disabled = isAtBottom;
+      upBtn.disabled = currentPage <= 0;
+      downBtn.disabled = currentPage >= totalPages - 1;
+    }
+
+    // Double-rAF: waits for the browser to fully flush layout (including the
+    // display:none -> flex change on .kami-history-scroll-btns and the
+    // contain:layout reflow on .nft-card) before reading scroll geometry.
+    function scheduleUpdateScrollButtons(panel) {
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => updateScrollButtons(panel)),
+      );
     }
 
     // Capture scrolling globally to easily grab events from dynamically created panels
@@ -261,33 +278,30 @@
       });
       // Force an immediate evaluation of the scroll buttons when a user lands on the history page
       if (page === 3) {
-        requestAnimationFrame(() => {
-          document
-            .querySelectorAll(".kami-history-rows")
-            .forEach(updateScrollButtons);
-        });
+        document
+          .querySelectorAll(".kami-history-rows")
+          .forEach(scheduleUpdateScrollButtons);
       }
     };
 
     function scrollHistory(panel, direction) {
       if (!panel) return;
-      const rows = Array.from(panel.querySelectorAll(".kami-history-row-top"));
+      const rows = panel.querySelectorAll(".kami-history-row");
       if (!rows.length) return;
-      const panelTop = panel.getBoundingClientRect().top;
-      const tops = rows.map(
-        (row) => panel.scrollTop + row.getBoundingClientRect().top - panelTop,
-      );
+
+      const pageHeight = panel.clientHeight;
+      const currentPage = Math.round(panel.scrollTop / pageHeight);
+      const totalPages = rows.length;
+
+      let nextPage;
       if (direction === "down") {
-        const next = tops.find((top) => top > panel.scrollTop + 1);
-        panel.scrollTop = next !== undefined ? next : panel.scrollHeight;
+        nextPage = Math.min(currentPage + 1, totalPages - 1);
       } else {
-        const prev = [...tops]
-          .reverse()
-          .find((top) => top < panel.scrollTop - 1);
-        panel.scrollTop = prev !== undefined ? prev : 0;
+        nextPage = Math.max(currentPage - 1, 0);
       }
-      // Ensure buttons reflect the new state after manually changing scrollTop
-      requestAnimationFrame(() => updateScrollButtons(panel));
+
+      panel.scrollTop = nextPage * pageHeight;
+      scheduleUpdateScrollButtons(panel);
     }
 
     function patchArrow(arrow) {
@@ -327,9 +341,9 @@
 
         // Immediate check in case injected while already on page 3
         if (_currentPage === 3) {
-          requestAnimationFrame(() => {
-            updateScrollButtons(card?.querySelector(".kami-history-rows"));
-          });
+          scheduleUpdateScrollButtons(
+            card?.querySelector(".kami-history-rows"),
+          );
         }
 
         upBtn.addEventListener("click", (e) => {

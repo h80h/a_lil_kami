@@ -1219,13 +1219,9 @@ button {
 
 .kami-history-rows {
   flex: 1;
-  overflow-y: auto;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+  overflow-y: hidden;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding-bottom: 22px;
 }
 
 .kami-history-rows::-webkit-scrollbar {
@@ -1273,10 +1269,13 @@ button {
 }
 
 .kami-history-row {
+  flex-shrink: 0;
+  /* each row is exactly one "page" tall */
+  height: 100%;
+  /* keep your internal row layout */
   display: flex;
   flex-direction: column;
   gap: 3px;
-  /* padding-bottom: 2px; */
 }
 
 .kami-history-row-top {
