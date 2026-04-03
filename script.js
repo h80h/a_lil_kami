@@ -2650,7 +2650,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!document.getElementById('sc-loading-hint-style')) {
             const s = document.createElement('style');
             s.id = 'sc-loading-hint-style';
-            s.textContent = `#sc-loading-hint{position:absolute;bottom:calc(100% + 3px);left:50%;transform:translateX(-50%);font-size:9px;white-space:nowrap;color:#000;pointer-events:none;opacity:0;transition:opacity 0.2s ease;}#sc-loading-hint.visible{opacity:1;}`;
+            s.textContent = `#sc-loading-hint{position:absolute;bottom:calc(100% + 1px);left:50%;transform:translateX(-50%);font-size:9px;white-space:nowrap;color:#000;pointer-events:none;opacity:0;transition:opacity 0.2s ease;}#sc-loading-hint.visible{opacity:1;}`;
             document.head.appendChild(s);
         }
         const hint = document.createElement('div');
