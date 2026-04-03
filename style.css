@@ -893,6 +893,12 @@ button {
   overflow: hidden;
 }
 
+.kami-history {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 0;
+}
+
 .kami-traits div,
 .kami-info div {
   margin-bottom: 3px;
@@ -1217,8 +1223,8 @@ button {
   -ms-overflow-style: none;
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  padding-bottom: 14px;
+  gap: 10px;
+  padding-bottom: 22px;
 }
 
 .kami-history-rows::-webkit-scrollbar {
@@ -1269,7 +1275,7 @@ button {
   display: flex;
   flex-direction: column;
   gap: 3px;
-  padding-bottom: 2px;
+  /* padding-bottom: 2px; */
 }
 
 .kami-history-row-top {
@@ -1347,6 +1353,12 @@ button {
   color: #333;
 }
 
+.kami-history-up:disabled,
+.kami-history-down:disabled {
+  color: #e0e0e0;
+  cursor: default;
+  pointer-events: none;
+}
 
 .listing-time-ago {
   border-color: #fff;
