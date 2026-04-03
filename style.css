@@ -543,9 +543,9 @@ button {
   position: relative;
   background: white;
   border: 2px solid #333;
+  box-shadow: 0px 2px 2px rgba(0,0,0,0.2);
   border-radius: 10px;
   padding: 1px 8px 0 8px;
-  box-shadow: 0px 2px 2px rgba(0,0,0,0.2);
   overflow: hidden;
   height: 243px;
   user-select: none;
@@ -696,7 +696,7 @@ button {
 
 .scroll-to-top {
   position: fixed;
-  bottom: 30px;
+  bottom: 80px;
   right: 30px;
   border-radius: 50%;
   cursor: pointer;
@@ -1350,6 +1350,137 @@ button {
   font-size: 14px;
 }
 
+/* The icon shown when collapsed */
+#soundcloud-player {
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+  z-index: 999;
+}
+
+.sc-seek-row,
+.sc-controls {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+
+.sc-seek-row {
+  justify-content: space-between;
+}
+
+.sc-seek-bar {
+  max-width: 100px;
+  margin-top: -1px;
+}
+
+.sc-controls div {
+  cursor: pointer;
+}
+
+.sc-btn-play {
+  margin-bottom: -1.5px;
+}
+
+.sc-track-title,
+.sc-seek-current,
+.sc-seek-duration {
+  font-size: 10px;
+  
+}
+
+.sc-track-title {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding-right: 20px;
+  color: inherit;
+  cursor: pointer;
+  outline: none;
+  font-family: inherit;
+  white-space: normal;
+  display: flex;
+  align-items: center;
+}
+
+/* Custom arrow — add a wrapper div around the select */
+.sc-title-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.sc-title-wrapper::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid currentColor;
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+#sc-toggle-btn {
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#sc-toggle-btn svg {
+    width: 40px;
+    height: 40px;
+    display: block;
+}
+
+#soundcloud-player .sc-panel {
+    position: absolute;
+    bottom: -5px;
+    right: calc(100% + 8px);
+    padding: 10px 10px 10px 10px;
+    background: #fff;
+    border-radius: 5px;
+    white-space: nowrap;
+    border: 2px solid #333;
+    box-shadow: 0px 2px 2px rgba(0,0,0,0.2);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-1px);
+    transition: opacity 0.3s ease, visibility 0.3s ease, transform 0.15s ease;
+}
+
+#soundcloud-player.sc-open .sc-panel {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(0);
+}
+
+.sc-artwork {
+    width: 100%;
+    border-radius: 3px;
+    display: block;
+}
+
+.artwork-wrapper {
+  position: relative;
+}
+
+/* hide when no artwork loaded yet */
+.sc-artwork[src=""] {
+    display: none;
+}
+
 /* ============================================================
    CUSTOM TOOLTIP (replaces native title attribute delay)
    ============================================================ */
@@ -1398,7 +1529,13 @@ button {
   opacity: 0;
 }
 
-@media (max-width: 834px){  
+@media (max-width: 1194px){
+  .nft-id {
+    font-size: 8.5px;
+  }
+}
+
+@media (max-width: 834px){ 
   .kami-traits div,
   .kami-info div {
     margin-bottom: 2px;
@@ -1471,6 +1608,29 @@ button {
 
   .listing-time {
     font-size: 6.5px;
+  }
+}
+
+@media (max-width: 796px) {
+  .nft-id {
+      font-size: 7.5px;
+  }
+
+  .kami-history-header {
+    margin-bottom: 0;
+  }
+
+  .nft-card-content {
+    gap: 0;
+  }
+
+  .kami-history-tradetime {
+    font-size: 6px;
+  }
+
+  .kami-history-seller,
+  .kami-history-buyer {
+    font-size: 6px;
   }
 }
 
@@ -1680,10 +1840,17 @@ button {
     font-size: 13px;
   }
 
-  .scroll-to-top {
+  #soundcloud-player { 
     width: 45px;
     height: 45px;
     bottom: 10px;
+    right: 10px;
+  }
+
+  .scroll-to-top {
+    width: 45px;
+    height: 45px;
+    bottom: 60px;
     right: 10px;
   }
 
@@ -1785,7 +1952,7 @@ button {
 
   #messageBox {
     min-width: 65%;
-  }  
+  }
 }
 
 @media (max-width: 326px) {
@@ -2032,7 +2199,8 @@ button {
     margin-bottom: 20px;
   }
 
-  .scroll-to-top {
+  .scroll-to-top,
+  #soundcloud-player {
     right: 5px;
   }
 
