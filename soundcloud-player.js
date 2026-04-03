@@ -459,12 +459,12 @@ document.addEventListener("DOMContentLoaded", () => {
         const dc = document.createElement("div");
         dc.className = "sc-artwork-dots";
         dc.style.cssText =
-          "display:flex;gap:6px;justify-content:center;align-items:center;flex-wrap:wrap;";
+          "position:absolute;bottom:0;left: 50%;transform: translateX(-50%);display:none;justify-content:center;align-items:center;gap:5px;padding:5px 0;";
 
         if (!document.getElementById("sc-dots-style")) {
           const s = document.createElement("style");
           s.id = "sc-dots-style";
-          s.textContent = `.sc-artwork-dot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,0.35);cursor:pointer;transition:background .25s,transform .25s;flex-shrink:0}.sc-artwork-dot:hover{background:rgba(255,255,255,0.7)}.sc-artwork-dot.active{background:#fff;transform:scale(1.25)}`;
+          s.textContent = `.sc-artwork-dot{width:6.5px;height:6.5px;border-radius:50%;background:rgba(255,255,255,0.35);cursor:pointer;transition:background .25s,transform .25s;flex-shrink:0}.sc-artwork-dot:hover{background:rgba(255,255,255,0.7)}.sc-artwork-dot.active{background:#fff;}`;
           document.head.appendChild(s);
         }
         artworkEl.insertAdjacentElement("afterend", dc);
