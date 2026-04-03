@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -48,6 +49,7 @@
   <meta name="apple-mobile-web-app-title" content="a lil kami" />
   <link rel="manifest" href="/favicon/site.webmanifest" />
 </head>
+
 <body>
   <img src="kami_loading.gif" alt="" class="loader">
   <div class="container" style="display: none;">
@@ -56,13 +58,21 @@
       <div id="search-section-container">
         <input type="text" id="searchInput" placeholder="Enter NFT ID..." autocomplete="off">
         <div id="searchBtn" title="search">
-          <svg id="searchBtn_svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 26 26"><path d="M9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.44,13.73L14.71,14H15.5L20.5,19L19,20.5L14,15.5V14.71L13.73,14.44C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3M9.5,5C7,5 5,7 5,9.5C5,12 7,14 9.5,14C12,14 14,12 14,9.5C14,7 12,5 9.5,5Z" /></svg>
+          <svg id="searchBtn_svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 26 26">
+            <path
+              d="M9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.44,13.73L14.71,14H15.5L20.5,19L19,20.5L14,15.5V14.71L13.73,14.44C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3M9.5,5C7,5 5,7 5,9.5C5,12 7,14 9.5,14C12,14 14,12 14,9.5C14,7 12,5 9.5,5Z" />
+          </svg>
         </div>
         <div id="clearSearchBtn" title="clean">
-          <svg id="clearSearchBtn_svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 28"><path d="M20.62,2C23.97,7.61 12.47,20.15 12.47,20.15L9.6,17.28L4.91,22L2.77,19.86L20.62,2Z" /></svg>
+          <svg id="clearSearchBtn_svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 28">
+            <path d="M20.62,2C23.97,7.61 12.47,20.15 12.47,20.15L9.6,17.28L4.91,22L2.77,19.86L20.62,2Z" />
+          </svg>
         </div>
         <div id="refreshDataBtn" data-tooltip="refresh data">
-          <svg id="refreshDataBtn_svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 30"><path d="M2 12C2 16.97 6.03 21 11 21C13.39 21 15.68 20.06 17.4 18.4L15.9 16.9C14.63 18.25 12.86 19 11 19C4.76 19 1.64 11.46 6.05 7.05C10.46 2.64 18 5.77 18 12H15L19 16H19.1L23 12H20C20 7.03 15.97 3 11 3C6.03 3 2 7.03 2 12Z" /></svg>
+          <svg id="refreshDataBtn_svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 30">
+            <path
+              d="M2 12C2 16.97 6.03 21 11 21C13.39 21 15.68 20.06 17.4 18.4L15.9 16.9C14.63 18.25 12.86 19 11 19C4.76 19 1.64 11.46 6.05 7.05C10.46 2.64 18 5.77 18 12H15L19 16H19.1L23 12H20C20 7.03 15.97 3 11 3C6.03 3 2 7.03 2 12Z" />
+          </svg>
         </div>
       </div>
       <div class="some-info">
@@ -73,10 +83,10 @@
           </span>
         </div>
         <div class="mint-price-text">
-            <span id="mint-price"></span> musu
+          <span id="mint-price"></span> musu
         </div>
         <div class="reroll-price-text">
-            <span id="reroll-price"></span> onyx
+          <span id="reroll-price"></span> onyx
         </div>
       </div>
     </div>
@@ -87,28 +97,28 @@
     <!-- Filter by Traits -->
     <div class="trait-filter-section">
       <div id="filterControls"></div>
-      
+
       <!-- Selected Traits Display -->
       <div id="selectedTraitsDisplay" class="selected-traits-display" style="display: none;"></div>
-        <div class="advanced-filter-buttons">
-          <button id="clearBtn">CLEAR</button>
-          <button id="affinityFilterToggle">Affinity</button>
-          <button id="minmaxFilterToggle">min-MAX</button>
-          <button id="listingFilterBtn">Listing</button>
-        </div>
+      <div class="advanced-filter-buttons">
+        <button id="clearBtn">CLEAR</button>
+        <button id="affinityFilterToggle">Affinity</button>
+        <button id="minmaxFilterToggle">min-MAX</button>
+        <button id="listingFilterBtn">Listing</button>
       </div>
+    </div>
 
     <div class="sort-section">
       <div class="sort-label">Sort Order:</div>
       <div class="sort-buttons">
-          <button class="sort-btn active" data-sort="latest">Latest!</button>
-          <button class="sort-btn" data-sort="oldest">Oldest!</button>
-          <button class="sort-btn" data-sort="rarity">Rarest!</button>
-          <button class="sort-btn harmony" data-sort="harmony">Harmony</button>
-          <button class="sort-btn health" data-sort="health">Health</button>
-          <button class="sort-btn power" data-sort="power">Power</button>
-          <button class="sort-btn violence" data-sort="violence">Violence</button>
-          <button id="cloneFilterBtn">Clones</button>
+        <button class="sort-btn active" data-sort="latest">Latest!</button>
+        <button class="sort-btn" data-sort="oldest">Oldest!</button>
+        <button class="sort-btn" data-sort="rarity">Rarest!</button>
+        <button class="sort-btn harmony" data-sort="harmony">Harmony</button>
+        <button class="sort-btn health" data-sort="health">Health</button>
+        <button class="sort-btn power" data-sort="power">Power</button>
+        <button class="sort-btn violence" data-sort="violence">Violence</button>
+        <button id="cloneFilterBtn">Clones</button>
       </div>
     </div>
 
@@ -118,19 +128,19 @@
         <div id="bodyAffinity">
           <div id="bodyAffinityLabel">Body:</div>
           <div class="affinity-filter-buttons">
-              <button class="affinity-btn">EERIE</button>
-              <button class="affinity-btn">SCRAP</button>
-              <button class="affinity-btn">INSECT</button>
-              <button class="affinity-btn">NORMAL</button>
+            <button class="affinity-btn">EERIE</button>
+            <button class="affinity-btn">SCRAP</button>
+            <button class="affinity-btn">INSECT</button>
+            <button class="affinity-btn">NORMAL</button>
           </div>
         </div>
         <div id="handAffinity">
           <div id="handAffinityLabel">Hand:</div>
           <div class="affinity-filter-buttons">
-              <button class="affinity-btn">EERIE</button>
-              <button class="affinity-btn">SCRAP</button>
-              <button class="affinity-btn">INSECT</button>
-              <button class="affinity-btn">NORMAL</button>
+            <button class="affinity-btn">EERIE</button>
+            <button class="affinity-btn">SCRAP</button>
+            <button class="affinity-btn">INSECT</button>
+            <button class="affinity-btn">NORMAL</button>
           </div>
         </div>
       </div>
@@ -172,14 +182,14 @@
           </div>
         </div>
         <div class="stat-control violence">
-            <img class="stat-icon" src="https://app.kamigotchi.io/assets/violence-2QoeI4RM.png" title="violence">
-            <input min="10" max="42" step="1" class="stat-control-input" type="range" value="10">
-            <div class="display">
+          <img class="stat-icon" src="https://app.kamigotchi.io/assets/violence-2QoeI4RM.png" title="violence">
+          <input min="10" max="42" step="1" class="stat-control-input" type="range" value="10">
+          <div class="display">
             <div class="display-item">
               <span class="stat-control-input-value">10</span>
             </div>
-            </div>
-            <div class="minmax-toggle">
+          </div>
+          <div class="minmax-toggle">
             <input type="checkbox" id="violence-toggle" class="toggle-input">
             <label for="violence-toggle" class="toggle-label">
               <span class="label-min">min</span>
@@ -230,29 +240,41 @@
       </div>
     </div>
     <div id="soundcloud-player" data-sc-state="idle">
-    <div id="sc-toggle-btn">
-      <svg xmlns="http://www.w3.org/2000/svg"  viewBox="0 0 16 16"><g fill="currentColor"><path d="M10.304 3.13a1 1 0 0 1 1.196.98v1.8l-2.5.5v5.09c0 .495-.301.883-.662 1.123C7.974 12.866 7.499 13 7 13s-.974-.134-1.338-.377C5.302 12.383 5 11.995 5 11.5s.301-.883.662-1.123C6.026 10.134 6.501 10 7 10c.356 0 .7.068 1 .196V4.41a1 1 0 0 1 .804-.98z"/></g></svg>
-    </div>
-    <div class="sc-panel">
+      <div id="sc-toggle-btn">
+        <svg id="sc-toggle-btn_svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">
+          <path
+            d="M10.304 3.13a1 1 0 0 1 1.196.98v1.8l-2.5.5v5.09c0 .495-.301.883-.662 1.123C7.974 12.866 7.499 13 7 13s-.974-.134-1.338-.377C5.302 12.383 5 11.995 5 11.5s.301-.883.662-1.123C6.026 10.134 6.501 10 7 10c.356 0 .7.068 1 .196V4.41a1 1 0 0 1 .804-.98z" />
+        </svg>
+      </div>
+      <div class="sc-panel">
         <div class="artwork-wrapper">
           <img class="sc-artwork" src="" alt="">
         </div>
         <div class="sc-title-wrapper"></div>
         <div class="sc-seek-row">
-            <span class="sc-seek-current">0:00</span>
-            <div class="sc-controls">
-                <div class="sc-btn-play" aria-label="Play" data-state="paused">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 32 32"><path fill="currentColor" d="M11 23a1 1 0 0 1-1-1V10a1 1 0 0 1 1.447-.894l12 6a1 1 0 0 1 0 1.788l-12 6A1 1 0 0 1 11 23m1-11.382v8.764L20.764 16Z"/><path fill="currentColor" d="M16 4A12 12 0 1 1 4 16A12 12 0 0 1 16 4m0-2a14 14 0 1 0 14 14A14 14 0 0 0 16 2"/></svg>
-                </div>
+          <span class="sc-seek-current">0:00</span>
+          <div class="sc-controls">
+            <div class="sc-btn-play" aria-label="Play" data-state="paused">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 32 32">
+                <path fill="currentColor"
+                  d="M11 23a1 1 0 0 1-1-1V10a1 1 0 0 1 1.447-.894l12 6a1 1 0 0 1 0 1.788l-12 6A1 1 0 0 1 11 23m1-11.382v8.764L20.764 16Z" />
+                <path fill="currentColor"
+                  d="M16 4A12 12 0 1 1 4 16A12 12 0 0 1 16 4m0-2a14 14 0 1 0 14 14A14 14 0 0 0 16 2" />
+              </svg>
             </div>
-            <input class="sc-seek-bar" type="range" min="0" max="100" value="0" step="0.1">
-            <span class="sc-seek-duration">0:00</span>
+          </div>
+          <input class="sc-seek-bar" type="range" min="0" max="100" value="0" step="0.1">
+          <span class="sc-seek-duration">0:00</span>
         </div>
+      </div>
+      <div id="scrollToTop" class="scroll-to-top" title="Back to top">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+          <title>arrow-up</title>
+          <path d="M13,20H11V8L5.5,13.5L4.08,12.08L12,4.16L19.92,12.08L18.5,13.5L13,8V20Z" />
+        </svg>
+      </div>
     </div>
-    <div id="scrollToTop" class="scroll-to-top" title="Back to top">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><title>arrow-up</title><path d="M13,20H11V8L5.5,13.5L4.08,12.08L12,4.16L19.92,12.08L18.5,13.5L13,8V20Z" /></svg>
-    </div>
-  </div>
-  <div id="results"></div>
+    <div id="results"></div>
 </body>
+
 </html>
