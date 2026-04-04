@@ -1551,8 +1551,8 @@ button {
    iPod Player Mod Overrides (Brushed Metal Edition)
    ============================================================ */
 #soundcloud-player .sc-panel {
-  width: 180px;
-  padding: 15px 15px;
+  width: 170px;
+  padding: 10px 10px;
   background:
     /* 1. Top edge highlight */
     linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0) 4%),
@@ -1636,9 +1636,9 @@ button {
 /* Restrain original components inside the new screen */
 .sc-artwork,
 .artwork-wrapper {
-  width: 80;
+  width: 90px;
   /* was 100% — set any px value you want */
-  height: 80;
+  height: 90px;
   /* match width to keep it square */
   aspect-ratio: 1;
   border-radius: 2px;
@@ -1646,7 +1646,7 @@ button {
   object-fit: cover;
   align-self: center;
   /* center it horizontally inside the screen */
-  margin: 2px 0;
+  margin: 1px 0;
 }
 
 .sc-title-wrapper {
@@ -1749,7 +1749,7 @@ button {
 
 .wheel-label.top {
   top: 1px;
-  font-size: 7.5px;
+  font-size: 7px;
   padding: 10px 10px 15px 10px;
   font-family: 'dogica_pixelregular', monospace;
 }
@@ -1851,8 +1851,8 @@ button {
 }
 
 .sc-kami-corner-link img {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   /* Circular look common for X profile photos */
   display: block;
   image-rendering: pixelated;
