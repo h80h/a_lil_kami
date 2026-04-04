@@ -389,6 +389,7 @@ async function fetchFeedTrades(deadlineMs: number): Promise<SaleRecord[]> {
 async function fetchBackfillBatch(
   batch: KamiAccount[],
   existingHistoryMap: Map<string, SaleRecord>,
+  bidTradeIndex: Map<string, SaleRecord>,
   getBaseOrderId: (orderId: string) => string
 ): Promise<{ newRecords: SaleRecord[]; totalNewSales: number }> {
   const client = await getClient();
@@ -438,17 +439,27 @@ async function fetchBackfillBatch(
             const buyer  = order.Bid!.BuyerAccountID ?? accountId;
             for (const ki of boughtIndexes) {
               const subId   = `${order.OrderID}-${ki}-${order.Timestamp}`;
-              const existing = existingHistoryMap.get(subId);
+              // Look up by exact subId first; fall back to baseOrderId|kamiId index
+              // to find records stored under a different trailing timestamp (old format).
+              const dedupKey = `${order.OrderID}|${Number(ki)}`;
+              const existing =
+                existingHistoryMap.get(subId) ??
+                bidTradeIndex.get(dedupKey);
+              // Use the existing record's orderId if found, so we never store a
+              // duplicate under a new key when only order.Timestamp has changed.
+              const resolvedSubId = existing?.orderId ?? subId;
               const isNew    = !existing;
 
-              // Skip if a bid with the same base order + kamiId + timestamp already recorded
+              // Skip if a bid with the same base order + kamiId already recorded
+              // (order.Timestamp changes each time a new kami is bought, so we
+              //  intentionally omit it — the {baseOrderId, kamiId} pair uniquely
+              //  identifies one trade regardless of when the order was polled)
               const seller   = existing?.seller || order.Bid!.SellerAccountID || "";
-              const dedupKey = `${getBaseOrderId(subId)}|${Number(ki)}|${order.Timestamp}`;
               if (!existing && batchDedupIndex.has(dedupKey)) continue;
 
               const isoTime = new Date(tsMs).toISOString();
               const record: SaleRecord = {
-                orderId:  subId,
+                orderId:  resolvedSubId,
                 kamiId:   Number(ki),
                 price,
                 seller,
@@ -581,20 +592,34 @@ async function main() {
     // loop never lets a wrong value written earlier in the same batch run
     // permanently lock out a correct seller written later in the same run.
     const r2SellerLock = new Set<string>();
-    for (const record of prevHistory) {
-      historyMap.set(record.orderId, record);
-      if (record.seller) r2SellerLock.add(record.orderId);
-    }
 
-    // Index for bid dedup: "baseOrderId|kamiId|rawTime" -> true
     // baseOrderId strips the trailing "-{kamiId}-{timestamp}" suffix added to partial-fill bids
-    // Used only to dedup between backfill and feed within the current run.
-    // Cross-run dedup is already handled by existingHistoryMap.get(subId) inside fetchBackfillBatch.
     function getBaseOrderId(orderId: string): string {
       // subIds have the form  "{realOrderId}-{kamiIndex}-{timestamp}"
       // Strip the last two dash-separated numeric segments when present
       return orderId.replace(/-\d+-\d+$/, "");
     }
+
+    // Secondary index for partial-fill bid records: "baseOrderId|kamiId" -> SaleRecord
+    // Allows finding an existing record even when the trailing order.Timestamp differs
+    // (old records used order.Timestamp in the orderId; new records omit it from the key).
+    const bidTradeIndex = new Map<string, SaleRecord>();
+
+    for (const record of prevHistory) {
+      historyMap.set(record.orderId, record);
+      if (record.seller) r2SellerLock.add(record.orderId);
+      if (record.type === "bid") {
+        const base = getBaseOrderId(record.orderId);
+        // Only index records that look like partial-fill subIds (base != full orderId)
+        if (base !== record.orderId) {
+          bidTradeIndex.set(`${base}|${record.kamiId}`, record);
+        }
+      }
+    }
+
+    // Index for bid dedup: "baseOrderId|kamiId" -> true
+    // Used only to dedup between backfill and feed within the current run.
+    // Cross-run dedup is handled by existingHistoryMap / bidTradeIndex inside fetchBackfillBatch.
     const bidDedupIndex = new Set<string>();
 
     // --------------------------------------------------------
@@ -602,29 +627,33 @@ async function main() {
     // --------------------------------------------------------
     const [feedTrades, { newRecords: backfillRecords, totalNewSales }] = await Promise.all([
       feedTradesPromise,
-      fetchBackfillBatch(batch, historyMap, getBaseOrderId),
+      fetchBackfillBatch(batch, historyMap, bidTradeIndex, getBaseOrderId),
     ]);
 
     // --------------------------------------------------------
     // Merge: backfill first, then feed (feed wins on conflict — has tradeTime)
     // Never overwrite rawTime or tradeTime of an already-stored record.
-    // Skip bid records that share the same base orderId + kamiId + rawTime as an existing one.
+    // Skip bid records that share the same baseOrderId + kamiId as an existing one.
+    // When an existing record is found via bidTradeIndex (different trailing timestamp),
+    // preserve the existing orderId so no duplicate key is introduced.
     // --------------------------------------------------------
     for (const record of backfillRecords) {
       if (record.type === "bid") {
-        const key = `${getBaseOrderId(record.orderId)}|${record.kamiId}|${record.rawTime}`;
+        const key = `${getBaseOrderId(record.orderId)}|${record.kamiId}`;
         if (bidDedupIndex.has(key)) continue;
         bidDedupIndex.add(key);
       }
-      const existing = historyMap.get(record.orderId);
+      const existing = historyMap.get(record.orderId) ?? bidTradeIndex.get(`${getBaseOrderId(record.orderId)}|${record.kamiId}`);
+      const storeId  = existing?.orderId ?? record.orderId;
       if (existing) {
         // Only treat existing.seller as a hard lock if it came from R2 (manual edit
         // or a prior correct run). If it was written this run (e.g. buyer's account
         // processed before seller's), allow a non-empty record.seller to win.
-        const sellerLocked = r2SellerLock.has(record.orderId);
-        historyMap.set(record.orderId, {
+        const sellerLocked = r2SellerLock.has(storeId);
+        historyMap.set(storeId, {
           ...existing,
           ...record,
+          orderId:   storeId,
           seller:    sellerLocked ? existing.seller : (record.seller || existing.seller),
           buyer:     existing.buyer     || record.buyer,
           rawTime:   existing.rawTime,
@@ -636,16 +665,18 @@ async function main() {
     }
     for (const record of feedTrades) {
       if (record.type === "bid") {
-        const key = `${getBaseOrderId(record.orderId)}|${record.kamiId}|${record.rawTime}`;
+        const key = `${getBaseOrderId(record.orderId)}|${record.kamiId}`;
         if (bidDedupIndex.has(key)) continue;
         bidDedupIndex.add(key);
       }
-      const existing = historyMap.get(record.orderId);
+      const existing = historyMap.get(record.orderId) ?? bidTradeIndex.get(`${getBaseOrderId(record.orderId)}|${record.kamiId}`);
+      const storeId  = existing?.orderId ?? record.orderId;
       if (existing) {
-        const sellerLocked = r2SellerLock.has(record.orderId);
-        historyMap.set(record.orderId, {
+        const sellerLocked = r2SellerLock.has(storeId);
+        historyMap.set(storeId, {
           ...existing,
           ...record,
+          orderId:   storeId,
           seller:    sellerLocked ? existing.seller : (record.seller || existing.seller),
           buyer:     existing.buyer     || record.buyer,
           rawTime:   existing.rawTime,
