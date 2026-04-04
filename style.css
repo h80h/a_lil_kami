@@ -1418,7 +1418,7 @@ button {
 }
 
 .sc-seek-bar {
-  max-width: 100px;
+  cursor: pointer;
   margin-top: -1px;
 }
 
