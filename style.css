@@ -1644,7 +1644,7 @@ button {
   object-fit: cover;
   align-self: center;
   /* center it horizontally inside the screen */
-  padding: 2px 0;
+  margin: 2px 0;
 }
 
 .sc-title-wrapper {
@@ -1740,7 +1740,6 @@ button {
   font-family: 'Courier New', monospace;
   pointer-events: auto;
   cursor: pointer;
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8);
   transition: color 0.1s ease;
   user-select: none;
   -webkit-user-select: none;
