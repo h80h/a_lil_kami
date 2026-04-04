@@ -16,6 +16,24 @@ document.addEventListener("DOMContentLoaded", () => {
       s.textContent = `#sc-loading-hint{position:absolute;bottom:calc(100% + 1px);left:50%;transform:translateX(-50%);font-size:9px;white-space:nowrap;color:#000;pointer-events:none;opacity:0;transition:opacity 0.2s ease;}#sc-loading-hint.visible{opacity:1;}`;
       document.head.appendChild(s);
     }
+
+    // Inject visualizer styles once
+    if (!document.getElementById("sc-visualizer-style")) {
+      const s = document.createElement("style");
+      s.id = "sc-visualizer-style";
+      s.textContent = `
+        .sc-visualizer{display:inline-flex;align-items:flex-end;gap:2px;height:12px;margin:0 1px 3px 0;vertical-align:middle;flex-shrink:0;overflow:visible;color:#AAA;}
+        .sc-visualizer .sc-vis-bar{width:3px;height:12px;border-radius:1px;background:currentColor;transform-origin:bottom;transition:transform 0.15s ease,opacity 0.4s ease;}
+        .sc-title-wrapper{display:flex;align-items:center;}
+        @keyframes sc-vis-load{0%,100%{opacity:0.25}50%{opacity:0.75}}
+        .sc-visualizer[data-vis-state="loading"] .sc-vis-bar{animation:sc-vis-load 1.2s ease-in-out infinite;transform:scaleY(0.3)!important;}
+        .sc-visualizer[data-vis-state="loading"] .sc-vis-bar:nth-child(2){animation-delay:0.2s;}
+        .sc-visualizer[data-vis-state="loading"] .sc-vis-bar:nth-child(3){animation-delay:0.4s;}
+        .sc-visualizer[data-vis-state="paused"] .sc-vis-bar{transition:transform 0.4s ease,opacity 0.4s ease;transform:scaleY(0.3)!important;opacity:0.4;}
+        .sc-visualizer[data-vis-state="idle"] .sc-vis-bar{transform:scaleY(0.3)!important;opacity:0;}
+      `;
+      document.head.appendChild(s);
+    }
     const hint = document.createElement("div");
     hint.id = "sc-loading-hint";
     hint.textContent = "loading";
@@ -164,10 +182,29 @@ document.addEventListener("DOMContentLoaded", () => {
       return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
     };
 
-    const titleWrapper = scContainer.querySelector(".sc-title-wrapper");
+    let titleWrapper = scContainer.querySelector(".sc-title-wrapper");
+    if (!titleWrapper) {
+      // Fallback: create and inject into the iPod screen if not in static HTML
+      titleWrapper = document.createElement("div");
+      titleWrapper.className = "sc-title-wrapper";
+      const ipodScreen = scContainer.querySelector(".sc-ipod-screen");
+      if (ipodScreen) ipodScreen.appendChild(titleWrapper);
+    }
     const trackTitleEl = document.createElement("span");
     trackTitleEl.className = "sc-track-title";
     titleWrapper.appendChild(trackTitleEl);
+
+    // Visualizer: 3 animated bars beside the track title
+    const visEl = document.createElement("span");
+    visEl.className = "sc-visualizer";
+    visEl.setAttribute("data-vis-state", "idle");
+    visEl.setAttribute("aria-hidden", "true");
+    for (let i = 0; i < 3; i++) {
+      const bar = document.createElement("span");
+      bar.className = "sc-vis-bar";
+      visEl.appendChild(bar);
+    }
+    titleWrapper.appendChild(visEl);
     const seekBar = scContainer.querySelector(".sc-seek-bar");
     const seekCur = scContainer.querySelector(".sc-seek-current");
     const seekDur = scContainer.querySelector(".sc-seek-duration");
@@ -543,6 +580,31 @@ document.addEventListener("DOMContentLoaded", () => {
       let cachedDuration = 0;
       let userStartedPlayback = false;
 
+      // Waveform cache: track id → Float32Array of 0..1 amplitudes (100 samples)
+      const waveformCache = new Map();
+      let currentWaveform = null;
+
+      const fetchWaveform = (sound) => {
+        if (!sound || !sound.waveform_url || waveformCache.has(sound.id))
+          return;
+        fetch(
+          sound.waveform_url
+            .replace("wis.sndcdn.com", "wave.sndcdn.com")
+            .replace(/\.png$/, ".json"),
+        )
+          .then((r) => r.json())
+          .then((data) => {
+            // data.samples is an array of integers (0–max), data.width is sample count
+            const samples = data.samples;
+            const max = Math.max(...samples) || 1;
+            waveformCache.set(
+              sound.id,
+              samples.map((v) => v / max),
+            );
+          })
+          .catch(() => {}); // silently ignore fetch failures
+      };
+
       widget.bind(SC.Widget.Events.READY, () => {
         scContainer.setAttribute("data-sc-state", "paused");
         widget.setVolume(10);
@@ -556,6 +618,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
             scContainer._scSoundsCache = sounds;
             scContainer.dataset.scReady = "true";
+
+            // Pre-fetch waveforms for all tracks
+            sounds.forEach(fetchWaveform);
 
             const randomIndex = Math.floor(Math.random() * sounds.length);
             widget.skip(randomIndex);
@@ -584,6 +649,7 @@ document.addEventListener("DOMContentLoaded", () => {
           widget.pause();
           return;
         }
+        visEl.setAttribute("data-vis-state", "playing");
         if (playBtn) {
           playBtn.setAttribute("data-state", "playing");
           // playBtn.innerHTML =
@@ -595,6 +661,8 @@ document.addEventListener("DOMContentLoaded", () => {
           if (sound) {
             trackTitleEl.textContent = sound.title;
             if (seekDur) seekDur.textContent = formatTime(sound.duration);
+            currentWaveform = waveformCache.get(sound.id) || null;
+            fetchWaveform(sound); // ensure fetched if cache missed
           }
         });
         widget.getDuration((d) => {
@@ -606,6 +674,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       widget.bind(SC.Widget.Events.PAUSE, () => {
         scContainer.setAttribute("data-sc-state", "paused");
+        visEl.setAttribute("data-vis-state", "paused");
         if (playBtn) {
           playBtn.setAttribute("data-state", "paused");
           // playBtn.innerHTML =
@@ -631,6 +700,7 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
           }
           scContainer.setAttribute("data-sc-state", "paused");
+          visEl.setAttribute("data-vis-state", "idle");
           if (playBtn) {
             playBtn.setAttribute("data-state", "paused");
             // playBtn.innerHTML =
@@ -645,6 +715,43 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!isSeeking) {
           if (seekBar) seekBar.value = e.relativePosition * 100;
           if (seekCur) seekCur.textContent = formatTime(e.currentPosition);
+        }
+        // Show loading state when buffer hasn't caught up to playhead
+        if (scContainer.getAttribute("data-sc-state") === "playing") {
+          const isBuffering =
+            typeof e.loadedProgress === "number" &&
+            e.loadedProgress < e.relativePosition + 0.01;
+          if (isBuffering) {
+            visEl.setAttribute("data-vis-state", "loading");
+          } else {
+            visEl.setAttribute("data-vis-state", "playing");
+            // Drive bar heights from waveform amplitude
+            const wf =
+              currentWaveform ||
+              waveformCache.get(
+                (
+                  (scContainer._scSoundsCache || []).find(
+                    (s) => s.title === trackTitleEl.textContent,
+                  ) || {}
+                ).id,
+              );
+            if (wf && wf.length > 0) {
+              const pos = e.relativePosition;
+              // Sample three slightly offset positions for the three bars
+              const offsets = [-0.01, 0, 0.01];
+              const bars = visEl.querySelectorAll(".sc-vis-bar");
+              bars.forEach((bar, i) => {
+                const idx = Math.min(
+                  wf.length - 1,
+                  Math.max(0, Math.round((pos + offsets[i]) * (wf.length - 1))),
+                );
+                
+                const scale = 0 + wf[idx] * 1;
+                bar.style.transform = `scaleY(${scale.toFixed(3)})`;
+                bar.style.opacity = (0 + wf[idx] * 1).toFixed(3);
+              });
+            }
+          }
         }
       });
 
