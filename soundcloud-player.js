@@ -579,6 +579,7 @@ document.addEventListener("DOMContentLoaded", () => {
       let isSeeking = false;
       let cachedDuration = 0;
       let userStartedPlayback = false;
+      let currentTrackIndex = 0;
 
       // Waveform cache: track id → Float32Array of 0..1 amplitudes (100 samples)
       const waveformCache = new Map();
@@ -623,6 +624,7 @@ document.addEventListener("DOMContentLoaded", () => {
             sounds.forEach(fetchWaveform);
 
             const randomIndex = Math.floor(Math.random() * sounds.length);
+            currentTrackIndex = randomIndex;
             widget.skip(randomIndex);
             updateArtwork(sounds[randomIndex]);
             if (titleWrapper)
@@ -685,41 +687,35 @@ document.addEventListener("DOMContentLoaded", () => {
 
       widget.bind(SC.Widget.Events.FINISH, () => {
         const sounds = scContainer._scSoundsCache || [];
-        widget.getCurrentSoundIndex((i) => {
-          if (sounds.length > 0 && i === sounds.length - 1) {
-            // Last track finished — wrap around to index 0
-            const firstSound = sounds[0];
-            widget.skip(0);
-            widget.seekTo(0);
-            widget.play();
-            updateArtwork(firstSound);
-            trackTitleEl.textContent = firstSound.title;
-            if (seekDur) seekDur.textContent = formatTime(firstSound.duration);
-            if (seekBar) seekBar.value = 0;
-            if (seekCur) seekCur.textContent = "0:00";
-            return;
-          }
-          scContainer.setAttribute("data-sc-state", "paused");
-          visEl.setAttribute("data-vis-state", "idle");
-          if (playBtn) {
-            playBtn.setAttribute("data-state", "paused");
-            // playBtn.innerHTML =
-            //   '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 32 32"><path fill="currentColor" d="M11 23a1 1 0 0 1-1-1V10a1 1 0 0 1 1.447-.894l12 6a1 1 0 0 1 0 1.788l-12 6A1 1 0 0 1 11 23m1-11.382v8.764L20.764 16Z"/><path fill="currentColor" d="M16 4A12 12 0 1 1 4 16A12 12 0 0 1 16 4m0-2a14 14 0 1 0 14 14A14 14 0 0 0 16 2"/></svg>';
-          }
-          // Advance to next track from the beginning
-          const nextIndex = i + 1;
-          const nextSound = sounds[nextIndex];
-          widget.skip(nextIndex);
+        const i = currentTrackIndex;
+        if (sounds.length > 0 && i === sounds.length - 1) {
+          // Last track finished — wrap around to index 0
+          const firstSound = sounds[0];
+          currentTrackIndex = 0;
+          widget.skip(0);
           widget.seekTo(0);
           widget.play();
-          if (nextSound) {
-            updateArtwork(nextSound);
-            trackTitleEl.textContent = nextSound.title;
-            if (seekDur) seekDur.textContent = formatTime(nextSound.duration);
-          }
+          updateArtwork(firstSound);
+          trackTitleEl.textContent = firstSound.title;
+          if (seekDur) seekDur.textContent = formatTime(firstSound.duration);
           if (seekBar) seekBar.value = 0;
           if (seekCur) seekCur.textContent = "0:00";
-        });
+          return;
+        }
+        // Auto-advance to next track — always reset to beginning
+        const nextIndex = i + 1;
+        const nextSound = sounds[nextIndex];
+        currentTrackIndex = nextIndex;
+        widget.skip(nextIndex);
+        widget.seekTo(0);
+        widget.play();
+        if (nextSound) {
+          updateArtwork(nextSound);
+          trackTitleEl.textContent = nextSound.title;
+          if (seekDur) seekDur.textContent = formatTime(nextSound.duration);
+        }
+        if (seekBar) seekBar.value = 0;
+        if (seekCur) seekCur.textContent = "0:00";
       });
 
       widget.bind(SC.Widget.Events.PLAY_PROGRESS, (e) => {
@@ -878,7 +874,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!trackListVisible || soundsCache.length === 0) return;
         const sound = soundsCache[highlightedIndex];
         widget.skip(highlightedIndex);
-        widget.seekTo(0);
+        currentTrackIndex = highlightedIndex;
         if (seekBar) seekBar.value = 0;
         if (seekCur) seekCur.textContent = "0:00";
         trackTitleEl.textContent = sound.title;
@@ -913,20 +909,19 @@ document.addEventListener("DOMContentLoaded", () => {
           if (trackListVisible) {
             moveHighlight(-1);
           } else {
-            widget.getCurrentSoundIndex((i) => {
-              const prevIndex = Math.max(0, i - 1);
-              const sound = (scContainer._scSoundsCache || [])[prevIndex];
-              widget.skip(prevIndex);
-              widget.seekTo(0);
-              if (seekBar) seekBar.value = 0;
-              if (seekCur) seekCur.textContent = "0:00";
-              if (userStartedPlayback) widget.play();
-              if (sound) {
-                updateArtwork(sound);
-                trackTitleEl.textContent = sound.title;
-                if (seekDur) seekDur.textContent = formatTime(sound.duration);
-              }
-            });
+            const prevIndex = Math.max(0, currentTrackIndex - 1);
+            const sound = (scContainer._scSoundsCache || [])[prevIndex];
+            currentTrackIndex = prevIndex;
+            widget.skip(prevIndex);
+            widget.seekTo(0);
+            if (seekBar) seekBar.value = 0;
+            if (seekCur) seekCur.textContent = "0:00";
+            if (userStartedPlayback) widget.play();
+            if (sound) {
+              updateArtwork(sound);
+              trackTitleEl.textContent = sound.title;
+              if (seekDur) seekDur.textContent = formatTime(sound.duration);
+            }
           }
         });
       }
@@ -937,21 +932,21 @@ document.addEventListener("DOMContentLoaded", () => {
           if (trackListVisible) {
             moveHighlight(1);
           } else {
-            widget.getCurrentSoundIndex((i) => {
-              const sounds = scContainer._scSoundsCache || [];
-              const nextIndex = i + 1 < sounds.length ? i + 1 : 0;
-              const sound = sounds[nextIndex];
-              widget.skip(nextIndex);
-              widget.seekTo(0);
-              if (seekBar) seekBar.value = 0;
-              if (seekCur) seekCur.textContent = "0:00";
-              if (userStartedPlayback) widget.play();
-              if (sound) {
-                updateArtwork(sound);
-                trackTitleEl.textContent = sound.title;
-                if (seekDur) seekDur.textContent = formatTime(sound.duration);
-              }
-            });
+            const sounds = scContainer._scSoundsCache || [];
+            const nextIndex =
+              currentTrackIndex + 1 < sounds.length ? currentTrackIndex + 1 : 0;
+            const sound = sounds[nextIndex];
+            currentTrackIndex = nextIndex;
+            widget.skip(nextIndex);
+            widget.seekTo(0);
+            if (seekBar) seekBar.value = 0;
+            if (seekCur) seekCur.textContent = "0:00";
+            if (userStartedPlayback) widget.play();
+            if (sound) {
+              updateArtwork(sound);
+              trackTitleEl.textContent = sound.title;
+              if (seekDur) seekDur.textContent = formatTime(sound.duration);
+            }
           }
         });
       }
