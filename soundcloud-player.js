@@ -4,12 +4,6 @@
 // #soundcloud-player is styled freely in your CSS.
 // Data attribute exposed for styling hooks:
 //   [data-sc-state="idle|playing|paused"]  on #soundcloud-player
-// HTML elements expected in index.html:
-//   .sc-title-wrapper  — container where the <select> dropdown is appended
-//   .sc-seek-bar       — <input type="range"> seek slider
-//   .sc-seek-current   — elapsed time label
-//   .sc-seek-duration  — total duration label
-//   .sc-btn-play       — play/pause toggle button
 // ============================================================
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -32,6 +26,10 @@ document.addEventListener("DOMContentLoaded", () => {
       const player = document.getElementById("soundcloud-player");
       if (player.classList.contains("sc-open")) {
         player.classList.remove("sc-open");
+        if (player._artworkInterval) {
+          clearInterval(player._artworkInterval);
+          player._artworkInterval = null;
+        }
         return;
       }
       const artwork = player.querySelector(".sc-artwork");
@@ -50,8 +48,6 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       // Show loading hint while waiting
       hint.classList.add("visible");
-      // Wait for the next load event — covers both: src already set but loading,
-      // and src not yet set (updateArtwork will set it shortly after widget READY)
       const onLoad = () => {
         artwork.removeEventListener("error", onError);
         hint.classList.remove("visible");
@@ -69,6 +65,83 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const scContainer = document.getElementById("soundcloud-player");
   if (scContainer) {
+    // --- START: iPod DOM Restructuring ---
+    const panel = scContainer.querySelector(".sc-panel");
+    if (panel && !panel.dataset.ipod) {
+      panel.dataset.ipod = "true";
+
+      // Create Kamigotchi Corner Link
+      const kamiLink = document.createElement("a");
+      kamiLink.href = "https://app.kamigotchi.io";
+      kamiLink.target = "_blank";
+      kamiLink.className = "sc-kami-corner-link";
+
+      const kamiImg = document.createElement("img");
+      kamiImg.src =
+        "https://pbs.twimg.com/profile_images/1886393558795513856/ZuXYVnfL_400x400.png";
+      kamiImg.alt = "Kamigotchi";
+      kamiLink.appendChild(kamiImg);
+
+      // Create iPod Screen
+      const screen = document.createElement("div");
+      screen.className = "sc-ipod-screen";
+
+      // Create iPod Wheel
+      const wheelContainer = document.createElement("div");
+      wheelContainer.className = "sc-ipod-wheel-container";
+      const wheel = document.createElement("div");
+      wheel.className = "sc-ipod-wheel";
+      const centerBtn = document.createElement("div");
+      centerBtn.className = "sc-ipod-center-btn";
+
+      // Grab existing elements
+      const artworkWrap =
+        panel.querySelector(".artwork-wrapper") ||
+        panel.querySelector(".sc-artwork");
+      const titleWrap = panel.querySelector(".sc-title-wrapper");
+      const seekRow = panel.querySelector(".sc-seek-row");
+      const controls = panel.querySelector(".sc-controls");
+
+      // Move elements into the screen
+      if (artworkWrap) screen.appendChild(artworkWrap);
+      if (titleWrap) screen.appendChild(titleWrap);
+      if (seekRow) screen.appendChild(seekRow);
+
+      // Move play controls into the center button
+      if (controls) centerBtn.appendChild(controls);
+
+      // Add interactive wheel labels
+      const menu = document.createElement("span");
+      menu.className = "wheel-label top";
+      menu.innerText = "MENU";
+      const prev = document.createElement("span");
+      prev.className = "wheel-label left";
+      prev.innerText = `\u23EE\uFE0E`;
+      const next = document.createElement("span");
+      next.className = "wheel-label right";
+      next.innerText = `\u23ED\uFE0E`;
+      const play = document.createElement("span");
+      play.className = "wheel-label bottom";
+      play.innerText = `\u23F5\uFE0E\u23F8\uFE0E`;
+
+      // Store refs on wheel so initWidget can wire them up
+      wheel._menuBtn = menu;
+      wheel._prevBtn = prev;
+      wheel._nextBtn = next;
+      wheel._playBtn = play;
+
+      wheel.append(menu, prev, next, play, centerBtn);
+      wheelContainer.appendChild(wheel);
+
+      // Clear panel and append new structure
+      panel.innerHTML = "";
+      panel.appendChild(screen);
+      panel.appendChild(wheelContainer);
+
+      panel.appendChild(kamiLink);
+    }
+    // --- END: iPod DOM Restructuring ---
+
     // Hidden iframe — audio engine only
     const scIframe = document.createElement("iframe");
     scIframe.id = "sc-hidden-iframe";
@@ -92,10 +165,14 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     const titleWrapper = scContainer.querySelector(".sc-title-wrapper");
+    const trackTitleEl = document.createElement("span");
+    trackTitleEl.className = "sc-track-title";
+    titleWrapper.appendChild(trackTitleEl);
     const seekBar = scContainer.querySelector(".sc-seek-bar");
     const seekCur = scContainer.querySelector(".sc-seek-current");
     const seekDur = scContainer.querySelector(".sc-seek-duration");
     const playBtn = scContainer.querySelector(".sc-btn-play");
+    const centerBtn = scContainer.querySelector(".sc-ipod-center-btn");
 
     // Load Widget API script once, then init
     const initWidget = () => {
@@ -106,7 +183,7 @@ document.addEventListener("DOMContentLoaded", () => {
         arrivalNight: ["Arrival Night", ["02-2", "03-2"]],
         mystique: ["Mystique", ["04"]],
         amusement: ["Amusement", ["05-1", "06-1"]],
-        amusementNight: ["Amusement Night", ["05-2", "06-2"]], // Fixed missing array brackets here
+        amusementNight: ["Amusement Night", ["05-2", "06-2"]],
         k11: ["Forest", ["09", "33", "36", "48"]],
         k4: ["Musty Forest Path", ["10", "35", "50", "51", "61"]],
         glitter: ["Glitter", ["11"]],
@@ -121,7 +198,6 @@ document.addEventListener("DOMContentLoaded", () => {
         cave: ["Cave", ["29", "30", "31", "32", "47"]],
         k2: ["Airplane", ["52", "54"]],
         k8: ["Butterfly Forest", ["55", "56", "57", "63"]],
-        // "k14": ["Black Pool", ['59']],
         k5: ["Centipedes", ["62"]],
         k3: ["Forest Hut", ["64", "65"]],
         market: ["Market", ["66"]],
@@ -361,37 +437,31 @@ document.addEventListener("DOMContentLoaded", () => {
         ],
       };
 
-      // 1. Build the artworkOverrides dictionary to hold ARRAYS of images
       const artworkOverrides = {};
 
       Object.values(trackKeyMap).forEach((trackData) => {
-        const trackTitle = trackData[0]; // e.g. "Arrival"
-        const roomIds = trackData[1]; // e.g. ['00', '01', '02-1', '03-1']
+        const trackTitle = trackData[0];
+        const roomIds = trackData[1];
         const imagesForTrack = [];
 
-        // Loop through all rooms assigned to this track
         for (const roomId of roomIds) {
           if (roomMap[roomId] && roomMap[roomId].length > 0) {
-            // Push ALL image variants for this room into our pool
             roomMap[roomId].forEach((imagePath) => {
               imagesForTrack.push(BASE_IMG_URL + imagePath);
             });
           }
         }
 
-        // Only save it if we actually found images
         if (imagesForTrack.length > 0) {
           artworkOverrides[trackTitle] = imagesForTrack;
         }
       });
 
-      // 2. Global variables to keep track of the timer and current image
-      let artworkInterval = null;
+      scContainer._artworkInterval = null;
       let currentArtworkIndex = 0;
       let currentArtworkTitle = null;
-      const SWITCH_SPEED_MS = 5000; // Change image every 5 seconds
+      const SWITCH_SPEED_MS = 5000;
 
-      // Dots container injected once, positioned below .sc-artwork
       let dotsContainer = null;
 
       const renderDots = (images, activeIndex) => {
@@ -416,37 +486,33 @@ document.addEventListener("DOMContentLoaded", () => {
         });
       };
 
-      // 3. The updated updateArtwork function
       const updateArtwork = (sound) => {
         if (!sound) return;
 
         const images = artworkOverrides[sound.title];
         const artEl = scContainer.querySelector(".sc-artwork");
 
-        // Reset cycling when track changes
         if (sound.title !== currentArtworkTitle) {
           currentArtworkTitle = sound.title;
           currentArtworkIndex = 0;
-          clearInterval(artworkInterval);
-          artworkInterval = null;
+          clearInterval(scContainer._artworkInterval);
+          scContainer._artworkInterval = null;
         }
 
         if (images && images.length > 0) {
           if (artEl) artEl.src = images[currentArtworkIndex];
           renderDots(images, currentArtworkIndex);
 
-          // Start cycling only if more than one image and not already running
-          if (images.length > 1 && !artworkInterval) {
-            artworkInterval = setInterval(() => {
+          if (images.length > 1 && !scContainer._artworkInterval) {
+            scContainer._artworkInterval = setInterval(() => {
               currentArtworkIndex = (currentArtworkIndex + 1) % images.length;
               if (artEl) artEl.src = images[currentArtworkIndex];
               renderDots(images, currentArtworkIndex);
             }, SWITCH_SPEED_MS);
           }
         } else {
-          // Fallback to default SoundCloud artwork if no override exists
-          clearInterval(artworkInterval);
-          artworkInterval = null;
+          clearInterval(scContainer._artworkInterval);
+          scContainer._artworkInterval = null;
           if (artEl && sound.artwork_url) {
             artEl.src = sound.artwork_url.replace("-large", "-t500x500");
           }
@@ -455,6 +521,7 @@ document.addEventListener("DOMContentLoaded", () => {
       };
 
       const artworkEl = scContainer.querySelector(".sc-artwork");
+      if (artworkEl) artworkEl.style.imageRendering = "pixelated";
       if (artworkEl && !scContainer.querySelector(".sc-artwork-dots")) {
         const dc = document.createElement("div");
         dc.className = "sc-artwork-dots";
@@ -464,7 +531,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!document.getElementById("sc-dots-style")) {
           const s = document.createElement("style");
           s.id = "sc-dots-style";
-          s.textContent = `.sc-artwork-dot{width:6.5px;height:6.5px;border-radius:50%;background:rgba(255,255,255,0.35);cursor:pointer;transition:background .25s,transform .25s;flex-shrink:0}.sc-artwork-dot:hover{background:rgba(255,255,255,0.7)}.sc-artwork-dot.active{background:#fff;}`;
+          s.textContent = `.sc-artwork-dot{width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,0.75);cursor:pointer;transition:background .25s,transform .25s;flex-shrink:0}.sc-artwork-dot:hover{background:rgba(255,255,255,0.7)}.sc-artwork-dot.active{background:#fff;}`;
           document.head.appendChild(s);
         }
         artworkEl.insertAdjacentElement("afterend", dc);
@@ -479,7 +546,6 @@ document.addEventListener("DOMContentLoaded", () => {
       widget.bind(SC.Widget.Events.READY, () => {
         scContainer.setAttribute("data-sc-state", "paused");
         widget.setVolume(10);
-        // Build track dropdown and append into the existing .sc-title-wrapper
         const loadSounds = () => {
           widget.getSounds((sounds) => {
             const allLoaded = sounds.every((s) => s.title);
@@ -488,30 +554,14 @@ document.addEventListener("DOMContentLoaded", () => {
               return;
             }
 
-            const select = document.createElement("select");
-            select.className = "sc-track-title";
-            sounds.forEach((sound, i) => {
-              const opt = document.createElement("option");
-              opt.value = i;
-              opt.textContent = sound.title;
-              select.appendChild(opt);
-            });
-            select.addEventListener("change", () => {
-              const index = parseInt(select.value);
-              widget.skip(index);
-              widget.play();
-              updateArtwork(sounds[index]);
-              if (seekDur)
-                seekDur.textContent = formatTime(sounds[index].duration);
-            });
-            if (titleWrapper) titleWrapper.appendChild(select);
-            scContainer._scSelect = select;
+            scContainer._scSoundsCache = sounds;
             scContainer.dataset.scReady = "true";
 
             const randomIndex = Math.floor(Math.random() * sounds.length);
-            select.value = randomIndex;
             widget.skip(randomIndex);
             updateArtwork(sounds[randomIndex]);
+            if (titleWrapper)
+              trackTitleEl.textContent = sounds[randomIndex].title;
             if (seekDur)
               seekDur.textContent = formatTime(sounds[randomIndex].duration);
           });
@@ -536,13 +586,10 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         if (playBtn) {
           playBtn.setAttribute("data-state", "playing");
-          playBtn.innerHTML =
-            '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 32 32"><path fill="currentColor" d="M14 10h-2v12h2zm6 0h-2v12h2z"/><path fill="currentColor" d="M16 4A12 12 0 1 1 4 16A12 12 0 0 1 16 4m0-2a14 14 0 1 0 14 14A14 14 0 0 0 16 2"/></svg>';
+          // playBtn.innerHTML =
+          //   '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 32 32"><path fill="currentColor" d="M14 10h-2v12h2zm6 0h-2v12h2z"/><path fill="currentColor" d="M16 4A12 12 0 1 1 4 16A12 12 0 0 1 16 4m0-2a14 14 0 1 0 14 14A14 14 0 0 0 16 2"/></svg>';
           playBtn.setAttribute("aria-label", "Pause");
         }
-        widget.getCurrentSoundIndex((i) => {
-          if (scContainer._scSelect) scContainer._scSelect.value = i;
-        });
         widget.getCurrentSound((sound) => {
           updateArtwork(sound);
         });
@@ -558,8 +605,8 @@ document.addEventListener("DOMContentLoaded", () => {
         scContainer.setAttribute("data-sc-state", "paused");
         if (playBtn) {
           playBtn.setAttribute("data-state", "paused");
-          playBtn.innerHTML =
-            '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 32 32"><path fill="currentColor" d="M11 23a1 1 0 0 1-1-1V10a1 1 0 0 1 1.447-.894l12 6a1 1 0 0 1 0 1.788l-12 6A1 1 0 0 1 11 23m1-11.382v8.764L20.764 16Z"/><path fill="currentColor" d="M16 4A12 12 0 1 1 4 16A12 12 0 0 1 16 4m0-2a14 14 0 1 0 14 14A14 14 0 0 0 16 2"/></svg>';
+          // playBtn.innerHTML =
+          //   '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 32 32"><path fill="currentColor" d="M11 23a1 1 0 0 1-1-1V10a1 1 0 0 1 1.447-.894l12 6a1 1 0 0 1 0 1.788l-12 6A1 1 0 0 1 11 23m1-11.382v8.764L20.764 16Z"/><path fill="currentColor" d="M16 4A12 12 0 1 1 4 16A12 12 0 0 1 16 4m0-2a14 14 0 1 0 14 14A14 14 0 0 0 16 2"/></svg>';
           playBtn.setAttribute("aria-label", "Play");
         }
       });
@@ -568,8 +615,8 @@ document.addEventListener("DOMContentLoaded", () => {
         scContainer.setAttribute("data-sc-state", "paused");
         if (playBtn) {
           playBtn.setAttribute("data-state", "paused");
-          playBtn.innerHTML =
-            '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 32 32"><path fill="currentColor" d="M11 23a1 1 0 0 1-1-1V10a1 1 0 0 1 1.447-.894l12 6a1 1 0 0 1 0 1.788l-12 6A1 1 0 0 1 11 23m1-11.382v8.764L20.764 16Z"/><path fill="currentColor" d="M16 4A12 12 0 1 1 4 16A12 12 0 0 1 16 4m0-2a14 14 0 1 0 14 14A14 14 0 0 0 16 2"/></svg>';
+          // playBtn.innerHTML =
+          //   '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 32 32"><path fill="currentColor" d="M11 23a1 1 0 0 1-1-1V10a1 1 0 0 1 1.447-.894l12 6a1 1 0 0 1 0 1.788l-12 6A1 1 0 0 1 11 23m1-11.382v8.764L20.764 16Z"/><path fill="currentColor" d="M16 4A12 12 0 1 1 4 16A12 12 0 0 1 16 4m0-2a14 14 0 1 0 14 14A14 14 0 0 0 16 2"/></svg>';
         }
         if (seekBar) seekBar.value = 0;
         if (seekCur) seekCur.textContent = "0:00";
@@ -587,6 +634,201 @@ document.addEventListener("DOMContentLoaded", () => {
           userStartedPlayback = true;
           widget.toggle();
         });
+
+      if (centerBtn)
+        centerBtn.addEventListener("click", () => {
+          userStartedPlayback = true;
+          widget.toggle();
+        });
+
+      // --- iPod Wheel button wiring ---
+      const wheel = scContainer.querySelector(".sc-ipod-wheel");
+      const menuBtn = wheel && wheel._menuBtn;
+      const prevBtn = wheel && wheel._prevBtn;
+      const nextBtn = wheel && wheel._nextBtn;
+      const playWheelBtn = wheel && wheel._playBtn;
+      const screen = scContainer.querySelector(".sc-ipod-screen");
+
+      // Track list overlay inside the screen
+      let trackListEl = null;
+      let trackListVisible = false;
+      let highlightedIndex = 0;
+      let soundsCache = [];
+
+      const buildTrackList = () => {
+        if (!screen || soundsCache.length === 0) return;
+        if (trackListEl) trackListEl.remove();
+
+        trackListEl = document.createElement("div");
+        trackListEl.className = "sc-ipod-tracklist";
+
+        soundsCache.forEach((sound, i) => {
+          const row = document.createElement("div");
+          row.className =
+            "sc-ipod-tracklist-row" +
+            (i === highlightedIndex ? " highlighted" : "");
+          row.dataset.index = i;
+
+          const title = document.createElement("span");
+          title.className = "sc-ipod-tracklist-title";
+          title.textContent = sound.title;
+
+          const arrow = document.createElement("span");
+          arrow.className = "sc-ipod-tracklist-arrow";
+          arrow.textContent = "›";
+
+          row.appendChild(title);
+          row.appendChild(arrow);
+
+          row.addEventListener("mouseenter", () => {
+            trackListEl
+              .querySelectorAll(".sc-ipod-tracklist-row")
+              .forEach((r) => r.classList.remove("highlighted"));
+            row.classList.add("highlighted");
+            highlightedIndex = i;
+          });
+
+          row.addEventListener("click", () => {
+            highlightedIndex = i;
+            selectHighlighted();
+          });
+
+          trackListEl.appendChild(row);
+        });
+
+        screen.appendChild(trackListEl);
+        scrollHighlightedIntoView();
+      };
+
+      const scrollHighlightedIntoView = () => {
+        if (!trackListEl) return;
+        const highlighted = trackListEl.querySelector(".highlighted");
+        if (highlighted) highlighted.scrollIntoView({ block: "nearest" });
+      };
+
+      const showTrackList = () => {
+        if (!screen) return;
+        // Lock height to current rendered size so tracklist view doesn't resize the screen
+        screen.style.height = screen.offsetHeight + "px";
+        screen.setAttribute("data-view", "tracklist");
+        trackListVisible = true;
+        // Sync highlight to current track
+        widget.getCurrentSoundIndex((i) => {
+          highlightedIndex = i >= 0 ? i : 0;
+          buildTrackList();
+        });
+      };
+
+      const hideTrackList = () => {
+        if (!screen) return;
+        screen.removeAttribute("data-view");
+        screen.style.height = "";
+        trackListVisible = false;
+        if (trackListEl) {
+          trackListEl.remove();
+          trackListEl = null;
+        }
+      };
+
+      const moveHighlight = (dir) => {
+        if (!trackListVisible || soundsCache.length === 0) return;
+        highlightedIndex =
+          (highlightedIndex + dir + soundsCache.length) % soundsCache.length;
+        buildTrackList();
+      };
+
+      const selectHighlighted = () => {
+        if (!trackListVisible || soundsCache.length === 0) return;
+        const sound = soundsCache[highlightedIndex];
+        widget.skip(highlightedIndex);
+        trackTitleEl.textContent = sound.title;
+        widget.play();
+        userStartedPlayback = true;
+        updateArtwork(sound);
+        if (seekDur) seekDur.textContent = formatTime(sound.duration);
+        hideTrackList();
+      };
+
+      // Store soundsCache when tracks load — patch into the existing loadSounds flow
+      // We hook into scContainer._scSoundsCache set below after loadSounds
+      const _origGetSounds = () => {
+        soundsCache = scContainer._scSoundsCache || [];
+      };
+
+      // MENU: toggle track list
+      if (menuBtn) {
+        menuBtn.addEventListener("click", () => {
+          soundsCache = scContainer._scSoundsCache || [];
+          if (trackListVisible) {
+            hideTrackList();
+          } else {
+            showTrackList();
+          }
+        });
+      }
+
+      // ⏮ PREV: in tracklist mode scroll up; otherwise skip to previous track
+      if (prevBtn) {
+        prevBtn.addEventListener("click", () => {
+          if (trackListVisible) {
+            moveHighlight(-1);
+          } else {
+            widget.getCurrentSoundIndex((i) => {
+              const prevIndex = Math.max(0, i - 1);
+              const sound = (scContainer._scSoundsCache || [])[prevIndex];
+              widget.skip(prevIndex);
+              if (userStartedPlayback) widget.play();
+              if (sound) {
+                updateArtwork(sound);
+                trackTitleEl.textContent = sound.title;
+                if (seekDur) seekDur.textContent = formatTime(sound.duration);
+              }
+            });
+          }
+        });
+      }
+
+      // ⏭ NEXT: in tracklist mode scroll down; otherwise skip to next track
+      if (nextBtn) {
+        nextBtn.addEventListener("click", () => {
+          if (trackListVisible) {
+            moveHighlight(1);
+          } else {
+            widget.getCurrentSoundIndex((i) => {
+              const sounds = scContainer._scSoundsCache || [];
+              const nextIndex = i + 1 < sounds.length ? i + 1 : 0;
+              const sound = sounds[nextIndex];
+              widget.skip(nextIndex);
+              if (userStartedPlayback) widget.play();
+              if (sound) {
+                updateArtwork(sound);
+                trackTitleEl.textContent = sound.title;
+                if (seekDur) seekDur.textContent = formatTime(sound.duration);
+              }
+            });
+          }
+        });
+      }
+
+      // ▶∥ BOTTOM: always play/pause
+      if (playWheelBtn) {
+        playWheelBtn.addEventListener("click", () => {
+          userStartedPlayback = true;
+          widget.toggle();
+        });
+      }
+
+      // Center button: confirm selection in tracklist, else play/pause
+      if (centerBtn) {
+        centerBtn.addEventListener("click", () => {
+          if (trackListVisible) {
+            selectHighlighted();
+          } else {
+            userStartedPlayback = true;
+            widget.toggle();
+          }
+        });
+      }
 
       if (seekBar) {
         seekBar.addEventListener("mousedown", () => {
