@@ -592,11 +592,14 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         widget.getCurrentSound((sound) => {
           updateArtwork(sound);
+          if (sound) {
+            trackTitleEl.textContent = sound.title;
+            if (seekDur) seekDur.textContent = formatTime(sound.duration);
+          }
         });
         widget.getDuration((d) => {
           if (d) {
             cachedDuration = d;
-            if (seekDur) seekDur.textContent = formatTime(d);
           }
         });
       });
@@ -612,14 +615,30 @@ document.addEventListener("DOMContentLoaded", () => {
       });
 
       widget.bind(SC.Widget.Events.FINISH, () => {
-        scContainer.setAttribute("data-sc-state", "paused");
-        if (playBtn) {
-          playBtn.setAttribute("data-state", "paused");
-          // playBtn.innerHTML =
-          //   '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 32 32"><path fill="currentColor" d="M11 23a1 1 0 0 1-1-1V10a1 1 0 0 1 1.447-.894l12 6a1 1 0 0 1 0 1.788l-12 6A1 1 0 0 1 11 23m1-11.382v8.764L20.764 16Z"/><path fill="currentColor" d="M16 4A12 12 0 1 1 4 16A12 12 0 0 1 16 4m0-2a14 14 0 1 0 14 14A14 14 0 0 0 16 2"/></svg>';
-        }
-        if (seekBar) seekBar.value = 0;
-        if (seekCur) seekCur.textContent = "0:00";
+        const sounds = scContainer._scSoundsCache || [];
+        widget.getCurrentSoundIndex((i) => {
+          if (sounds.length > 0 && i === sounds.length - 1) {
+            // Last track finished — wrap around to index 0
+            const firstSound = sounds[0];
+            widget.skip(0);
+            widget.seekTo(0);
+            widget.play();
+            updateArtwork(firstSound);
+            trackTitleEl.textContent = firstSound.title;
+            if (seekDur) seekDur.textContent = formatTime(firstSound.duration);
+            if (seekBar) seekBar.value = 0;
+            if (seekCur) seekCur.textContent = "0:00";
+            return;
+          }
+          scContainer.setAttribute("data-sc-state", "paused");
+          if (playBtn) {
+            playBtn.setAttribute("data-state", "paused");
+            // playBtn.innerHTML =
+            //   '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 32 32"><path fill="currentColor" d="M11 23a1 1 0 0 1-1-1V10a1 1 0 0 1 1.447-.894l12 6a1 1 0 0 1 0 1.788l-12 6A1 1 0 0 1 11 23m1-11.382v8.764L20.764 16Z"/><path fill="currentColor" d="M16 4A12 12 0 1 1 4 16A12 12 0 0 1 16 4m0-2a14 14 0 1 0 14 14A14 14 0 0 0 16 2"/></svg>';
+          }
+          if (seekBar) seekBar.value = 0;
+          if (seekCur) seekCur.textContent = "0:00";
+        });
       });
 
       widget.bind(SC.Widget.Events.PLAY_PROGRESS, (e) => {
@@ -741,6 +760,9 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!trackListVisible || soundsCache.length === 0) return;
         const sound = soundsCache[highlightedIndex];
         widget.skip(highlightedIndex);
+        widget.seekTo(0);
+        if (seekBar) seekBar.value = 0;
+        if (seekCur) seekCur.textContent = "0:00";
         trackTitleEl.textContent = sound.title;
         widget.play();
         userStartedPlayback = true;
@@ -777,6 +799,9 @@ document.addEventListener("DOMContentLoaded", () => {
               const prevIndex = Math.max(0, i - 1);
               const sound = (scContainer._scSoundsCache || [])[prevIndex];
               widget.skip(prevIndex);
+              widget.seekTo(0);
+              if (seekBar) seekBar.value = 0;
+              if (seekCur) seekCur.textContent = "0:00";
               if (userStartedPlayback) widget.play();
               if (sound) {
                 updateArtwork(sound);
@@ -799,6 +824,9 @@ document.addEventListener("DOMContentLoaded", () => {
               const nextIndex = i + 1 < sounds.length ? i + 1 : 0;
               const sound = sounds[nextIndex];
               widget.skip(nextIndex);
+              widget.seekTo(0);
+              if (seekBar) seekBar.value = 0;
+              if (seekCur) seekCur.textContent = "0:00";
               if (userStartedPlayback) widget.play();
               if (sound) {
                 updateArtwork(sound);
