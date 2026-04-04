@@ -22,7 +22,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const s = document.createElement("style");
       s.id = "sc-visualizer-style";
       s.textContent = `
-        .sc-visualizer{display:inline-flex;align-items:flex-end;gap:2px;height:12px;margin:0 1px 3px 0;vertical-align:middle;flex-shrink:0;overflow:visible;color:#AAA;}
+        .sc-visualizer{display:inline-flex;align-items:flex-end;gap:2px;height:12px;margin:0 1px 3px 0;vertical-align:middle;flex-shrink:0;overflow:visible;color:#888;}
         .sc-visualizer .sc-vis-bar{width:3px;height:12px;border-radius:1px;background:currentColor;transform-origin:bottom;transition:transform 0.15s ease,opacity 0.4s ease;}
         .sc-title-wrapper{display:flex;align-items:center;}
         @keyframes sc-vis-load{0%,100%{opacity:0.25}50%{opacity:0.75}}
@@ -745,7 +745,7 @@ document.addEventListener("DOMContentLoaded", () => {
                   wf.length - 1,
                   Math.max(0, Math.round((pos + offsets[i]) * (wf.length - 1))),
                 );
-                
+
                 const scale = 0 + wf[idx] * 1;
                 bar.style.transform = `scaleY(${scale.toFixed(3)})`;
                 bar.style.opacity = (0 + wf[idx] * 1).toFixed(3);
@@ -966,35 +966,35 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       if (seekBar) {
-        seekBar.addEventListener("mousedown", () => {
+        const getSeekRatio = (e) => {
+          const rect = seekBar.getBoundingClientRect();
+          return Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+        };
+        seekBar.addEventListener("pointerdown", (e) => {
           isSeeking = true;
-        });
-        seekBar.addEventListener(
-          "touchstart",
-          () => {
-            isSeeking = true;
-          },
-          { passive: true },
-        );
-        seekBar.addEventListener("input", () => {
+          seekBar.setPointerCapture(e.pointerId);
+          const ratio = getSeekRatio(e);
+          seekBar.value = ratio * 100;
           if (cachedDuration) {
-            widget.seekTo((seekBar.value / 100) * cachedDuration);
+            widget.seekTo(ratio * cachedDuration);
             if (seekCur)
-              seekCur.textContent = formatTime(
-                (seekBar.value / 100) * cachedDuration,
-              );
+              seekCur.textContent = formatTime(ratio * cachedDuration);
           }
         });
-        seekBar.addEventListener("mouseup", () => {
-          if (cachedDuration)
-            widget.seekTo((seekBar.value / 100) * cachedDuration);
-          setTimeout(() => {
-            isSeeking = false;
-          }, 300);
+        seekBar.addEventListener("pointermove", (e) => {
+          if (!isSeeking) return;
+          const ratio = getSeekRatio(e);
+          seekBar.value = ratio * 100;
+          if (cachedDuration) {
+            widget.seekTo(ratio * cachedDuration);
+            if (seekCur)
+              seekCur.textContent = formatTime(ratio * cachedDuration);
+          }
         });
-        seekBar.addEventListener("touchend", () => {
-          if (cachedDuration)
-            widget.seekTo((seekBar.value / 100) * cachedDuration);
+        seekBar.addEventListener("pointerup", (e) => {
+          if (!isSeeking) return;
+          const ratio = getSeekRatio(e);
+          if (cachedDuration) widget.seekTo(ratio * cachedDuration);
           setTimeout(() => {
             isSeeking = false;
           }, 300);
