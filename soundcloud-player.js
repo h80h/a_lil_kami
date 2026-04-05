@@ -874,6 +874,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!trackListVisible || soundsCache.length === 0) return;
         const sound = soundsCache[highlightedIndex];
         widget.skip(highlightedIndex);
+        widget.seekTo(0);
         currentTrackIndex = highlightedIndex;
         if (seekBar) seekBar.value = 0;
         if (seekCur) seekCur.textContent = "0:00";
