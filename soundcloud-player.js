@@ -22,13 +22,13 @@ document.addEventListener("DOMContentLoaded", () => {
       const s = document.createElement("style");
       s.id = "sc-visualizer-style";
       s.textContent = `
-        .sc-visualizer{display:inline-flex;align-items:flex-end;gap:2px;height:12px;margin:0 2px 5px 0;vertical-align:middle;flex-shrink:0;overflow:visible;color:#888;}
-        .sc-visualizer .sc-vis-bar{width:3px;height:12px;border-radius:1px;background:currentColor;transform-origin:bottom;transition:transform 0.15s ease,opacity 0.4s ease;}
+        .sc-visualizer{display:inline-flex;align-items:flex-end;gap:2px;height:8px;margin:0 2px 5px 0;vertical-align:middle;flex-shrink:0;overflow:visible;color:#888;}
+        .sc-visualizer .sc-vis-bar{width:3px;height:8px;border-radius:1px;background:currentColor;transform-origin:bottom;transition:transform 0.15s ease,opacity 0.4s ease;}
         .sc-title-wrapper{display:flex;align-items:center;}
         @keyframes sc-vis-load{0%,100%{opacity:0.25}50%{opacity:0.75}}
-        .sc-visualizer[data-vis-state="loading"] .sc-vis-bar{animation:sc-vis-load 0.2s ease-in-out infinite;transform:scaleY(0)!important;}
-        .sc-visualizer[data-vis-state="loading"] .sc-vis-bar:nth-child(2){animation-delay:0.2s;}
-        .sc-visualizer[data-vis-state="loading"] .sc-vis-bar:nth-child(3){animation-delay:0.4s;}
+        .sc-visualizer[data-vis-state="loading"] .sc-vis-bar { animation: sc-vis-load 1.2s ease-in-out infinite; }
+        .sc-visualizer[data-vis-state="loading"] .sc-vis-bar:nth-child(2) { animation-delay: 0.8s; }
+        .sc-visualizer[data-vis-state="loading"] .sc-vis-bar:nth-child(3) { animation-delay: 0.4s; }
         .sc-visualizer[data-vis-state="paused"] .sc-vis-bar{transition:transform 0.4s ease,opacity 0.4s ease;transform:scaleY(0)!important;opacity:0.4;}
         .sc-visualizer[data-vis-state="idle"] .sc-vis-bar{transform:scaleY(0)!important;opacity:0;}
       `;
@@ -597,16 +597,23 @@ document.addEventListener("DOMContentLoaded", () => {
           .then((data) => {
             // data.samples is an array of integers (0–max), data.width is sample count
             const samples = data.samples;
-            const max = Math.max(...samples) || 1;
-            const min = Math.min(...samples);
-            const range = max - min || 1;
-            waveformCache.set(
-              sound.id,
-              samples.map((v) => {
-                const normalized = (v - min) / range;
-                return Math.pow(normalized, 0.5); // square root — boosts low values, spreads the middle
-              }),
+            // Use 5th/95th percentile to avoid outliers collapsing the range
+            const sorted = [...samples].sort((a, b) => a - b);
+            const p05 = sorted[Math.floor(sorted.length * 0.05)];
+            const p95 = sorted[Math.floor(sorted.length * 0.95)];
+            const range = p95 - p05 || 1;
+            // First stretch: percentile bounds, clamp to 0..1
+            const stretched = samples.map((v) =>
+              Math.min(1, Math.max(0, (v - p05) / range)),
             );
+            // Second stretch: remap actual min..max → 0..1
+            // guarantees full bar travel regardless of how compressed the track is
+            const sMin = Math.min(...stretched);
+            const sMax = Math.max(...stretched);
+            const sRange = sMax - sMin || 1;
+            // Power curve 0.4 for visual feel — boosts low values, keeps peaks bright
+            const wf = stretched.map((v) => Math.pow((v - sMin) / sRange, 0.4));
+            waveformCache.set(sound.id, wf);
           })
           .catch(() => {}); // silently ignore fetch failures
       };
@@ -758,9 +765,9 @@ document.addEventListener("DOMContentLoaded", () => {
                   Math.max(0, Math.round((pos + offsets[i]) * (wf.length - 1))),
                 );
 
-                const scale = 0 + wf[idx] * 0.8;
+                const scale = wf[idx] * 1.3;
                 bar.style.transform = `scaleY(${scale.toFixed(3)})`;
-                bar.style.opacity = Math.pow(wf[idx], 0.5).toFixed(3);
+                bar.style.opacity = Math.pow(wf[idx], 0.15).toFixed(3);
               });
             }
           }
