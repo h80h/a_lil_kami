@@ -22,15 +22,15 @@ document.addEventListener("DOMContentLoaded", () => {
       const s = document.createElement("style");
       s.id = "sc-visualizer-style";
       s.textContent = `
-        .sc-visualizer{display:inline-flex;align-items:flex-end;gap:2px;height:12px;margin:0 1px 3px 0;vertical-align:middle;flex-shrink:0;overflow:visible;color:#888;}
+        .sc-visualizer{display:inline-flex;align-items:flex-end;gap:2px;height:12px;margin:0 2px 5px 0;vertical-align:middle;flex-shrink:0;overflow:visible;color:#888;}
         .sc-visualizer .sc-vis-bar{width:3px;height:12px;border-radius:1px;background:currentColor;transform-origin:bottom;transition:transform 0.15s ease,opacity 0.4s ease;}
         .sc-title-wrapper{display:flex;align-items:center;}
         @keyframes sc-vis-load{0%,100%{opacity:0.25}50%{opacity:0.75}}
-        .sc-visualizer[data-vis-state="loading"] .sc-vis-bar{animation:sc-vis-load 1.2s ease-in-out infinite;transform:scaleY(0.3)!important;}
+        .sc-visualizer[data-vis-state="loading"] .sc-vis-bar{animation:sc-vis-load 0.2s ease-in-out infinite;transform:scaleY(0)!important;}
         .sc-visualizer[data-vis-state="loading"] .sc-vis-bar:nth-child(2){animation-delay:0.2s;}
         .sc-visualizer[data-vis-state="loading"] .sc-vis-bar:nth-child(3){animation-delay:0.4s;}
-        .sc-visualizer[data-vis-state="paused"] .sc-vis-bar{transition:transform 0.4s ease,opacity 0.4s ease;transform:scaleY(0.3)!important;opacity:0.4;}
-        .sc-visualizer[data-vis-state="idle"] .sc-vis-bar{transform:scaleY(0.3)!important;opacity:0;}
+        .sc-visualizer[data-vis-state="paused"] .sc-vis-bar{transition:transform 0.4s ease,opacity 0.4s ease;transform:scaleY(0)!important;opacity:0.4;}
+        .sc-visualizer[data-vis-state="idle"] .sc-vis-bar{transform:scaleY(0)!important;opacity:0;}
       `;
       document.head.appendChild(s);
     }
@@ -598,9 +598,14 @@ document.addEventListener("DOMContentLoaded", () => {
             // data.samples is an array of integers (0–max), data.width is sample count
             const samples = data.samples;
             const max = Math.max(...samples) || 1;
+            const min = Math.min(...samples);
+            const range = max - min || 1;
             waveformCache.set(
               sound.id,
-              samples.map((v) => v / max),
+              samples.map((v) => {
+                const normalized = (v - min) / range;
+                return Math.pow(normalized, 0.5); // square root — boosts low values, spreads the middle
+              }),
             );
           })
           .catch(() => {}); // silently ignore fetch failures
@@ -745,7 +750,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (wf && wf.length > 0) {
               const pos = e.relativePosition;
               // Sample three slightly offset positions for the three bars
-              const offsets = [-0.01, 0, 0.01];
+              const offsets = [-0.02, 0, 0.02];
               const bars = visEl.querySelectorAll(".sc-vis-bar");
               bars.forEach((bar, i) => {
                 const idx = Math.min(
@@ -753,9 +758,9 @@ document.addEventListener("DOMContentLoaded", () => {
                   Math.max(0, Math.round((pos + offsets[i]) * (wf.length - 1))),
                 );
 
-                const scale = 0 + wf[idx] * 1;
+                const scale = 0 + wf[idx] * 0.8;
                 bar.style.transform = `scaleY(${scale.toFixed(3)})`;
-                bar.style.opacity = (0 + wf[idx] * 1).toFixed(3);
+                bar.style.opacity = Math.pow(wf[idx], 0.5).toFixed(3);
               });
             }
           }
