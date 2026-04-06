@@ -494,6 +494,9 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       });
 
+      Object.keys(roomMap).forEach((k) => delete roomMap[k]);
+      Object.keys(trackKeyMap).forEach((k) => delete trackKeyMap[k]);
+
       scContainer._artworkInterval = null;
       let currentArtworkIndex = 0;
       let currentArtworkTitle = null;
@@ -501,7 +504,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
       let dotsContainer = null;
 
-      const renderDots = (images, activeIndex) => {
+      // OPTIMIZATION 1: Stop deleting and recreating DOM nodes every 5 seconds
+      const buildDots = (images, activeIndex) => {
         if (!dotsContainer) return;
         dotsContainer.innerHTML = "";
         if (images.length <= 1) {
@@ -517,43 +521,65 @@ document.addEventListener("DOMContentLoaded", () => {
             currentArtworkIndex = i;
             const artEl = scContainer.querySelector(".sc-artwork");
             if (artEl) artEl.src = images[i];
-            renderDots(images, i);
+            updateDots(i);
+
+            // Reset interval so it doesn't immediately skip
+            if (scContainer._artworkInterval) {
+              clearInterval(scContainer._artworkInterval);
+              scContainer._artworkInterval = setInterval(() => {
+                currentArtworkIndex = (currentArtworkIndex + 1) % images.length;
+                if (artEl) artEl.src = images[currentArtworkIndex];
+                updateDots(currentArtworkIndex);
+              }, SWITCH_SPEED_MS);
+            }
           });
           dotsContainer.appendChild(dot);
         });
       };
 
+      const updateDots = (activeIndex) => {
+        if (!dotsContainer) return;
+        const dots = dotsContainer.querySelectorAll(".sc-artwork-dot");
+        dots.forEach((dot, i) => {
+          if (i === activeIndex) dot.classList.add("active");
+          else dot.classList.remove("active");
+        });
+      };
+
+      // OPTIMIZATION 2: Prevent redundant logic & cache blowouts when track hasn't changed
       const updateArtwork = (sound) => {
         if (!sound) return;
+
+        // Bypasses the memory spike of re-fetching images if the track is just paused/unpaused
+        if (sound.title === currentArtworkTitle) return;
+
+        currentArtworkTitle = sound.title;
+        currentArtworkIndex = 0;
+        clearInterval(scContainer._artworkInterval);
+        scContainer._artworkInterval = null;
 
         const images = artworkOverrides[sound.title];
         const artEl = scContainer.querySelector(".sc-artwork");
 
-        if (sound.title !== currentArtworkTitle) {
-          currentArtworkTitle = sound.title;
-          currentArtworkIndex = 0;
-          clearInterval(scContainer._artworkInterval);
-          scContainer._artworkInterval = null;
-        }
+        if (artEl) artEl.src = "";
 
         if (images && images.length > 0) {
           if (artEl) artEl.src = images[currentArtworkIndex];
-          renderDots(images, currentArtworkIndex);
 
-          if (images.length > 1 && !scContainer._artworkInterval) {
+          buildDots(images, currentArtworkIndex);
+
+          if (images.length > 1) {
             scContainer._artworkInterval = setInterval(() => {
               currentArtworkIndex = (currentArtworkIndex + 1) % images.length;
               if (artEl) artEl.src = images[currentArtworkIndex];
-              renderDots(images, currentArtworkIndex);
+              updateDots(currentArtworkIndex);
             }, SWITCH_SPEED_MS);
           }
         } else {
-          clearInterval(scContainer._artworkInterval);
-          scContainer._artworkInterval = null;
           if (artEl && sound.artwork_url) {
             artEl.src = sound.artwork_url.replace("-large", "-t500x500");
           }
-          renderDots([], 0);
+          buildDots([], 0);
         }
       };
 
@@ -580,8 +606,9 @@ document.addEventListener("DOMContentLoaded", () => {
       let cachedDuration = 0;
       let userStartedPlayback = false;
       let currentTrackIndex = 0;
+      let currentSoundId = null; // Track current ID to prevent massive array mapping inside the event loop
+      const cachedVisBars = Array.from(visEl.querySelectorAll(".sc-vis-bar"));
 
-      // Waveform cache: track id → Float32Array of 0..1 amplitudes (100 samples)
       const waveformCache = new Map();
       let currentWaveform = null;
 
@@ -595,27 +622,26 @@ document.addEventListener("DOMContentLoaded", () => {
         )
           .then((r) => r.json())
           .then((data) => {
-            // data.samples is an array of integers (0–max), data.width is sample count
             const samples = data.samples;
-            // Use 5th/95th percentile to avoid outliers collapsing the range
             const sorted = [...samples].sort((a, b) => a - b);
             const p05 = sorted[Math.floor(sorted.length * 0.05)];
             const p95 = sorted[Math.floor(sorted.length * 0.95)];
             const range = p95 - p05 || 1;
-            // First stretch: percentile bounds, clamp to 0..1
             const stretched = samples.map((v) =>
               Math.min(1, Math.max(0, (v - p05) / range)),
             );
-            // Second stretch: remap actual min..max → 0..1
-            // guarantees full bar travel regardless of how compressed the track is
             const sMin = Math.min(...stretched);
             const sMax = Math.max(...stretched);
             const sRange = sMax - sMin || 1;
-            // Power curve 0.4 for visual feel — boosts low values, keeps peaks bright
             const wf = stretched.map((v) => Math.pow((v - sMin) / sRange, 0.4));
             waveformCache.set(sound.id, wf);
+
+            // Assign straight to the active property
+            if (currentSoundId === sound.id) {
+              currentWaveform = wf;
+            }
           })
-          .catch(() => {}); // silently ignore fetch failures
+          .catch(() => {});
       };
 
       widget.bind(SC.Widget.Events.READY, () => {
@@ -631,9 +657,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
             scContainer._scSoundsCache = sounds;
             scContainer.dataset.scReady = "true";
-
-            // Pre-fetch waveforms for all tracks
-            sounds.forEach(fetchWaveform);
 
             const randomIndex = Math.floor(Math.random() * sounds.length);
             currentTrackIndex = randomIndex;
@@ -666,17 +689,16 @@ document.addEventListener("DOMContentLoaded", () => {
         visEl.setAttribute("data-vis-state", "playing");
         if (playBtn) {
           playBtn.setAttribute("data-state", "playing");
-          // playBtn.innerHTML =
-          //   '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 32 32"><path fill="currentColor" d="M14 10h-2v12h2zm6 0h-2v12h2z"/><path fill="currentColor" d="M16 4A12 12 0 1 1 4 16A12 12 0 0 1 16 4m0-2a14 14 0 1 0 14 14A14 14 0 0 0 16 2"/></svg>';
           playBtn.setAttribute("aria-label", "Pause");
         }
         widget.getCurrentSound((sound) => {
           updateArtwork(sound);
           if (sound) {
+            currentSoundId = sound.id;
             trackTitleEl.textContent = sound.title;
             if (seekDur) seekDur.textContent = formatTime(sound.duration);
             currentWaveform = waveformCache.get(sound.id) || null;
-            fetchWaveform(sound); // ensure fetched if cache missed
+            fetchWaveform(sound);
           }
         });
         widget.getDuration((d) => {
@@ -691,8 +713,6 @@ document.addEventListener("DOMContentLoaded", () => {
         visEl.setAttribute("data-vis-state", "paused");
         if (playBtn) {
           playBtn.setAttribute("data-state", "paused");
-          // playBtn.innerHTML =
-          //   '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 32 32"><path fill="currentColor" d="M11 23a1 1 0 0 1-1-1V10a1 1 0 0 1 1.447-.894l12 6a1 1 0 0 1 0 1.788l-12 6A1 1 0 0 1 11 23m1-11.382v8.764L20.764 16Z"/><path fill="currentColor" d="M16 4A12 12 0 1 1 4 16A12 12 0 0 1 16 4m0-2a14 14 0 1 0 14 14A14 14 0 0 0 16 2"/></svg>';
           playBtn.setAttribute("aria-label", "Play");
         }
       });
@@ -701,7 +721,6 @@ document.addEventListener("DOMContentLoaded", () => {
         const sounds = scContainer._scSoundsCache || [];
         const i = currentTrackIndex;
         if (sounds.length > 0 && i === sounds.length - 1) {
-          // Last track finished — wrap around to index 0
           const firstSound = sounds[0];
           currentTrackIndex = 0;
           widget.skip(0);
@@ -714,7 +733,6 @@ document.addEventListener("DOMContentLoaded", () => {
           if (seekCur) seekCur.textContent = "0:00";
           return;
         }
-        // Auto-advance to next track — always reset to beginning
         const nextIndex = i + 1;
         const nextSound = sounds[nextIndex];
         currentTrackIndex = nextIndex;
@@ -735,7 +753,6 @@ document.addEventListener("DOMContentLoaded", () => {
           if (seekBar) seekBar.value = e.relativePosition * 100;
           if (seekCur) seekCur.textContent = formatTime(e.currentPosition);
         }
-        // Show loading state when buffer hasn't caught up to playhead
         if (scContainer.getAttribute("data-sc-state") === "playing") {
           const isBuffering =
             typeof e.loadedProgress === "number" &&
@@ -744,22 +761,13 @@ document.addEventListener("DOMContentLoaded", () => {
             visEl.setAttribute("data-vis-state", "loading");
           } else {
             visEl.setAttribute("data-vis-state", "playing");
-            // Drive bar heights from waveform amplitude
-            const wf =
-              currentWaveform ||
-              waveformCache.get(
-                (
-                  (scContainer._scSoundsCache || []).find(
-                    (s) => s.title === trackTitleEl.textContent,
-                  ) || {}
-                ).id,
-              );
+            // OPTIMIZATION 3: Completely removes the heavy `.find()` filtering and array allocations
+            // that occurred ~50 times per second during playback.
+            const wf = currentWaveform;
             if (wf && wf.length > 0) {
               const pos = e.relativePosition;
-              // Sample three slightly offset positions for the three bars
               const offsets = [-0.02, 0, 0.02];
-              const bars = visEl.querySelectorAll(".sc-vis-bar");
-              bars.forEach((bar, i) => {
+              cachedVisBars.forEach((bar, i) => {
                 const idx = Math.min(
                   wf.length - 1,
                   Math.max(0, Math.round((pos + offsets[i]) * (wf.length - 1))),
@@ -794,7 +802,6 @@ document.addEventListener("DOMContentLoaded", () => {
       const playWheelBtn = wheel && wheel._playBtn;
       const screen = scContainer.querySelector(".sc-ipod-screen");
 
-      // Track list overlay inside the screen
       let trackListEl = null;
       let trackListVisible = false;
       let highlightedIndex = 0;
@@ -802,6 +809,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const buildTrackList = () => {
         if (!screen || soundsCache.length === 0) return;
+
+        if (trackListEl && trackListEl.isConnected) {
+          trackListEl
+            .querySelectorAll(".sc-ipod-tracklist-row")
+            .forEach((r) => {
+              const idx = parseInt(r.dataset.index, 10);
+              r.classList.toggle("highlighted", idx === highlightedIndex);
+            });
+          scrollHighlightedIntoView();
+          return;
+        }
+
         if (trackListEl) trackListEl.remove();
 
         trackListEl = document.createElement("div");
@@ -853,11 +872,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const showTrackList = () => {
         if (!screen) return;
-        // Lock height to current rendered size so tracklist view doesn't resize the screen
         screen.style.height = screen.offsetHeight + "px";
         screen.setAttribute("data-view", "tracklist");
         trackListVisible = true;
-        // Sync highlight to current track
         widget.getCurrentSoundIndex((i) => {
           highlightedIndex = i >= 0 ? i : 0;
           buildTrackList();
@@ -898,13 +915,6 @@ document.addEventListener("DOMContentLoaded", () => {
         hideTrackList();
       };
 
-      // Store soundsCache when tracks load — patch into the existing loadSounds flow
-      // We hook into scContainer._scSoundsCache set below after loadSounds
-      const _origGetSounds = () => {
-        soundsCache = scContainer._scSoundsCache || [];
-      };
-
-      // MENU: toggle track list
       if (menuBtn) {
         menuBtn.addEventListener("click", () => {
           soundsCache = scContainer._scSoundsCache || [];
@@ -916,7 +926,6 @@ document.addEventListener("DOMContentLoaded", () => {
         });
       }
 
-      // ⏮ PREV: in tracklist mode scroll up; otherwise skip to previous track
       if (prevBtn) {
         prevBtn.addEventListener("click", () => {
           if (trackListVisible) {
@@ -939,7 +948,6 @@ document.addEventListener("DOMContentLoaded", () => {
         });
       }
 
-      // ⏭ NEXT: in tracklist mode scroll down; otherwise skip to next track
       if (nextBtn) {
         nextBtn.addEventListener("click", () => {
           if (trackListVisible) {
@@ -964,7 +972,6 @@ document.addEventListener("DOMContentLoaded", () => {
         });
       }
 
-      // ▶∥ BOTTOM: always play/pause
       if (playWheelBtn) {
         playWheelBtn.addEventListener("click", () => {
           userStartedPlayback = true;
@@ -972,7 +979,6 @@ document.addEventListener("DOMContentLoaded", () => {
         });
       }
 
-      // Center button: confirm selection in tracklist, else play/pause
       if (centerBtn) {
         centerBtn.addEventListener("click", () => {
           if (trackListVisible) {

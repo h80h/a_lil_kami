@@ -152,24 +152,6 @@ async function updateLiveStatus() {
       const displayCount = rawCount > 0 ? rawCount : 1;
       countElement.innerText = displayCount;
       countElement.classList.add("visible");
-
-      const time = new Date().toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-        hour12: false,
-      });
-      const statusColor = rawCount > 0 ? "#22c55e" : "#999";
-      console.log(
-        `%c● %cLive Status %c[%s]%c %c${rawCount} Online %c(UI: ${displayCount})`,
-        `color: ${statusColor}; font-size: 14px;`,
-        "color: #bbb;",
-        "color: #666; font-family: monospace;",
-        time,
-        "color: #bbb;",
-        `color: ${statusColor};`,
-        "color: #555; font-size: 10px; font-style: italic;",
-      );
     }
   } catch (err) {
     console.error("%c[!] Live Sync Interrupted.", "color: #ef4444;");
@@ -186,8 +168,8 @@ let kamiStatsData = {};
 let kamiTraitIndexData = {};
 let traitNameToIndex = {};
 let kamiInfoData = {};
-let kamiAccountsData = {};
-let kamiToAccount = {}; // { [kamiIndex]: { accountIndex, accountName } }  — built after load
+let kamiToAccount = {}; // { [kamiIndex]: [accountName, accountIndex] } — pre-inverted by extractor
+let _bundleKamiOwnerMap = {}; // temporary staging slot — freed after loadKamiInfoData assigns it
 let kamiScoresData = {}; // { [kamiIndex]: [rarityScore, overallScore] } — from kamiScores
 let kamiInGameRanks = {}; // { [kamiIndex]: rank } — computed client-side from kamiScoresData
 let isShowingIngameRank = false; // global toggle: false = openrarity, true = in-game
@@ -210,6 +192,7 @@ let traitAffinityLookup = {};
 let traitCounts = {};
 let nftRarityScores = {};
 
+let totalNFTsCount = 0; // cached after data loads — avoids Object.keys(traitsData).length on every card
 let allNFTIds = [];
 let filteredNFTIds = [];
 let selectedIDs = new Set();
@@ -238,10 +221,14 @@ const INITIAL_LOAD_COUNT = 50;
 const LAZY_LOAD_COUNT = 30;
 
 let isMobile = window.innerWidth <= 390;
+let _resizeTimer;
 window.addEventListener(
   "resize",
   () => {
-    isMobile = window.innerWidth <= 390;
+    clearTimeout(_resizeTimer);
+    _resizeTimer = setTimeout(() => {
+      isMobile = window.innerWidth <= 390;
+    }, 150);
   },
   { passive: true },
 );
@@ -567,7 +554,7 @@ function calculateTraitCounts() {
 // OpenRarity — information content scoring (score = I(x) / E[I(x)])
 // See: https://openrarity.gitbook.io/developers/fundamentals/methodology
 function calculateRarityScores() {
-  const totalNFTs = Object.keys(traitsData).length;
+  const totalNFTs = totalNFTsCount || Object.keys(traitsData).length;
   const scores = {};
 
   const traitIC = {};
@@ -1305,7 +1292,7 @@ function createFilterControls() {
   filterGroupsContainer.id = "filterGroupsContainer";
   filterControls.appendChild(filterGroupsContainer);
 
-  const totalNFTs = Object.keys(traitsData).length;
+  const totalNFTs = totalNFTsCount;
 
   Object.keys(allTraits)
     .sort()
@@ -1857,20 +1844,20 @@ function getOverlaySlotHTML(id, page) {
   }
   if (page === 2) {
     const _kamiInfo = kamiInfoData[id] || {};
-    const _kamiAccount = kamiToAccount[id] || {};
+    const _kamiAccount = kamiToAccount[id] || [];
     const _kamiName = _kamiInfo.name || `Kamigotchi ${id}`;
     const isWildKami = wildNFTs.has(String(id));
 
     const _wildOwner = isWildKami ? wildKamiOwners[String(id)] || {} : null;
     const _ownerName = isWildKami
       ? _wildOwner.accountName || "—"
-      : _kamiAccount.accountName || "—";
+      : _kamiAccount[0] || "—";
     const _accountIdx = isWildKami
       ? _wildOwner.accountIndex != null
         ? `#${_wildOwner.accountIndex}`
         : "—"
-      : _kamiAccount.accountIndex != null
-        ? `#${_kamiAccount.accountIndex}`
+      : _kamiAccount[1] != null
+        ? `#${_kamiAccount[1]}`
         : "—";
     const _level = _kamiInfo.level != null ? _kamiInfo.level : "—";
     const _s = _kamiInfo.stats || [];
@@ -1935,7 +1922,7 @@ function displayNFT(id, showCloseButton = false) {
   card.className = "nft-card hover_wrapper";
   card.dataset.nftId = id;
 
-  const totalNFTs = Object.keys(traitsData).length;
+  const totalNFTs = totalNFTsCount;
   const rankPercentile = (rank / totalNFTs) * 100;
   let rankClass = "rank-common";
   if (rankPercentile <= 1) rankClass = "rank-legendary";
@@ -2430,18 +2417,13 @@ async function loadListingsData(v) {
 
 async function loadKamiInfoData(v) {
   try {
-    // kamiInfoData and kamiAccountsData are already populated from kamiBundle.json
-    // Build reverse lookup: kamiIndex → { accountIndex, accountName }
-    kamiToAccount = {};
-    Object.entries(kamiAccountsData).forEach(([accountIndex, acc]) => {
-      (acc.kamis || []).forEach((kamiIndex) => {
-        kamiToAccount[kamiIndex] = { accountIndex, accountName: acc.name };
-      });
-    });
+    // kamiOwnerMap is pre-inverted by the extractor: { kamiIndex: [accountName, accountIndex] }
+    // Just assign directly — no loop needed
+    kamiToAccount = _bundleKamiOwnerMap;
+    _bundleKamiOwnerMap = null; // free staging slot
     console.log(
-      `📖 Loaded info for ${Object.keys(kamiInfoData).length} Kamigotchi, ${Object.keys(kamiAccountsData).length} accounts`,
+      `📖 Loaded info for ${Object.keys(kamiInfoData).length} Kamigotchi`,
     );
-    kamiAccountsData = {}; // free memory — reverse lookup is all we need going forward
   } catch (err) {}
 }
 
@@ -2527,13 +2509,9 @@ function patchNewListingIcons(newListingWindow) {
   });
 }
 
-function patchInfoOverlays(freshAccounts) {
-  kamiToAccount = {};
-  Object.entries(freshAccounts).forEach(([accountIndex, acc]) => {
-    (acc.kamis || []).forEach((kamiIndex) => {
-      kamiToAccount[kamiIndex] = { accountIndex, accountName: acc.name };
-    });
-  });
+function patchInfoOverlays(freshOwnerMap) {
+  // freshOwnerMap: { [kamiIndex]: [accountName, accountIndex] } — same shape as kamiToAccount
+  kamiToAccount = freshOwnerMap;
   if (kamiOverlayPage !== 2) return; // nobody is on the info page, skip DOM work
   document.querySelectorAll(".nft-card").forEach((card) => {
     const slot = card.querySelector(".kami-overlay-slot");
@@ -2555,7 +2533,6 @@ async function checkForUpdates() {
     ]);
 
     let shouldRefresh = false;
-    let freshMetaAccounts = null; // kamiAccounts from kamiMeta.json for this tick
 
     // ── listings ─────────────────────────────────────────────────────
     let newListings = null;
@@ -2589,7 +2566,7 @@ async function checkForUpdates() {
       const windowChanged =
         JSON.stringify(newMeta.kamiNewWindow) !==
         JSON.stringify(metadataInfo.kamiNewWindow);
-      const newAccountsHash = JSON.stringify(newMeta.kamiAccounts ?? {});
+      const newAccountsHash = JSON.stringify(newMeta.accountIdMap ?? {});
       const accountsChanged =
         cachedAccountsHash && newAccountsHash !== cachedAccountsHash;
 
@@ -2600,29 +2577,20 @@ async function checkForUpdates() {
         patchNewBadges(newMeta.kamiNewWindow);
       }
 
+      // Ownership changes require a full bundle refresh — kamiMeta.json no longer
+      // carries kamiOwnerMap, so we can't patch in place without re-fetching the bundle.
       if (accountsChanged && !shouldRefresh) {
-        patchInfoOverlays(newMeta.kamiAccounts ?? {});
+        console.log("👤 Ownership changed, refreshing all data...");
+        shouldRefresh = true;
       }
 
       cachedMetaHash = getSignificantMetaHash(newMeta);
       cachedAccountsHash = newAccountsHash;
       if (!shouldRefresh) metadataInfo.totalCount = newMeta.totalCount;
-
-      // Stash for post-refresh reconciliation below
-      if (newMeta.kamiAccounts) freshMetaAccounts = newMeta.kamiAccounts;
     }
 
     if (shouldRefresh) {
       await refreshData();
-      // The bundle fetched by refreshData() may still lag behind kamiMeta.json:
-      // a kami that was just minted/rerolled (gaining its first owner) and then
-      // immediately listed can arrive in kamiListings.json before the bundle is
-      // regenerated with the new owner mapping.  Re-applying the kamiAccounts
-      // from kamiMeta.json — already fetched moments ago in this same tick —
-      // ensures those newly-listed kamis show the correct owner instead of '—'.
-      if (freshMetaAccounts) {
-        patchInfoOverlays(freshMetaAccounts);
-      }
     }
   } catch (err) {}
 }
@@ -2661,8 +2629,9 @@ async function fetchAndSplitBundle(v) {
   bundle.kamiMetadata = null;
   kamiInfoData = bundle.kamiInfo || {};
   bundle.kamiInfo = null;
-  kamiAccountsData = bundle.kamiAccounts || {};
-  bundle.kamiAccounts = null;
+  _bundleKamiOwnerMap = bundle.kamiOwnerMap || {};
+  bundle.kamiOwnerMap = null;
+  bundle.accountIdMap = null; // only consumed by trade-history.js via kamiMeta.json
   kamiScoresData = bundle.kamiScores || {};
   bundle.kamiScores = null;
   if (bundle.wildKamiOwners) {
@@ -2756,6 +2725,8 @@ function calculateKamiStats() {
 function processLoadedData() {
   traitNameToIndex = buildTraitNameToIndex();
   traitEntityToIndex = buildTraitEntityToIndex();
+  kamiTraitIndexData = null; // free — lookup tables are now the source of truth
+  totalNFTsCount = Object.keys(traitsData).length;
   kamiStatsData = calculateKamiStats();
   affinityData = extractAffinityData();
   traitAffinityLookup = buildTraitAffinityLookup();
@@ -2900,7 +2871,7 @@ async function loadData() {
     cachedListingsHash = getSignificantListingsHash(listingMetaInfo);
     cachedListingsMetaHash = JSON.stringify(listingMetaInfo.listingNewWindow);
     cachedMetaHash = getSignificantMetaHash(metadataInfo);
-    cachedAccountsHash = JSON.stringify(metadataInfo.kamiAccounts ?? {});
+    cachedAccountsHash = JSON.stringify({}); // accountIdMap from kamiMeta.json; populated on first checkForUpdates tick
     startAutoRefresh();
   } catch (error) {
     console.error("Detailed error:", error);
@@ -3118,15 +3089,21 @@ async function refreshData() {
 function setupScrollToTop() {
   const scrollBtn = document.getElementById("scrollToTop");
   let lastScrollTop = 0;
+  let _scrollRafPending = false;
 
   window.addEventListener("scroll", () => {
-    const currentScroll = window.pageYOffset;
-    if (currentScroll > 300) {
-      scrollBtn.classList.toggle("show", currentScroll > lastScrollTop);
-    } else {
-      scrollBtn.classList.remove("show");
-    }
-    lastScrollTop = currentScroll;
+    if (_scrollRafPending) return;
+    _scrollRafPending = true;
+    requestAnimationFrame(() => {
+      _scrollRafPending = false;
+      const currentScroll = window.pageYOffset;
+      if (currentScroll > 300) {
+        scrollBtn.classList.toggle("show", currentScroll > lastScrollTop);
+      } else {
+        scrollBtn.classList.remove("show");
+      }
+      lastScrollTop = currentScroll;
+    });
   });
 
   scrollBtn.addEventListener("click", () =>
@@ -3204,44 +3181,47 @@ if (!document.getElementById("enhanced-trait-styles")) {
 
   document.addEventListener("mouseover", (e) => {
     const badge = e.target.closest(".listing-badge, .new-listing-icon");
-    if (!badge) return;
-    const related = e.relatedTarget;
-    if (related && badge.contains(related)) return;
-    const container = badge.closest(".image-container");
-    const price = container?.querySelector(".listing-price");
-    if (price) price.style.opacity = "0.7";
+    if (badge) {
+      const related = e.relatedTarget;
+      if (!related || !badge.contains(related)) {
+        const price = badge
+          .closest(".image-container")
+          ?.querySelector(".listing-price");
+        if (price) price.style.opacity = "0.7";
+      }
+    }
+    const timeIcon = e.target.closest(".listing-time-ago");
+    if (timeIcon) {
+      const related = e.relatedTarget;
+      if (!related || !timeIcon.contains(related)) {
+        const timeEl = timeIcon
+          .closest(".nft-card")
+          ?.querySelector(".image-container .listing-time");
+        if (timeEl) timeEl.style.opacity = "0.7";
+      }
+    }
   });
   document.addEventListener("mouseout", (e) => {
     const badge = e.target.closest(".listing-badge, .new-listing-icon");
-    if (!badge) return;
-    const related = e.relatedTarget;
-    if (related && badge.contains(related)) return;
-    const container = badge.closest(".image-container");
-    const price = container?.querySelector(".listing-price");
-    if (price) price.style.opacity = "";
-  });
-
-  document.addEventListener("mouseover", (e) => {
+    if (badge) {
+      const related = e.relatedTarget;
+      if (!related || !badge.contains(related)) {
+        const price = badge
+          .closest(".image-container")
+          ?.querySelector(".listing-price");
+        if (price) price.style.opacity = "";
+      }
+    }
     const timeIcon = e.target.closest(".listing-time-ago");
-    if (!timeIcon) return;
-    const related = e.relatedTarget;
-    if (related && timeIcon.contains(related)) return;
-    const container = timeIcon
-      .closest(".nft-card")
-      ?.querySelector(".image-container");
-    const timeEl = container?.querySelector(".listing-time");
-    if (timeEl) timeEl.style.opacity = "0.7";
-  });
-  document.addEventListener("mouseout", (e) => {
-    const timeIcon = e.target.closest(".listing-time-ago");
-    if (!timeIcon) return;
-    const related = e.relatedTarget;
-    if (related && timeIcon.contains(related)) return;
-    const container = timeIcon
-      .closest(".nft-card")
-      ?.querySelector(".image-container");
-    const timeEl = container?.querySelector(".listing-time");
-    if (timeEl) timeEl.style.opacity = "";
+    if (timeIcon) {
+      const related = e.relatedTarget;
+      if (!related || !timeIcon.contains(related)) {
+        const timeEl = timeIcon
+          .closest(".nft-card")
+          ?.querySelector(".image-container .listing-time");
+        if (timeEl) timeEl.style.opacity = "";
+      }
+    }
   });
 }
 

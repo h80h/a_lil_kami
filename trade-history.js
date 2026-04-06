@@ -27,22 +27,32 @@
       const meta = await fetch(
         `${getBaseUrl()}/kamiMeta.json?v=${Date.now()}`,
       ).then((r) => (r.ok ? r.json() : null));
-      const accounts = meta?.kamiAccounts ?? null;
 
+      // kamiMeta.json now carries accountIdMap: { [id]: accountName }
+      const idMap = meta?.accountIdMap ?? null;
+      if (idMap && Object.keys(idMap).length > 0) {
+        for (const [id, name] of Object.entries(idMap)) {
+          accountNameMap.set(String(id), name);
+        }
+        return;
+      }
+
+      // Fallback: old kamiMeta.json shape with kamiAccounts (pre-migration)
+      const accounts = meta?.kamiAccounts ?? null;
       if (accounts && Object.keys(accounts).length > 0) {
-        // kamiMeta.json already has kamiAccounts (new extractor)
         for (const acc of Object.values(accounts)) {
           if (acc.id && acc.name) accountNameMap.set(String(acc.id), acc.name);
         }
-      } else {
-        // Fall back to kamiBundle.json (old extractor or first deploy)
-        const bundle = await fetch(
-          `${getBaseUrl()}/kamiBundle.json?v=${Date.now()}`,
-        ).then((r) => (r.ok ? r.json() : null));
-        const bundleAccounts = bundle?.kamiAccounts ?? {};
-        for (const acc of Object.values(bundleAccounts)) {
-          if (acc.id && acc.name) accountNameMap.set(String(acc.id), acc.name);
-        }
+        return;
+      }
+
+      // Last resort: fetch kamiBundle.json (old extractor or first deploy)
+      const bundle = await fetch(
+        `${getBaseUrl()}/kamiBundle.json?v=${Date.now()}`,
+      ).then((r) => (r.ok ? r.json() : null));
+      const bundleAccounts = bundle?.kamiAccounts ?? {};
+      for (const acc of Object.values(bundleAccounts)) {
+        if (acc.id && acc.name) accountNameMap.set(String(acc.id), acc.name);
       }
     } catch (err) {
       console.warn("📜 Account name load failed:", err);
