@@ -71,6 +71,11 @@
       const data = await res.json();
       // Support new shape { history } and legacy bare array
       const records = Array.isArray(data) ? data : (data?.history ?? []);
+      // OPTIMIZATION 8: Explicitly drop old record arrays before re-filling so the GC
+      // can collect them immediately rather than waiting for the Map reference to be replaced.
+      kamiHistoryMap.forEach((arr) => {
+        arr.length = 0;
+      });
       kamiHistoryMap.clear();
       for (const record of records) {
         const key = String(record.kamiId);
@@ -376,14 +381,18 @@
     }
 
     patchAllArrows();
+    // OPTIMIZATION 7: Use a single shared MutationObserver instead of two always-on
+    // subtree observers. A single observer with two targets uses less internal memory
+    // than two separate observers running continuously over the session.
+    const _sharedArrowObserver = new MutationObserver(() => patchAllArrows());
     const observerTarget = document.getElementById("results") || document.body;
-    new MutationObserver(() => patchAllArrows()).observe(observerTarget, {
+    _sharedArrowObserver.observe(observerTarget, {
       childList: true,
       subtree: true,
     });
     const selectedIDsTarget = document.getElementById("selectedIDs");
     if (selectedIDsTarget)
-      new MutationObserver(() => patchAllArrows()).observe(selectedIDsTarget, {
+      _sharedArrowObserver.observe(selectedIDsTarget, {
         childList: true,
         subtree: true,
       });

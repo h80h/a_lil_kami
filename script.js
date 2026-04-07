@@ -2428,8 +2428,10 @@ async function loadKamiInfoData(v) {
 }
 
 function getSignificantListingsHash(listingsData) {
+  // Avoid Object.fromEntries(listingNFTs) which materializes the whole Map into a
+  // temporary plain object on every poll tick — stringify the entries array directly.
   return JSON.stringify({
-    listings: Object.fromEntries(listingNFTs),
+    listings: [...listingNFTs.entries()],
     listingNewWindow: listingsData?.listingNewWindow ?? {},
   });
 }
@@ -3229,6 +3231,7 @@ if ("serviceWorker" in navigator) {
   navigator.serviceWorker.getRegistrations().then((registrations) => {
     registrations.forEach((r) => r.unregister());
   });
+  caches.keys().then((keys) => keys.forEach((k) => caches.delete(k)));
 }
 
 loadData();
