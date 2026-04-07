@@ -3136,6 +3136,12 @@ document.addEventListener("DOMContentLoaded", () => {
   setupScrollToTop();
   setupRefreshButton();
 
+  document.getElementById("sc-toggle-btn")?.addEventListener("click", () => {
+    const player = document.getElementById("soundcloud-player");
+    if (!player.classList.contains("sc-open") && window.umami)
+      umami.track("check-music");
+  });
+
   document
     .querySelectorAll(".mint-price-text, .reroll-price-text")
     .forEach((el) => {
