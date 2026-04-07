@@ -1248,16 +1248,16 @@ button {
 
 .kami-history-header {
   color: #888;
-  margin-bottom: 2px;
+  margin-bottom: -1px;
   display: flex;
   align-items: center;
   gap: 5px;
 }
 
-.last-trade-badge {
+.trade-time-badge {
   color: #bbb;
   font-size: 7px;
-  padding: 1px 0;
+  padding-bottom: 1px;
   letter-spacing: 0.3px;
   flex-shrink: 0;
 }
@@ -1320,7 +1320,7 @@ button {
 .kami-history-seller,
 .kami-history-buyer,
 .kami-history-tradetime,
-.last-trade-badge {
+.trade-time-badge {
   font-size: 7px;
 }
 
@@ -1948,12 +1948,23 @@ button {
 }
 
 @media (max-width: 796px) {
+  
   .nft-id {
     font-size: 7.5px;
   }
 
   .kami-history-header {
-    margin-bottom: 0;
+    margin-top: 2px;
+  }
+
+  .kami-history-row-top {
+    margin-top: -3px;
+  }
+
+  .kami-traits,
+  .kami-info,
+  .kami-history {
+    font-size: 7px;
   }
 
   .nft-card-content {
@@ -2070,7 +2081,7 @@ button {
   .kami-history-buyer,
   .kami-history-arrow,
   .kami-history-type,
-  .last-trade-badge {
+  .trade-time-badge {
     font-size: 9px;
   }
 
@@ -2115,10 +2126,13 @@ button {
   .listing-price {
     font-size: 9px;
   }
+
+  .kami-history-header {
+    margin-bottom: 3px;
+  }
 }
 
 @media (max-width: 390px) {
-
   .kami-traits div,
   .kami-info div {
     margin-bottom: 3px;
@@ -2253,7 +2267,7 @@ button {
   .kami-history-arrow,
   .kami-history-type,
   .kami-history-tradetime,
-  .last-trade-badge {
+  .trade-time-badge {
     font-size: 10px;
   }
 
@@ -2294,6 +2308,10 @@ button {
 
   #messageBox {
     min-width: 65%;
+  }
+
+  .kami-history-header {
+    gap: 15px;
   }
 }
 
@@ -2379,7 +2397,7 @@ button {
   .kami-history-arrow,
   .kami-history-type,
   .kami-history-tradetime,
-  .last-trade-badge {
+  .trade-time-badge {
     font-size: 8px;
   }
 
@@ -2504,7 +2522,7 @@ button {
   .kami-history-arrow,
   .kami-history-type,
   .kami-history-tradetime,
-  .last-trade-badge {
+  .trade-time-badge {
     font-size: 6.5px;
   }
 

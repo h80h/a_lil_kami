@@ -168,8 +168,7 @@
       if (!r.tradeTime) return latest;
       return !latest || r.tradeTime > latest ? r.tradeTime : latest;
     }, null);
-    const ago = latestTradeTime ? timeAgo(latestTradeTime) : null;
-    const badgeHTML = ago ? `<span class="last-trade-badge">${ago}</span>` : "";
+    
 
     // Explicitly sort by tradeTime descending so the newest trade is always on top
     const rows = [...records]
@@ -191,23 +190,31 @@
         const tag = r.type === "bid" ? "offer" : "sale";
         const seller = resolveAccount(r.seller);
         const buyer = resolveAccount(r.buyer);
-        return `<div class="kami-history-row">
-        <div class="kami-history-row-top">
-          <span class="kami-history-price">Ξ${r.price}</span>
-          <span class="kami-history-type ${r.type}">${tag}</span>
-        </div>
-        <div class="kami-history-row-bottom">
-          <span class="kami-history-seller">${seller}</span>
-          <span class="kami-history-arrow">=></span>
-          <span class="kami-history-buyer">${buyer}</span>
-        </div>
-        <span class="kami-history-tradetime">${tradeTime}</span>
-      </div>`;
+        const ago = tradeTime ? timeAgo(tradeTime) : null;
+        
+        return `
+        
+        <div class="kami-history-row">
+          <div class="kami-history-header">
+            <div>${records.length} sale(s)</div>
+            <span class="trade-time-badge">${ago}</span>
+          </div>
+          <div class="kami-history-row-top">
+            <span class="kami-history-price">Ξ${r.price}</span>
+            <span class="kami-history-type ${r.type}">${tag}</span>
+          </div>
+          <div class="kami-history-row-bottom">
+            <span class="kami-history-seller">${seller}</span>
+            <span class="kami-history-arrow">=></span>
+            <span class="kami-history-buyer">${buyer}</span>
+          </div>
+          <span class="kami-history-tradetime">${tradeTime}</span>
+        </div>`;
       })
       .join("");
-
+      
     return `<div class="kami-history" id="kami-history-panel">
-      <div class="kami-history-header">${records.length} sale(s) ${badgeHTML}</div>
+      
       <div class="kami-history-rows">${rows}</div>
     </div>`;
   }
