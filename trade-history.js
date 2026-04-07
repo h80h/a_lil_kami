@@ -225,42 +225,48 @@
       return;
     }
 
-    // Handle scroll button states dynamically based on scroll position.
-    // NOTE: must only be called after layout is fully flushed — always use
-    // scheduleUpdateScrollButtons (double-rAF) after DOM/style changes.
-    // .kami-history-scroll-btns starts as display:none and .nft-card has
-    // contain:layout, so clientHeight/scrollHeight both read 0 in the first
-    // rAF tick — making isAtBottom always true and permanently disabling the
-    // down button.
-    function updateScrollButtons(panel) {
-      if (!panel) return;
-      const card = panel.closest(".nft-card");
+    function updateScrollButtons(element) {
+      if (!element) return;
+      // Allow accepting either the panel itself or the parent card
+      const card = element.classList && element.classList.contains("nft-card") 
+        ? element 
+        : element.closest(".nft-card");
       if (!card) return;
+      
       const controls = card.querySelector(".kami-overlay-controls");
       if (!controls) return;
       const upBtn = controls.querySelector(".kami-history-up");
       const downBtn = controls.querySelector(".kami-history-down");
       if (!upBtn || !downBtn) return;
 
+      const panel = card.querySelector(".kami-history-rows");
+      
+      // If there are no history rows (e.g. "no trades yet"), force disable and exit
+      if (!panel) {
+        upBtn.disabled = true;
+        downBtn.disabled = true;
+        return;
+      }
+
       const rows = panel.querySelectorAll(".kami-history-row");
       const totalPages = rows.length;
       const pageHeight = panel.clientHeight || 1;
-      const currentPage = Math.round(panel.scrollTop / pageHeight);
+      const currentPage = Math.round(panel.scrollTop / pageHeight) + 1;
 
-      upBtn.disabled = currentPage <= 0;
-      downBtn.disabled = currentPage >= totalPages - 1;
+      upBtn.disabled = !(
+        totalPages > 1 &&
+        currentPage > 1 &&
+        currentPage <= totalPages
+      );
+      downBtn.disabled = !(totalPages > 1 && currentPage !== totalPages);
     }
 
-    // Double-rAF: waits for the browser to fully flush layout (including the
-    // display:none -> flex change on .kami-history-scroll-btns and the
-    // contain:layout reflow on .nft-card) before reading scroll geometry.
-    function scheduleUpdateScrollButtons(panel) {
+    function scheduleUpdateScrollButtons(element) {
       requestAnimationFrame(() =>
-        requestAnimationFrame(() => updateScrollButtons(panel)),
+        requestAnimationFrame(() => updateScrollButtons(element)),
       );
     }
 
-    // Capture scrolling globally to easily grab events from dynamically created panels
     if (!window.__tradeHistoryScrollBound) {
       window.__tradeHistoryScrollBound = true;
       document.addEventListener(
@@ -275,7 +281,7 @@
           }
         },
         true,
-      ); // `true` ensures it captures in the capture phase before bubbling stops
+      );
     }
 
     const _orig = window.getOverlaySlotHTML;
@@ -291,10 +297,10 @@
       document.querySelectorAll(".kami-overlay-controls").forEach((ctrl) => {
         ctrl.classList.toggle("kami-history-visible", page === 3);
       });
-      // Force an immediate evaluation of the scroll buttons when a user lands on the history page
+      // Target the cards instead of the panels, catching panels that exist synchronously
       if (page === 3) {
         document
-          .querySelectorAll(".kami-history-rows")
+          .querySelectorAll(".nft-card")
           .forEach(scheduleUpdateScrollButtons);
       }
     };
@@ -305,17 +311,16 @@
       if (!rows.length) return;
 
       const pageHeight = panel.clientHeight;
-      const currentPage = Math.round(panel.scrollTop / pageHeight);
+      const currentPage = Math.round(panel.scrollTop / pageHeight) + 1;
       const totalPages = rows.length;
 
       let nextPage;
       if (direction === "down") {
-        nextPage = Math.min(currentPage + 1, totalPages - 1);
+        nextPage = Math.min(currentPage + 1, totalPages);
       } else {
-        nextPage = Math.max(currentPage - 1, 0);
+        nextPage = Math.max(currentPage - 1, 1);
       }
-
-      panel.scrollTop = nextPage * pageHeight;
+      panel.scrollTop = (nextPage - 1) * pageHeight;
       scheduleUpdateScrollButtons(panel);
     }
 
@@ -330,8 +335,6 @@
         window.applyKamiPage(nextPage);
       });
 
-      // Inject scroll buttons into .kami-overlay-controls (z-index 20, pointer-events: auto when active)
-      // positioned absolutely at the bottom-center to overlay the slot
       const controls = newArrow.closest(".kami-overlay-controls");
       if (controls && !controls.dataset.scrollInjected) {
         controls.dataset.scrollInjected = "1";
@@ -340,10 +343,12 @@
         const upBtn = document.createElement("button");
         upBtn.className = "kami-history-up";
         upBtn.textContent = "△";
+        upBtn.disabled = true; // Initialize disabled
 
         const downBtn = document.createElement("button");
         downBtn.className = "kami-history-down";
         downBtn.textContent = "▽";
+        downBtn.disabled = true; // Initialize disabled
 
         const bar = document.createElement("div");
         bar.className = "kami-history-scroll-btns";
@@ -351,14 +356,10 @@
         bar.appendChild(downBtn);
         controls.appendChild(bar);
 
-        // Sync visibility immediately in case cards re-rendered while on page 3
         controls.classList.toggle("kami-history-visible", _currentPage === 3);
 
-        // Immediate check in case injected while already on page 3
         if (_currentPage === 3) {
-          scheduleUpdateScrollButtons(
-            card?.querySelector(".kami-history-rows"),
-          );
+          scheduleUpdateScrollButtons(card);
         }
 
         upBtn.addEventListener("click", (e) => {
@@ -381,10 +382,18 @@
     }
 
     patchAllArrows();
-    // OPTIMIZATION 7: Use a single shared MutationObserver instead of two always-on
-    // subtree observers. A single observer with two targets uses less internal memory
-    // than two separate observers running continuously over the session.
-    const _sharedArrowObserver = new MutationObserver(() => patchAllArrows());
+    
+    // Utilize the existing observer to debounce and sync scroll logic when script.js 
+    // asynchronously rewrites the .kami-overlay-slot innerHTML
+    const _sharedArrowObserver = new MutationObserver(() => {
+      patchAllArrows();
+      if (_currentPage === 3) {
+        clearTimeout(window.__historyScrollSyncTimer);
+        window.__historyScrollSyncTimer = setTimeout(() => {
+          document.querySelectorAll(".nft-card").forEach(scheduleUpdateScrollButtons);
+        }, 50);
+      }
+    });
     const observerTarget = document.getElementById("results") || document.body;
     _sharedArrowObserver.observe(observerTarget, {
       childList: true,
