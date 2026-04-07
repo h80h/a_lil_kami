@@ -583,7 +583,7 @@ document.addEventListener("DOMContentLoaded", () => {
       s.id = "sc-visualizer-style";
       s.textContent = `
         .sc-visualizer{display:inline-flex;align-items:flex-end;gap:2px;height:8px;margin:0 2px 5px 0;vertical-align:middle;flex-shrink:0;overflow:visible;color:#888;}
-        .sc-visualizer .sc-vis-bar{width:3px;height:8px;border-radius:1px;background:currentColor;transform-origin:bottom;transition:transform 0.15s ease,opacity 0.4s ease;}
+        .sc-visualizer .sc-vis-bar{width:3px;height:8px;border-radius:1px;background:currentColor;transform-origin:bottom;transition:transform 0.075s ease,opacity 0.4s ease;}
         .sc-title-wrapper{display:flex;align-items:center;}
         @keyframes sc-vis-load{0%,100%{opacity:0.25}50%{opacity:0.75}}
         .sc-visualizer[data-vis-state="loading"] .sc-vis-bar { animation: sc-vis-load 1.2s ease-in-out infinite; }
@@ -952,6 +952,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     if (!isBuffering && currentWaveform && currentWaveform.length > 0) {
+      // Always update bars on every non-buffering tick, independent of state attribute change.
       const wf = currentWaveform;
       const offsets = [-0.02, 0, 0.02];
       cachedVisBars.forEach((bar, i) => {
