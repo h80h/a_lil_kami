@@ -502,6 +502,7 @@ document.addEventListener("DOMContentLoaded", () => {
       "66_trading-room/backgrounds/room66b.png",
       "66_trading-room/backgrounds/room66c.png",
     ],
+    "15": ["15_temple-cave/backgrounds/room15a.png", "15_temple-cave/backgrounds/room15-christmas.png"],
     "16-1": [
       "16_techno-temple/backgrounds/room16a.png",
       "16_techno-temple/backgrounds/room16-christmas.png",
