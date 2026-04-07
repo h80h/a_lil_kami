@@ -1246,7 +1246,7 @@ button {
   display: flex;
 }
 
-.kami-history-header {
+.kami-history-row-header {
   color: #888;
   margin-bottom: -1px;
   display: flex;
@@ -1953,7 +1953,7 @@ button {
     font-size: 7.5px;
   }
 
-  .kami-history-header {
+  .kami-history-row-header {
     margin-top: 2px;
   }
 
@@ -2031,7 +2031,7 @@ button {
     gap: 1px;
   }
 
-  .kami-history-header {
+  .kami-history-row-header {
     margin-bottom: 1px;
   }
 }
@@ -2127,7 +2127,7 @@ button {
     font-size: 9px;
   }
 
-  .kami-history-header {
+  .kami-history-row-header {
     margin-bottom: 3px;
   }
 }
@@ -2310,8 +2310,8 @@ button {
     min-width: 65%;
   }
 
-  .kami-history-header {
-    gap: 15px;
+  .kami-history-row-header {
+    gap: 20px;
   }
 }
 

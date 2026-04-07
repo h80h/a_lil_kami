@@ -195,7 +195,7 @@
         return `
         
         <div class="kami-history-row">
-          <div class="kami-history-header">
+          <div class="kami-history-row-header">
             <div>${records.length} sale(s)</div>
             <span class="trade-time-badge">${ago}</span>
           </div>
