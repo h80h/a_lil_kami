@@ -752,11 +752,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const dc = document.createElement("div");
     dc.className = "sc-artwork-dots";
     dc.style.cssText =
-      "position:absolute;bottom:0;left:50%;transform:translateX(-50%);display:none;justify-content:center;align-items:center;gap:5px;padding:1.5px 0;";
+      "position:absolute;bottom:0;left:50%;transform:translateX(-50%);display:none;justify-content:center;align-items:center;gap:5px;padding:1.5px 0;@media (max-width: 390px){.sc-artwork-dots{gap:6px}}";
     if (!document.getElementById("sc-dots-style")) {
       const s = document.createElement("style");
       s.id = "sc-dots-style";
-      s.textContent = `.sc-artwork-dot{width:4px;height:4px;border-radius:50%;background:rgba(255,255,255,0.75);cursor:pointer;transition:background .25s,transform .25s;flex-shrink:0}.sc-artwork-dot:hover{background:rgba(255,255,255,0.7)}.sc-artwork-dot.active{background:#fff;}`;
+      s.textContent = `.sc-artwork-dot{width:4px;height:4px;border-radius:50%;background:rgba(255,255,255,0.75);cursor:pointer;transition:background .25s,transform .25s;flex-shrink:0}.sc-artwork-dot:hover{background:rgba(255,255,255,0.7)}.sc-artwork-dot.active{background:#fff;}@media (max-width: 390px) {.sc-artwork-dot{width:5px;height:5px}}`;
       document.head.appendChild(s);
     }
     artworkEl.insertAdjacentElement("afterend", dc);
