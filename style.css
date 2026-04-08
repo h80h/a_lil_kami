@@ -2345,65 +2345,6 @@ button {
     gap: 20px;
   }
 
-  #soundcloud-player .sc-panel {
-    width: 204px;
-    padding: 12px 12px;
-    border-radius: 15px;
-    gap: 8px;
-  }
-
-  .sc-ipod-wheel {
-    width: 144px;
-    height: 144px;
-  }
-
-  .sc-artwork,
-  .artwork-wrapper {
-    width: 108px;
-    height: 108px;
-  }
-
-  .wheel-label {
-    font-size: 14px;
-  }
-
-  .wheel-label.top {
-    font-size: 8.5px;
-  }
-
-  .sc-track-title,
-  .sc-seek-current,
-  .sc-seek-duration {
-    font-size: 9px;
-  }
-
-  .sc-ipod-tracklist-row {
-    font-size: 9px;
-  }
-
-  .sc-kami-corner-link img {
-    width: 33px;
-    height: 33px;
-  }
-
-  .sc-kami-corner-link {
-    bottom: 10px;
-    right: 10px;
-  }
-
-  .sc-ipod-center-btn {
-    width: 60px;
-    height: 60px;
-  }
-
-  .wheel-label.left {
-    left: 3px;
-  }
-
-  .wheel-label.right {
-    right: 3px;
-  }
-
 }
 
 @media (max-width: 326px) {

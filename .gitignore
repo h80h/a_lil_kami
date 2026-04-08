@@ -6,6 +6,3 @@ test-fetch-market-history-gha.js
 # Environment variables
 .env
 .env.local
-
-# Logs
-extraction.log
