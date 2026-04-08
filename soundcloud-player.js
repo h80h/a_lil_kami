@@ -239,7 +239,6 @@ document.addEventListener("DOMContentLoaded", () => {
       "https://wave.sndcdn.com/quq6pCyYAeKC_m.json",
       ["78"],
     ],
-
     [
       "Radiant Crystal",
       "radiantCrystal",
@@ -502,7 +501,10 @@ document.addEventListener("DOMContentLoaded", () => {
       "66_trading-room/backgrounds/room66b.png",
       "66_trading-room/backgrounds/room66c.png",
     ],
-    "15": ["15_temple-cave/backgrounds/room15a.png", "15_temple-cave/backgrounds/room15-christmas.png"],
+    15: [
+      "15_temple-cave/backgrounds/room15a.png",
+      "15_temple-cave/backgrounds/room15-christmas.png",
+    ],
     "16-1": [
       "16_techno-temple/backgrounds/room16a.png",
       "16_techno-temple/backgrounds/room16-christmas.png",
@@ -882,7 +884,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const loadTrack = (index, autoplay) => {
     currentTrackIndex = index;
-    const [title, key] = PLAYLIST[index];
+    const [title] = PLAYLIST[index];
     audio.src = `${R2_BASE_URL}/audio/${title}.mp3`;
     audio.load();
     trackTitleEl.textContent = title;

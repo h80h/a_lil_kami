@@ -1268,22 +1268,70 @@ function createFilterControls() {
   const dropdownLabel = document.createElement("label");
   dropdownLabel.textContent = "Select Trait Category:";
   dropdownLabel.className = "dropdown-label";
-  const dropdown = document.createElement("select");
+
+  // Custom dropdown replacing native <select> for consistent styling
+  const dropdown = document.createElement("div");
   dropdown.id = "traitCategoryDropdown";
-  dropdown.className = "trait-dropdown";
-  const defaultOption = document.createElement("option");
-  defaultOption.value = "";
-  defaultOption.textContent = "-- Choose a category --";
-  dropdown.appendChild(defaultOption);
+  dropdown.className = "trait-dropdown custom-select";
+  dropdown.dataset.value = "";
+
+  const customSelected = document.createElement("div");
+  customSelected.className = "custom-select__selected";
+
+  const customSelectedText = document.createElement("span");
+  customSelectedText.textContent = "-- Choose a category --";
+
+  const customArrow = document.createElement("span");
+  customArrow.className = "custom-select__arrow";
+  customArrow.innerHTML = `<svg width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1 1L5 5L9 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+  customSelected.appendChild(customSelectedText);
+  customSelected.appendChild(customArrow);
+
+  const customOptions = document.createElement("div");
+  customOptions.className = "custom-select__options";
+
+  // Only real category options — no duplicate placeholder in the list
   Object.keys(allTraits)
     .sort()
     .forEach((traitType) => {
-      const option = document.createElement("option");
-      option.value = traitType;
-      option.textContent =
-        traitType.charAt(0).toUpperCase() + traitType.slice(1);
-      dropdown.appendChild(option);
+      const item = document.createElement("div");
+      item.className = "custom-select__option";
+      item.dataset.value = traitType;
+      item.textContent = traitType.charAt(0).toUpperCase() + traitType.slice(1);
+      customOptions.appendChild(item);
     });
+
+  dropdown.appendChild(customSelected);
+  dropdown.appendChild(customOptions);
+
+  customSelected.addEventListener("click", (e) => {
+    const isOpen = dropdown.classList.toggle("custom-select--open");
+    customOptions.style.display = isOpen ? "block" : "none";
+  });
+
+  customOptions.addEventListener("click", (e) => {
+    const item = e.target.closest(".custom-select__option");
+    if (!item) return;
+    const value = item.dataset.value;
+    dropdown.dataset.value = value;
+    customSelectedText.textContent = value
+      ? item.textContent
+      : "-- Choose a category --";
+    dropdown.classList.remove("custom-select--open");
+    customOptions.style.display = "none";
+
+    document
+      .querySelectorAll(".filter-group")
+      .forEach((group) => (group.style.display = "none"));
+    if (value) {
+      const selectedGroup = document.querySelector(
+        `.filter-group[data-trait-type="${value}"]`,
+      );
+      if (selectedGroup) selectedGroup.style.display = "block";
+    }
+  });
+
   dropdownWrapper.appendChild(dropdownLabel);
   dropdownWrapper.appendChild(dropdown);
   filterControls.appendChild(dropdownWrapper);
@@ -1384,18 +1432,6 @@ function createFilterControls() {
         filterTraitOptions(traitType, e.target.value),
       );
     });
-
-  dropdown.addEventListener("change", (e) => {
-    document
-      .querySelectorAll(".filter-group")
-      .forEach((group) => (group.style.display = "none"));
-    if (e.target.value) {
-      const selectedGroup = document.querySelector(
-        `.filter-group[data-trait-type="${e.target.value}"]`,
-      );
-      if (selectedGroup) selectedGroup.style.display = "block";
-    }
-  });
 }
 
 function filterTraitOptions(traitType, searchTerm) {
@@ -2041,6 +2077,7 @@ function displayNFT(id, showCloseButton = false) {
     }
     rankBadgeEl.addEventListener("click", (e) => {
       e.stopPropagation();
+      if (window.umami) umami.track("switch-rank");
       isShowingIngameRank = !isShowingIngameRank;
       document.querySelectorAll(".nft-card").forEach((c) => {
         const badge = c.querySelector(".rank-badge");
@@ -3169,7 +3206,14 @@ document.addEventListener("DOMContentLoaded", () => {
         .querySelectorAll(".filter-group")
         .forEach((group) => (group.style.display = "none"));
       const dropdown = document.getElementById("traitCategoryDropdown");
-      if (dropdown) dropdown.value = "";
+      if (dropdown) {
+        dropdown.dataset.value = "";
+        dropdown.classList.remove("custom-select--open");
+        const opts = dropdown.querySelector(".custom-select__options");
+        if (opts) opts.style.display = "none";
+        const txt = dropdown.querySelector(".custom-select__selected span");
+        if (txt) txt.textContent = "-- Choose a category --";
+      }
     }
   });
 
@@ -3179,9 +3223,7 @@ document.addEventListener("DOMContentLoaded", () => {
 if (!document.getElementById("enhanced-trait-styles")) {
   const styleTag = document.createElement("style");
   styleTag.id = "enhanced-trait-styles";
-  styleTag.textContent = `
-    `;
-  document.head.appendChild(styleTag);
+    document.head.appendChild(styleTag);
 
   const messageBox = document.createElement("div");
   messageBox.id = "messageBox";

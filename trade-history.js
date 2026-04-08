@@ -168,7 +168,6 @@
       if (!r.tradeTime) return latest;
       return !latest || r.tradeTime > latest ? r.tradeTime : latest;
     }, null);
-    
 
     // Explicitly sort by tradeTime descending so the newest trade is always on top
     const rows = [...records]
@@ -190,10 +189,9 @@
         const tag = r.type === "bid" ? "offer" : "sale";
         const seller = resolveAccount(r.seller);
         const buyer = resolveAccount(r.buyer);
-        const ago = tradeTime ? timeAgo(tradeTime) : null;
-        
+        const ago = r.tradeTime ? timeAgo(r.tradeTime) : null;
+
         return `
-        
         <div class="kami-history-row">
           <div class="kami-history-row-header">
             <div>${records.length} sale(s)</div>
@@ -212,9 +210,8 @@
         </div>`;
       })
       .join("");
-      
+
     return `<div class="kami-history" id="kami-history-panel">
-      
       <div class="kami-history-rows">${rows}</div>
     </div>`;
   }
@@ -235,11 +232,12 @@
     function updateScrollButtons(element) {
       if (!element) return;
       // Allow accepting either the panel itself or the parent card
-      const card = element.classList && element.classList.contains("nft-card") 
-        ? element 
-        : element.closest(".nft-card");
+      const card =
+        element.classList && element.classList.contains("nft-card")
+          ? element
+          : element.closest(".nft-card");
       if (!card) return;
-      
+
       const controls = card.querySelector(".kami-overlay-controls");
       if (!controls) return;
       const upBtn = controls.querySelector(".kami-history-up");
@@ -247,7 +245,7 @@
       if (!upBtn || !downBtn) return;
 
       const panel = card.querySelector(".kami-history-rows");
-      
+
       // If there are no history rows (e.g. "no trades yet"), force disable and exit
       if (!panel) {
         upBtn.disabled = true;
@@ -389,15 +387,16 @@
     }
 
     patchAllArrows();
-    
-    // Utilize the existing observer to debounce and sync scroll logic when script.js 
+    // Utilize the existing observer to debounce and sync scroll logic when script.js
     // asynchronously rewrites the .kami-overlay-slot innerHTML
     const _sharedArrowObserver = new MutationObserver(() => {
       patchAllArrows();
       if (_currentPage === 3) {
         clearTimeout(window.__historyScrollSyncTimer);
         window.__historyScrollSyncTimer = setTimeout(() => {
-          document.querySelectorAll(".nft-card").forEach(scheduleUpdateScrollButtons);
+          document
+            .querySelectorAll(".nft-card")
+            .forEach(scheduleUpdateScrollButtons);
         }, 50);
       }
     });
@@ -419,12 +418,6 @@
       if (++pollCount >= 20) clearInterval(poll);
     }, 200);
   }
-
-  const style = document.createElement("style");
-  style.textContent = `
-    
-  `;
-  document.head.appendChild(style);
 
   // --------------------------------------------------------
   // TRADE HISTORY FILTER
