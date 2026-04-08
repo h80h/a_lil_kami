@@ -1784,7 +1784,7 @@ button {
   top: 1px;
   font-size: 7px;
   padding: 10px 10px 15px 10px;
-  
+  font-family: 'dogica_pixelregular', monospace;
 }
 
 .wheel-label.bottom {
