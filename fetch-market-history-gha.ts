@@ -567,14 +567,14 @@ async function main() {
       fetchPreviousListings(),
       fetchPreviousHistory(),
       fetchFromR2<Cursor>(CURSOR_KEY, { nextIndex: 0, total: 0 }),
-      fetchFromR2<{ kamiAccounts?: Record<string, KamiAccount> }>("kamiBundle.json", {}),
+      fetchFromR2<{ accountIdMap?: Record<string, string> }>("kamiBundle.json", {}),
     ]);
 
     // --------------------------------------------------------
     // BACKFILL BATCH SETUP (from fetch-history-backfill-gha.ts)
     // --------------------------------------------------------
-    const accounts          = bundle.kamiAccounts ?? {};
-    const allAccountEntries = Object.values(accounts).filter(a => a.id);
+    const accountIdMap      = bundle.accountIdMap ?? {};
+    const allAccountEntries = Object.entries(accountIdMap).map(([id, name]) => ({ id, name, kamis: [] as number[] }));
     const totalAccounts     = allAccountEntries.length;
 
     console.log(`\n📍 Backfill cursor: nextIndex=${cursor.nextIndex}, total=${cursor.total}`);
