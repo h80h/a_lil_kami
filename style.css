@@ -1974,8 +1974,6 @@ button {
   .listing-time {
     font-size: 6.5px;
   }
-
-
 }
 
 @media (max-width: 796px) {
@@ -2156,16 +2154,16 @@ button {
   .kami-history-row-header {
     margin-bottom: 3px;
   }
+
+  .loader {
+    transform: translate(-50%, -50%) scale(0.4);
+  }
 }
 
 @media (max-width: 390px) {
   .kami-traits div,
   .kami-info div {
     margin-bottom: 3px;
-  }
-
-  .loader {
-    transform: translate(-50%, -50%) scale(0.35);
   }
 
   .nft-card-content {
@@ -2340,6 +2338,9 @@ button {
     gap: 20px;
   }
 
+  .loader {
+    transform: translate(-50%, -50%) scale(0.35);
+  }
 }
 
 @media (max-width: 326px) {
