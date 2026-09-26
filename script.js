@@ -2694,25 +2694,28 @@ const BASE_STATS = {
   slots: 0,
 };
 
-// Traits that share a name across categories — resolved by entity id per category.
+// Traits that share a name across categories — resolved by their stable
+// ARRAY POSITION in kamiTraitIndex (the object's own key, 1..N), not by the
+// raw "entity" field. entity is a per-session ECS counter that shifts by a
+// random constant offset every extraction run; array position does not.
 // All other traits are looked up by name alone (no ambiguity).
-const AMBIGUOUS_TRAIT_ENTITIES = {
-  "background:Blue": 151,
-  "background:Orange": 165,
-  "background:Pink": 166,
-  "background:Purple": 167,
-  "background:Yellow": 171,
-  "background:Butterfly": 172,
-  "body:Butterfly": 181,
-  "body:Drip": 185,
-  "body:Plant": 199,
-  "color:Blue": 213,
-  "color:Orange": 217,
-  "color:Pink": 218,
-  "color:Purple": 219,
-  "color:Yellow": 222,
-  "face:Drip": 247,
-  "hand:Plant": 276,
+const AMBIGUOUS_TRAIT_POSITIONS = {
+  "background:Blue": 1,
+  "background:Orange": 15,
+  "background:Pink": 16,
+  "background:Purple": 17,
+  "background:Yellow": 21,
+  "background:Butterfly": 22,
+  "body:Butterfly": 31,
+  "body:Drip": 35,
+  "body:Plant": 49,
+  "color:Blue": 63,
+  "color:Orange": 67,
+  "color:Pink": 68,
+  "color:Purple": 69,
+  "color:Yellow": 72,
+  "face:Drip": 97,
+  "hand:Plant": 126,
 };
 
 function buildTraitNameToIndex() {
@@ -2725,21 +2728,14 @@ function buildTraitNameToIndex() {
   return lookup;
 }
 
-// Entity id → entry map, built once alongside traitNameToIndex
-let traitEntityToIndex = {};
-function buildTraitEntityToIndex() {
-  const lookup = {};
-  Object.values(kamiTraitIndexData).forEach((entry) => {
-    lookup[entry.entity] = entry;
-  });
-  return lookup;
-}
+// kamiTraitIndexData is ALREADY keyed 1..N by that same stable position
+// (see extract-kamigotchi-gha.js), so there's no need to rebuild a lookup by
+// entity id anymore — just keep a reference under a clearer name.
+let traitIndexByPosition = {};
 
-// Resolve a trait entry given its category slot and name.
-// Ambiguous names are routed to the correct entity; all others fall back to name lookup.
 function lookupTrait(category, name) {
-  const entityId = AMBIGUOUS_TRAIT_ENTITIES[`${category}:${name}`];
-  if (entityId !== undefined) return traitEntityToIndex[entityId];
+  const position = AMBIGUOUS_TRAIT_POSITIONS[`${category}:${name}`];
+  if (position !== undefined) return traitIndexByPosition[position];
   return traitNameToIndex[name];
 }
 
@@ -2763,8 +2759,8 @@ function calculateKamiStats() {
 
 function processLoadedData() {
   traitNameToIndex = buildTraitNameToIndex();
-  traitEntityToIndex = buildTraitEntityToIndex();
-  kamiTraitIndexData = null; // free — lookup tables are now the source of truth
+  traitIndexByPosition = kamiTraitIndexData; // just a rename — already keyed by position
+  kamiTraitIndexData = null; // the old name is freed; data lives on via traitIndexByPosition
   totalNFTsCount = Object.keys(traitsData).length;
   kamiStatsData = calculateKamiStats();
   affinityData = extractAffinityData();
