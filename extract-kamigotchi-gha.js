@@ -156,20 +156,14 @@ async function fetchPreviousMetadata() {
     const response = await r2Client.send(command);
     const body = await response.Body.transformToString();
     const bundle = JSON.parse(body);
-    return (
-      bundle.kamiMetadata || {
-        previousMaxId: null,
-        isFirstRun: true,
-        kamiNewWindow: {},
-      }
-    );
+    return bundle.kamiMetadata || { totalCount: null };
   } catch (error) {
     // Genuine first run (bucket empty) — safe to continue with defaults
     if (error.name === "NoSuchKey" || error.$metadata?.httpStatusCode === 404) {
       console.log(
         "   ⏭️  No existing kamiBundle.json found — treating as first run",
       );
-      return { previousMaxId: null, isFirstRun: true, kamiNewWindow: {} };
+      return { totalCount: null };
     }
     // Any other R2 error (network flake, auth, etc.) — abort to protect existing data
     throw new Error(`R2 read failed for kamiBundle.json: ${error.message}`);
@@ -471,53 +465,10 @@ async function runExtraction() {
     const wildKamiOwners =
       wildSet.length > 0 ? await resolveWildOwners(wildSet, accountHexMap) : {};
 
-    // Check for new Kamigotchi
-    console.log("\n📋 Checking for new Kamigotchi...");
+    // Fetch previous metadata (used for the sanity guard below)
     const previousMetadata = await fetchPreviousMetadata();
-    const isFirstRun = previousMetadata.previousMaxId === null;
 
     const allIds = Object.keys(imageMap).map(Number);
-    const currentMaxId = Math.max(...allIds);
-    const newKamiIds = allIds.filter(
-      (id) => id > (previousMetadata.previousMaxId || 0),
-    );
-    const hasNewKami = newKamiIds.length > 0 || isFirstRun;
-
-    if (isFirstRun) {
-      console.log(
-        `🆕 First run - establishing baseline (max ID: ${currentMaxId})`,
-      );
-    } else if (hasNewKami) {
-      console.log(`🆕 NEW Kamigotchi detected: ${newKamiIds.length}`);
-      console.log(`   IDs: ${newKamiIds.sort((a, b) => a - b).join(", ")}`);
-      console.log(
-        `   Previous max: ${previousMetadata.previousMaxId} → Current max: ${currentMaxId}`,
-      );
-    } else {
-      console.log(`💤 No new Kamigotchi (still at max ID: ${currentMaxId})`);
-    }
-
-    // New-window tracking: each newly discovered ID enters kamiNewWindow with 13 runs remaining.
-    // Every run decrements all counters; IDs reaching 0 are removed (~1 hour at 5-min intervals).
-    const NEW_WINDOW_RUNS = 13;
-    const prevWindow = previousMetadata.kamiNewWindow || {};
-
-    const updatedWindow = {};
-    for (const [id, remaining] of Object.entries(prevWindow)) {
-      const next = remaining - 1;
-      if (next > 0) updatedWindow[id] = next;
-    }
-
-    // Skip on first run — everything would be "new" otherwise
-    if (!isFirstRun) {
-      for (const id of newKamiIds) {
-        updatedWindow[id] = NEW_WINDOW_RUNS;
-      }
-    }
-
-    console.log(
-      `⏱️  IDs in new-window: ${Object.keys(updatedWindow).length > 0 ? Object.keys(updatedWindow).join(", ") : "none"}`,
-    );
 
     const bundle = {
       kamiImage: imageMap,
@@ -530,9 +481,6 @@ async function runExtraction() {
       wildKamiOwners: wildKamiOwners,
       kamiMetadata: {
         lastUpdate: new Date().toISOString(),
-        previousMaxId: currentMaxId,
-        newKamiIds: newKamiIds.sort((a, b) => a - b),
-        kamiNewWindow: updatedWindow,
         totalCount: allIds.length,
         extractionDuration: Math.round((Date.now() - startTime) / 1000),
         mintPrice: prices.mintPrice,
@@ -542,7 +490,6 @@ async function runExtraction() {
 
     const slimMeta = {
       lastUpdate: bundle.kamiMetadata.lastUpdate,
-      kamiNewWindow: bundle.kamiMetadata.kamiNewWindow,
       totalCount: bundle.kamiMetadata.totalCount,
       accountIdMap,
     };
@@ -550,7 +497,7 @@ async function runExtraction() {
     // ─── SANITY GUARD ─────────────────────────────────────────────────────────
     // If we fetched significantly fewer Kamis than last time, something went wrong
     // during extraction (site flake, early exit, etc.). Abort to protect R2 data.
-    if (!isFirstRun && previousMetadata.totalCount) {
+    if (previousMetadata.totalCount) {
       const DROP_THRESHOLD = 0.9; // allow up to 10% drop (e.g. kami burned/removed)
       if (allIds.length < previousMetadata.totalCount * DROP_THRESHOLD) {
         throw new Error(

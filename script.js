@@ -1937,12 +1937,6 @@ function displayNFT(id, showCloseButton = false) {
   const score = rarityData ? rarityData.score.toFixed(4) : "?";
   const isTied = rarityData ? rarityData.isTied : false;
 
-  const isNew =
-    metadataInfo.kamiNewWindow &&
-    Object.prototype.hasOwnProperty.call(
-      metadataInfo.kamiNewWindow,
-      String(id),
-    );
   const isClone = traitSignatures.cloneIds.has(id);
   const isSacrificed = sacrificedNFTs.has(String(id));
   const isWild = wildNFTs.has(String(id));
@@ -1974,9 +1968,6 @@ function displayNFT(id, showCloseButton = false) {
 
   const closeButtonHTML = showCloseButton
     ? `<button class="close-btn" onclick="removeSelectedID('${id}')" title="Remove this Kamigotchi">×</button>`
-    : "";
-  const newBadgeHTML = isNew
-    ? `<div class="new-badge" title="Recently Added!">NEW</div>`
     : "";
   const cloneBadgeHTML = isClone
     ? `<div class="clone-badge" title="This Kamigotchi has identical traits to others">CLONE</div>`
@@ -2017,7 +2008,6 @@ function displayNFT(id, showCloseButton = false) {
         <div class="rank-stat-container">
             <div class="rank-badge ${rankClass}" title="${rankTooltip}">${rank}</div>
             ${statColorHTML}
-            ${newBadgeHTML}
             ${cloneBadgeHTML}
         </div>`;
 
@@ -2475,31 +2465,7 @@ function getSignificantListingsHash(listingsData) {
 
 function getSignificantMetaHash(meta) {
   return JSON.stringify({
-    kamiNewWindow: meta.kamiNewWindow,
     totalCount: meta.totalCount,
-  });
-}
-
-function patchNewBadges(newWindow) {
-  metadataInfo.kamiNewWindow = newWindow;
-  document.querySelectorAll(".nft-card").forEach((card) => {
-    const id = card.dataset.nftId;
-    const rankStatContainer = card.querySelector(".rank-stat-container");
-    if (!rankStatContainer) return;
-    const shouldHave = Object.prototype.hasOwnProperty.call(
-      newWindow,
-      String(id),
-    );
-    const existing = rankStatContainer.querySelector(".new-badge");
-    if (shouldHave && !existing) {
-      const badge = document.createElement("div");
-      badge.className = "new-badge";
-      badge.title = "Recently Added!";
-      badge.textContent = "NEW";
-      rankStatContainer.appendChild(badge);
-    } else if (!shouldHave && existing) {
-      existing.remove();
-    }
   });
 }
 
@@ -2602,18 +2568,13 @@ async function checkForUpdates() {
       const newMeta = await metaRes.json();
 
       const countChanged = newMeta.totalCount !== metadataInfo.totalCount;
-      const windowChanged =
-        JSON.stringify(newMeta.kamiNewWindow) !==
-        JSON.stringify(metadataInfo.kamiNewWindow);
       const newAccountsHash = JSON.stringify(newMeta.accountIdMap ?? {});
       const accountsChanged =
         cachedAccountsHash && newAccountsHash !== cachedAccountsHash;
 
       if (countChanged) {
-        console.log("🆕 New Kamigotchi detected, refreshing all data...");
+        console.log("🔢 Kamigotchi count changed, refreshing all data...");
         shouldRefresh = true;
-      } else if (windowChanged && !shouldRefresh) {
-        patchNewBadges(newMeta.kamiNewWindow);
       }
 
       // Ownership changes require a full bundle refresh — kamiMeta.json no longer
@@ -2664,7 +2625,7 @@ async function fetchAndSplitBundle(v) {
   bundle.kamiTraits = null;
   kamiTraitIndexData = bundle.kamiTraitIndex || {};
   bundle.kamiTraitIndex = null;
-  metadataInfo = bundle.kamiMetadata || { newKamiIds: [] };
+  metadataInfo = bundle.kamiMetadata || {};
   bundle.kamiMetadata = null;
   kamiInfoData = bundle.kamiInfo || {};
   bundle.kamiInfo = null;
@@ -2818,11 +2779,6 @@ async function loadData() {
     ]);
     await loadKamiInfoData(v);
 
-    if (metadataInfo.newKamiIds?.length > 0) {
-      console.log(`✨ Found ${metadataInfo.newKamiIds.length} new Kamigotchi!`);
-      console.log(`   New IDs: ${metadataInfo.newKamiIds.join(", ")}`);
-    }
-
     const mintPriceEl = document.getElementById("mint-price");
     const rerollPriceEl = document.getElementById("reroll-price");
     if (mintPriceEl && metadataInfo.mintPrice != null)
@@ -2959,11 +2915,6 @@ async function refreshData() {
     ]);
 
     await loadKamiInfoData(v);
-
-    if (metadataInfo.newKamiIds?.length > 0) {
-      console.log(`✨ Found ${metadataInfo.newKamiIds.length} new Kamigotchi!`);
-      console.log(`   New IDs: ${metadataInfo.newKamiIds.join(", ")}`);
-    }
 
     const mintPriceEl = document.getElementById("mint-price");
     const rerollPriceEl = document.getElementById("reroll-price");
@@ -3216,7 +3167,7 @@ document.addEventListener("DOMContentLoaded", () => {
 if (!document.getElementById("enhanced-trait-styles")) {
   const styleTag = document.createElement("style");
   styleTag.id = "enhanced-trait-styles";
-    document.head.appendChild(styleTag);
+  document.head.appendChild(styleTag);
 
   const messageBox = document.createElement("div");
   messageBox.id = "messageBox";
